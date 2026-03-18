@@ -1,0 +1,98 @@
+[gd_scene format=3 uid="uid://basy0qkxblg2m"]
+
+[ext_resource type="Script" uid="uid://dk22ixmn3cmrb" path="res://CustomNodes/ExpandableButton/expandable_button.gd" id="1_vlimd"]
+[ext_resource type="Texture2D" uid="uid://bdblvy7bf8xgn" path="res://resources/Images/BasicImages/PointerRight.png" id="2_vlimd"]
+[ext_resource type="SystemFont" uid="uid://fue8lb1oipxq" path="res://resources/fonts/MainFont.tres" id="4_xrkke"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_bb450"]
+font = ExtResource("4_xrkke")
+font_size = 12
+
+[node name="VBoxContainer2" type="VBoxContainer" unique_id=1839611753]
+offset_right = 200.0
+offset_bottom = 29.0
+script = ExtResource("1_vlimd")
+
+[node name="Panel" type="Panel" parent="." unique_id=313381979]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Panel" unique_id=268927640]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.02
+anchor_top = 0.1249471
+anchor_right = 0.9800001
+anchor_bottom = 0.875053
+offset_top = -0.0094304085
+offset_right = -1.5258789e-05
+offset_bottom = 0.009429932
+grow_horizontal = 2
+grow_vertical = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="ExpandableIconButton" type="Button" parent="Panel/HBoxContainer" unique_id=997974806]
+custom_minimum_size = Vector2(10, 0)
+layout_mode = 2
+flat = true
+expand_icon = true
+
+[node name="ExpandableIcon" type="TextureRect" parent="Panel/HBoxContainer/ExpandableIconButton" unique_id=1125638604]
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_top = -5.1142473
+offset_bottom = 5.1142473
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_vlimd")
+expand_mode = 1
+
+[node name="MainIcon" type="TextureRect" parent="Panel/HBoxContainer" unique_id=1256922798]
+layout_mode = 2
+expand_mode = 3
+
+[node name="Text" type="Label" parent="Panel/HBoxContainer" unique_id=98671710]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "aab"
+label_settings = SubResource("LabelSettings_bb450")
+
+[node name="MainButton" type="Button" parent="Panel" unique_id=233225735]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+metadata/_edit_use_anchors_ = true
+
+[node name="CoverColorRect" type="ColorRect" parent="Panel" unique_id=18146638]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 0.05)
+
+[node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=1461148724]
+layout_mode = 2
+
+[node name="indent" type="Control" parent="HBoxContainer" unique_id=1017436973]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+
+[node name="ChildrenContainer" type="VBoxContainer" parent="HBoxContainer" unique_id=188769414]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0

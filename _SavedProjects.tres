@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="ProjectManagerSavedProjects" format=3]
+
+[ext_resource type="Script" path="res://scripts/resources/ProjectManagerSavedProjects.gd" id="1_ted65"]
+
+[resource]
+script = ExtResource("1_ted65")
+project_paths = Array[String](["C:/Users/User1/Documents/GodotProjects/Dylan is fat", "C:/Users/User1/Documents/GodotProjects/New Project()"])
+metadata/_custom_type_script = "uid://dfyq2iv2d23mq"

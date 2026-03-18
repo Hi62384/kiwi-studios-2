@@ -1,0 +1,168 @@
+[gd_scene format=3 uid="uid://xv8x7agkjvnl"]
+
+[ext_resource type="Script" uid="uid://dk22ixmn3cmrb" path="res://CustomNodes/ExpandableButton/expandable_button.gd" id="1_18wxj"]
+[ext_resource type="Texture2D" uid="uid://h5xgw3ns54ys" path="res://resources/Images/ToolImages/FolderColored.png" id="2_mhm32"]
+[ext_resource type="SystemFont" uid="uid://fue8lb1oipxq" path="res://resources/fonts/MainFont.tres" id="3_6nsq2"]
+[ext_resource type="StyleBox" uid="uid://ck4h6q1rp4uqc" path="res://resources/StyleBoxes/Default.tres" id="4_7wi11"]
+[ext_resource type="Texture2D" uid="uid://ciadauk2mpudq" path="res://resources/Images/BasicImages/PointerDown.png" id="5_o5lkt"]
+[ext_resource type="PackedScene" uid="uid://basy0qkxblg2m" path="res://CustomNodes/ExpandableButton/ExpandableButton.tscn" id="6_jrhfm"]
+[ext_resource type="Texture2D" uid="uid://mwmlqweqemfk" path="res://resources/Images/ToolImages/FileColored.png" id="7_o6gfd"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_ft6cd"]
+font = ExtResource("3_6nsq2")
+font_size = 12
+
+[node name="VBoxContainer2" type="VBoxContainer" unique_id=1839611753]
+offset_right = 200.0
+offset_bottom = 29.0
+script = ExtResource("1_18wxj")
+expanded = true
+icon = ExtResource("2_mhm32")
+text = "New Project()"
+label_settings = SubResource("LabelSettings_ft6cd")
+panel_stylebox = ExtResource("4_7wi11")
+
+[node name="Panel" type="Panel" parent="." unique_id=313381979]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = ExtResource("4_7wi11")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Panel" unique_id=268927640]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.02
+anchor_top = 0.1249471
+anchor_right = 0.9800001
+anchor_bottom = 0.875053
+offset_top = -0.0094304085
+offset_right = -1.5258789e-05
+offset_bottom = 0.009429932
+grow_horizontal = 2
+grow_vertical = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="ExpandableIconButton" type="Button" parent="Panel/HBoxContainer" unique_id=997974806]
+custom_minimum_size = Vector2(10, 0)
+layout_mode = 2
+flat = true
+expand_icon = true
+
+[node name="ExpandableIcon" type="TextureRect" parent="Panel/HBoxContainer/ExpandableIconButton" unique_id=1125638604]
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_top = -5.1142473
+offset_bottom = 5.1142473
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("5_o5lkt")
+expand_mode = 1
+
+[node name="MainIcon" type="TextureRect" parent="Panel/HBoxContainer" unique_id=1256922798]
+layout_mode = 2
+texture = ExtResource("2_mhm32")
+expand_mode = 3
+
+[node name="Text" type="Label" parent="Panel/HBoxContainer" unique_id=98671710]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "New Project()"
+label_settings = SubResource("LabelSettings_ft6cd")
+clip_text = true
+
+[node name="MainButton" type="Button" parent="Panel" unique_id=233225735]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true
+metadata/_edit_use_anchors_ = true
+
+[node name="CoverColorRect" type="ColorRect" parent="Panel" unique_id=18146638]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 0.05)
+
+[node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=1461148724]
+layout_mode = 2
+
+[node name="indent" type="Control" parent="HBoxContainer" unique_id=1017436973]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+
+[node name="ChildrenContainer" type="VBoxContainer" parent="HBoxContainer" unique_id=188769414]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
+
+[node name="VBoxContainer2" parent="HBoxContainer/ChildrenContainer" unique_id=1436982816 instance=ExtResource("6_jrhfm")]
+layout_mode = 2
+expanded = true
+icon = ExtResource("2_mhm32")
+text = ".proj"
+label_settings = SubResource("LabelSettings_ft6cd")
+panel_stylebox = ExtResource("4_7wi11")
+
+[node name="_VBoxContainer_153" parent="HBoxContainer/ChildrenContainer" unique_id=878759414 instance=ExtResource("6_jrhfm")]
+layout_mode = 2
+expanded = true
+icon = ExtResource("2_mhm32")
+text = "A"
+label_settings = SubResource("LabelSettings_ft6cd")
+panel_stylebox = ExtResource("4_7wi11")
+
+[node name="_VBoxContainer_165" parent="HBoxContainer/ChildrenContainer" unique_id=1475192740 instance=ExtResource("6_jrhfm")]
+layout_mode = 2
+expanded = true
+icon = ExtResource("2_mhm32")
+text = "B"
+label_settings = SubResource("LabelSettings_ft6cd")
+panel_stylebox = ExtResource("4_7wi11")
+
+[node name="_VBoxContainer_166" parent="HBoxContainer/ChildrenContainer" unique_id=352960868 instance=ExtResource("6_jrhfm")]
+layout_mode = 2
+icon = ExtResource("2_mhm32")
+text = "New folder"
+label_settings = SubResource("LabelSettings_ft6cd")
+panel_stylebox = ExtResource("4_7wi11")
+
+[node name="_VBoxContainer_167" parent="HBoxContainer/ChildrenContainer" unique_id=1374548236 instance=ExtResource("6_jrhfm")]
+layout_mode = 2
+icon = ExtResource("7_o6gfd")
+text = "DAS.txt"
+label_settings = SubResource("LabelSettings_ft6cd")
+panel_stylebox = ExtResource("4_7wi11")
+
+[node name="_VBoxContainer_168" parent="HBoxContainer/ChildrenContainer" unique_id=821698173 instance=ExtResource("6_jrhfm")]
+layout_mode = 2
+icon = ExtResource("7_o6gfd")
+text = "New Text Document.txt"
+label_settings = SubResource("LabelSettings_ft6cd")
+panel_stylebox = ExtResource("4_7wi11")
+
+[node name="_VBoxContainer_169" parent="HBoxContainer/ChildrenContainer" unique_id=1397088932 instance=ExtResource("6_jrhfm")]
+layout_mode = 2
+icon = ExtResource("7_o6gfd")
+text = "a.txt"
+label_settings = SubResource("LabelSettings_ft6cd")
+panel_stylebox = ExtResource("4_7wi11")
+
+[node name="_VBoxContainer_170" parent="HBoxContainer/ChildrenContainer" unique_id=1783441026 instance=ExtResource("6_jrhfm")]
+layout_mode = 2
+icon = ExtResource("7_o6gfd")
+text = "b.txt"
+label_settings = SubResource("LabelSettings_ft6cd")
+panel_stylebox = ExtResource("4_7wi11")

@@ -1,0 +1,738 @@
+[gd_scene format=3 uid="uid://bsbaem286ksho"]
+
+[ext_resource type="Script" uid="uid://cimwjbgwqiug0" path="res://scenes/ProjectManager/project_manager_ui.gd" id="1_bpdik"]
+[ext_resource type="Texture2D" uid="uid://b8lxo8dn1ahk4" path="res://resources/Images/Logos/KiwiStudiosLogo.png" id="1_e2h8r"]
+[ext_resource type="StyleBox" uid="uid://ck4h6q1rp4uqc" path="res://resources/StyleBoxes/Default.tres" id="2_gt6lk"]
+[ext_resource type="SystemFont" uid="uid://bwdt8qysdchp6" path="res://resources/fonts/ReemKufi.tres" id="3_qjc1s"]
+[ext_resource type="Texture2D" uid="uid://8vmiy3qcy1nq" path="res://resources/Images/BasicImages/Plus.png" id="4_bpdik"]
+[ext_resource type="Texture2D" uid="uid://cd70en77xwt7j" path="res://resources/Images/ToolImages/Folder.png" id="5_vhhin"]
+[ext_resource type="Texture2D" uid="uid://cmcyfn1jn63sc" path="res://resources/Images/ToolImages/Rename.png" id="6_48h6g"]
+[ext_resource type="Texture2D" uid="uid://clq7w7fh0dkga" path="res://resources/Images/ToolImages/Spyglass.png" id="6_gt6lk"]
+[ext_resource type="Texture2D" uid="uid://cqwv3phf7hbob" path="res://resources/Images/ToolImages/Copy.png" id="7_j4n8e"]
+[ext_resource type="StyleBox" uid="uid://bwq7q8kmumxnk" path="res://resources/StyleBoxes/button.tres" id="7_jak7c"]
+[ext_resource type="Texture2D" uid="uid://b25d122d020e7" path="res://resources/Images/ToolImages/TrashCan.png" id="8_bqi65"]
+[ext_resource type="Script" uid="uid://d3wgvbquosu7f" path="res://scenes/ProjectManager/project_manager.gd" id="11_vhhin"]
+[ext_resource type="Script" uid="uid://mrvy57bp00j6" path="res://scenes/ProjectManager/create_project_panel.gd" id="12_fhdkl"]
+[ext_resource type="Texture2D" uid="uid://dbllu7xvhjcej" path="res://resources/Images/BasicImages/X.png" id="12_vhhin"]
+[ext_resource type="Script" uid="uid://cbwugyqv7rtpg" path="res://scripts/Extra/DialogParamChooser/dialog_param_chooser_mapping.gd" id="13_1p5a0"]
+[ext_resource type="Script" uid="uid://cpbb83r3o2iah" path="res://scripts/Extra/DialogParamChooser/dialog_param_chooser.gd" id="15_1p5a0"]
+[ext_resource type="Script" uid="uid://bajqf1yngp3i0" path="res://scenes/ProjectManager/duplicate_project_panel.gd" id="15_jak7c"]
+[ext_resource type="Script" uid="uid://bp8vr2c67fsky" path="res://scenes/ProjectManager/delete_project_panel.gd" id="16_v7rjq"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mg8ax"]
+bg_color = Color(0.2020233, 0.21845171, 0.28642842, 1)
+expand_margin_top = 1.0
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_bpdik"]
+
+[sub_resource type="Resource" id="Resource_jak7c"]
+script = ExtResource("13_1p5a0")
+node = NodePath("VBoxContainer/LineEdit")
+property_name = "text"
+tag = "ProjectName"
+metadata/_custom_type_script = "uid://cbwugyqv7rtpg"
+
+[sub_resource type="Resource" id="Resource_v7rjq"]
+script = ExtResource("13_1p5a0")
+node = NodePath("VBoxContainer/HBoxContainer3/LineEdit2")
+property_name = "text"
+tag = "DirectorySavePath"
+metadata/_custom_type_script = "uid://cbwugyqv7rtpg"
+
+[sub_resource type="LabelSettings" id="LabelSettings_48h6g"]
+font = ExtResource("3_qjc1s")
+font_size = 24
+
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_vhhin"]
+color = Color(0.16513005, 0.17298183, 0.2230835, 1)
+thickness = 2
+
+[sub_resource type="LabelSettings" id="LabelSettings_vhhin"]
+font = ExtResource("3_qjc1s")
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_vhhin"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_48h6g"]
+
+[sub_resource type="DPITexture" id="DPITexture_vhhin"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"32\" height=\"16\"><g fill-opacity=\".5\"><rect width=\"30\" height=\"14\" x=\"1\" y=\"1\" fill=\"#1a1a1a\" rx=\"7\"/><circle cx=\"8\" cy=\"8\" r=\"5\" fill=\"#fff\"/></g></svg>
+"
+
+[sub_resource type="Resource" id="Resource_6ohh5"]
+script = ExtResource("13_1p5a0")
+node = NodePath("VBoxContainer/LineEdit")
+property_name = "text"
+tag = "NewProjectName"
+metadata/_custom_type_script = "uid://cbwugyqv7rtpg"
+
+[sub_resource type="Resource" id="Resource_1p5a0"]
+script = ExtResource("13_1p5a0")
+node = NodePath("VBoxContainer/LineEdit")
+property_name = "text"
+tag = "ProjectName"
+metadata/_custom_type_script = "uid://cbwugyqv7rtpg"
+
+[sub_resource type="Resource" id="Resource_wo5f6"]
+script = ExtResource("13_1p5a0")
+node = NodePath("VBoxContainer/HBoxContainer3/LineEdit2")
+property_name = "text"
+tag = "SavePath"
+metadata/_custom_type_script = "uid://cbwugyqv7rtpg"
+
+[sub_resource type="LabelSettings" id="LabelSettings_j4n8e"]
+font = ExtResource("3_qjc1s")
+font_size = 20
+
+[node name="ProjectManager" type="Control" unique_id=2114678636]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_bpdik")
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=1177543752]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.13283548, 0.15270954, 0.17392337, 1)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ColorRect" unique_id=182508565]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TextureRect" type="TextureRect" parent="ColorRect/VBoxContainer" unique_id=515238429]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+texture = ExtResource("1_e2h8r")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="HSeparator" type="HSeparator" parent="ColorRect/VBoxContainer" unique_id=41154103]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxFlat_mg8ax")
+
+[node name="Panel" type="Panel" parent="ColorRect/VBoxContainer" unique_id=959214369]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_styles/panel = ExtResource("2_gt6lk")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="ColorRect/VBoxContainer/Panel" unique_id=1096201201]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.0078125
+anchor_top = 0.15
+anchor_right = 0.9921875
+anchor_bottom = 0.85
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+metadata/_edit_use_anchors_ = true
+
+[node name="CreateProjectButton" type="Button" parent="ColorRect/VBoxContainer/Panel/HBoxContainer" unique_id=111500654]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_qjc1s")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("7_jak7c")
+text = "        Create"
+
+[node name="TextureRect" type="TextureRect" parent="ColorRect/VBoxContainer/Panel/HBoxContainer/CreateProjectButton" unique_id=1655842441]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.061206892
+anchor_top = 0.14057972
+anchor_right = 0.21544
+anchor_bottom = 0.82608694
+offset_right = -0.08800125
+texture = ExtResource("4_bpdik")
+expand_mode = 1
+metadata/_edit_use_anchors_ = true
+
+[node name="OpenProjectButton" type="Button" parent="ColorRect/VBoxContainer/Panel/HBoxContainer" unique_id=1609394722]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_qjc1s")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("7_jak7c")
+text = "        Import"
+
+[node name="TextureRect" type="TextureRect" parent="ColorRect/VBoxContainer/Panel/HBoxContainer/OpenProjectButton" unique_id=2119030113]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.06
+anchor_top = 0.25
+anchor_right = 0.20044
+anchor_bottom = 0.7166667
+offset_right = -0.08800125
+texture = ExtResource("5_vhhin")
+expand_mode = 1
+metadata/_edit_use_anchors_ = true
+
+[node name="FilterProjectLineEdit" type="LineEdit" parent="ColorRect/VBoxContainer/Panel/HBoxContainer" unique_id=1726368025]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(480, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_qjc1s")
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = ExtResource("7_jak7c")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_bpdik")
+placeholder_text = "Filter Projects"
+
+[node name="TextureRect" type="TextureRect" parent="ColorRect/VBoxContainer/Panel/HBoxContainer/FilterProjectLineEdit" unique_id=2020491085]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.90625
+anchor_top = 0.1521739
+anchor_right = 0.98066264
+anchor_bottom = 0.8594203
+offset_right = -0.08800125
+texture = ExtResource("6_gt6lk")
+expand_mode = 1
+metadata/_edit_use_anchors_ = true
+
+[node name="HBoxContainer" type="HBoxContainer" parent="ColorRect/VBoxContainer" unique_id=853263729]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Panel" type="Panel" parent="ColorRect/VBoxContainer/HBoxContainer" unique_id=1835954654]
+custom_minimum_size = Vector2(900, 0)
+layout_mode = 2
+theme_override_styles/panel = ExtResource("2_gt6lk")
+
+[node name="ScrollContainer" type="ScrollContainer" parent="ColorRect/VBoxContainer/HBoxContainer/Panel" unique_id=395251304]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.012222222
+anchor_top = 0.026422765
+anchor_right = 0.98777777
+anchor_bottom = 0.97357726
+grow_horizontal = 2
+grow_vertical = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="ProjectDisplayContainer" type="VBoxContainer" parent="ColorRect/VBoxContainer/HBoxContainer/Panel/ScrollContainer" unique_id=1227279772]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="Panel2" type="Panel" parent="ColorRect/VBoxContainer/HBoxContainer" unique_id=449869625]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = ExtResource("2_gt6lk")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ColorRect/VBoxContainer/HBoxContainer/Panel2" unique_id=240153187]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.032258064
+anchor_top = 0.014227643
+anchor_right = 0.9677419
+anchor_bottom = 0.9857724
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+metadata/_edit_use_anchors_ = true
+
+[node name="RenameProjectButton" type="Button" parent="ColorRect/VBoxContainer/HBoxContainer/Panel2/VBoxContainer" unique_id=468215959]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_qjc1s")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("7_jak7c")
+text = "            Rename"
+expand_icon = true
+
+[node name="TextureRect" type="TextureRect" parent="ColorRect/VBoxContainer/HBoxContainer/Panel2/VBoxContainer/RenameProjectButton" unique_id=2050901979]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.038793102
+anchor_top = 0.25
+anchor_right = 0.038793102
+anchor_bottom = 0.717
+offset_right = 33.0
+offset_bottom = -0.020000458
+texture = ExtResource("6_48h6g")
+expand_mode = 1
+metadata/_edit_use_anchors_ = true
+
+[node name="DuplicateProjectButton" type="Button" parent="ColorRect/VBoxContainer/HBoxContainer/Panel2/VBoxContainer" unique_id=1392990096]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_qjc1s")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("7_jak7c")
+text = "            Duplicate"
+
+[node name="TextureRect" type="TextureRect" parent="ColorRect/VBoxContainer/HBoxContainer/Panel2/VBoxContainer/DuplicateProjectButton" unique_id=1466486127]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.038793102
+anchor_top = 0.25
+anchor_right = 0.038793102
+anchor_bottom = 0.717
+offset_right = 33.0
+offset_bottom = -0.020000458
+texture = ExtResource("7_j4n8e")
+expand_mode = 1
+metadata/_edit_use_anchors_ = true
+
+[node name="RemoveProjectButton" type="Button" parent="ColorRect/VBoxContainer/HBoxContainer/Panel2/VBoxContainer" unique_id=2125994073]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_qjc1s")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("7_jak7c")
+text = "            Remove"
+
+[node name="TextureRect" type="TextureRect" parent="ColorRect/VBoxContainer/HBoxContainer/Panel2/VBoxContainer/RemoveProjectButton" unique_id=1366647738]
+modulate = Color(0.6812531, 2.7434528e-06, 4.813075e-07, 1)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.06896552
+anchor_top = 0.25
+anchor_right = 0.06896552
+anchor_bottom = 0.717
+offset_right = 19.0
+offset_bottom = -0.020000458
+texture = ExtResource("8_bqi65")
+expand_mode = 1
+metadata/_edit_use_anchors_ = true
+
+[node name="OpenInFileManagerButton" type="Button" parent="ColorRect/VBoxContainer/HBoxContainer/Panel2/VBoxContainer" unique_id=1969969497]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_qjc1s")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("7_jak7c")
+text = "                Open Location"
+
+[node name="TextureRect" type="TextureRect" parent="ColorRect/VBoxContainer/HBoxContainer/Panel2/VBoxContainer/OpenInFileManagerButton" unique_id=2117538791]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.06896552
+anchor_top = 0.25
+anchor_right = 0.06896552
+anchor_bottom = 0.717
+offset_right = 30.0
+offset_bottom = -0.020000458
+texture = ExtResource("5_vhhin")
+expand_mode = 1
+
+[node name="ProjectManager" type="Node" parent="." unique_id=2072369313]
+unique_name_in_owner = true
+script = ExtResource("11_vhhin")
+
+[node name="ScreenCover" type="ColorRect" parent="." unique_id=1967990564]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.69803923)
+
+[node name="CreateProjectPanel" type="Panel" parent="." unique_id=1004604970 node_paths=PackedStringArray("close_button", "select_button")]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -164.0
+offset_top = -141.0
+offset_right = 164.0
+offset_bottom = 141.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = ExtResource("2_gt6lk")
+script = ExtResource("12_fhdkl")
+close_button = NodePath("VBoxContainer/HBoxContainer/Button")
+select_button = NodePath("VBoxContainer/CreateProjectButton")
+mappings = Array[ExtResource("13_1p5a0")]([SubResource("Resource_jak7c"), SubResource("Resource_v7rjq")])
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CreateProjectPanel" unique_id=840404661]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.018518519
+anchor_top = 0.021951219
+anchor_right = 0.9814815
+anchor_bottom = 0.9780488
+grow_horizontal = 2
+grow_vertical = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="HBoxContainer" type="HBoxContainer" parent="CreateProjectPanel/VBoxContainer" unique_id=876224724]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="CreateProjectPanel/VBoxContainer/HBoxContainer" unique_id=1740957757]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Create Project"
+label_settings = SubResource("LabelSettings_48h6g")
+horizontal_alignment = 1
+
+[node name="Button" type="Button" parent="CreateProjectPanel/VBoxContainer/HBoxContainer" unique_id=624511768]
+modulate = Color(1, 0, 0, 1)
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+icon = ExtResource("12_vhhin")
+flat = true
+expand_icon = true
+
+[node name="HSeparator" type="HSeparator" parent="CreateProjectPanel/VBoxContainer" unique_id=1586753261]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_vhhin")
+
+[node name="Label" type="Label" parent="CreateProjectPanel/VBoxContainer" unique_id=1880318802]
+layout_mode = 2
+text = "Project Name:"
+label_settings = SubResource("LabelSettings_vhhin")
+
+[node name="LineEdit" type="LineEdit" parent="CreateProjectPanel/VBoxContainer" unique_id=1743351164]
+layout_mode = 2
+theme_override_styles/normal = ExtResource("7_jak7c")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_vhhin")
+text = "New Project()"
+
+[node name="Label2" type="Label" parent="CreateProjectPanel/VBoxContainer" unique_id=282688519]
+layout_mode = 2
+text = "Directory Save Path:"
+label_settings = SubResource("LabelSettings_vhhin")
+
+[node name="HBoxContainer3" type="HBoxContainer" parent="CreateProjectPanel/VBoxContainer" unique_id=2023967717]
+custom_minimum_size = Vector2(0, 31)
+layout_mode = 2
+
+[node name="LineEdit2" type="LineEdit" parent="CreateProjectPanel/VBoxContainer/HBoxContainer3" unique_id=1625780934]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+theme_override_styles/normal = ExtResource("7_jak7c")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_vhhin")
+text = "Path/to/dir"
+
+[node name="Button" type="Button" parent="CreateProjectPanel/VBoxContainer/HBoxContainer3" unique_id=2080138139]
+custom_minimum_size = Vector2(31, 0)
+layout_mode = 2
+icon = ExtResource("5_vhhin")
+flat = true
+expand_icon = true
+
+[node name="HBoxContainer2" type="HBoxContainer" parent="CreateProjectPanel/VBoxContainer" unique_id=2073357165]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="Label3" type="Label" parent="CreateProjectPanel/VBoxContainer/HBoxContainer2" unique_id=842138441]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Create New Folder:"
+label_settings = SubResource("LabelSettings_vhhin")
+
+[node name="CheckButton" type="CheckButton" parent="CreateProjectPanel/VBoxContainer/HBoxContainer2" unique_id=1054580700]
+layout_mode = 2
+theme_override_styles/focus = SubResource("StyleBoxEmpty_48h6g")
+theme_override_icons/unchecked = SubResource("DPITexture_vhhin")
+
+[node name="CreateProjectButton" type="Button" parent="CreateProjectPanel/VBoxContainer" unique_id=1814861013]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_qjc1s")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("7_jak7c")
+text = "Create"
+
+[node name="RenameProjectPanel" type="Panel" parent="." unique_id=2039126031 node_paths=PackedStringArray("close_button", "select_button")]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -164.0
+offset_top = -86.0
+offset_right = 164.0
+offset_bottom = 93.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = ExtResource("2_gt6lk")
+script = ExtResource("15_1p5a0")
+close_button = NodePath("VBoxContainer/HBoxContainer/Button")
+select_button = NodePath("VBoxContainer/CreateProjectButton")
+mappings = Array[ExtResource("13_1p5a0")]([SubResource("Resource_6ohh5")])
+
+[node name="VBoxContainer" type="VBoxContainer" parent="RenameProjectPanel" unique_id=30580752]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.018518519
+anchor_top = 0.021951219
+anchor_right = 0.9814815
+anchor_bottom = 0.9780488
+grow_horizontal = 2
+grow_vertical = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="HBoxContainer" type="HBoxContainer" parent="RenameProjectPanel/VBoxContainer" unique_id=1637905171]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="RenameProjectPanel/VBoxContainer/HBoxContainer" unique_id=340275022]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Rename Project"
+label_settings = SubResource("LabelSettings_48h6g")
+horizontal_alignment = 1
+
+[node name="Button" type="Button" parent="RenameProjectPanel/VBoxContainer/HBoxContainer" unique_id=1570189480]
+modulate = Color(1, 0, 0, 1)
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+icon = ExtResource("12_vhhin")
+flat = true
+expand_icon = true
+
+[node name="HSeparator" type="HSeparator" parent="RenameProjectPanel/VBoxContainer" unique_id=976363431]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_vhhin")
+
+[node name="Label" type="Label" parent="RenameProjectPanel/VBoxContainer" unique_id=1245317886]
+layout_mode = 2
+text = "Project Name:"
+label_settings = SubResource("LabelSettings_vhhin")
+
+[node name="LineEdit" type="LineEdit" parent="RenameProjectPanel/VBoxContainer" unique_id=1290095662]
+layout_mode = 2
+theme_override_styles/normal = ExtResource("7_jak7c")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_vhhin")
+text = "New Project()"
+
+[node name="Control" type="Control" parent="RenameProjectPanel/VBoxContainer" unique_id=906368747]
+layout_mode = 2
+
+[node name="CreateProjectButton" type="Button" parent="RenameProjectPanel/VBoxContainer" unique_id=1407179634]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_qjc1s")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("7_jak7c")
+text = "Rename"
+
+[node name="DuplicateProjectPanel" type="Panel" parent="." unique_id=1640296369 node_paths=PackedStringArray("close_button", "select_button")]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -164.0
+offset_top = -141.0
+offset_right = 164.0
+offset_bottom = 141.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = ExtResource("2_gt6lk")
+script = ExtResource("15_jak7c")
+close_button = NodePath("VBoxContainer/HBoxContainer/Button")
+select_button = NodePath("VBoxContainer/CreateProjectButton")
+mappings = Array[ExtResource("13_1p5a0")]([SubResource("Resource_1p5a0"), SubResource("Resource_wo5f6")])
+
+[node name="VBoxContainer" type="VBoxContainer" parent="DuplicateProjectPanel" unique_id=334475151]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.018518519
+anchor_top = 0.021951219
+anchor_right = 0.9814815
+anchor_bottom = 0.9780488
+grow_horizontal = 2
+grow_vertical = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="HBoxContainer" type="HBoxContainer" parent="DuplicateProjectPanel/VBoxContainer" unique_id=272985271]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="DuplicateProjectPanel/VBoxContainer/HBoxContainer" unique_id=828931178]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Duplicate Project"
+label_settings = SubResource("LabelSettings_48h6g")
+horizontal_alignment = 1
+
+[node name="Button" type="Button" parent="DuplicateProjectPanel/VBoxContainer/HBoxContainer" unique_id=1594339583]
+modulate = Color(1, 0, 0, 1)
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+icon = ExtResource("12_vhhin")
+flat = true
+expand_icon = true
+
+[node name="HSeparator" type="HSeparator" parent="DuplicateProjectPanel/VBoxContainer" unique_id=1716511824]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_vhhin")
+
+[node name="Label" type="Label" parent="DuplicateProjectPanel/VBoxContainer" unique_id=1839589518]
+layout_mode = 2
+text = "New Project Name:"
+label_settings = SubResource("LabelSettings_vhhin")
+
+[node name="LineEdit" type="LineEdit" parent="DuplicateProjectPanel/VBoxContainer" unique_id=1669422786]
+layout_mode = 2
+theme_override_styles/normal = ExtResource("7_jak7c")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_vhhin")
+text = "New Project()"
+
+[node name="Label2" type="Label" parent="DuplicateProjectPanel/VBoxContainer" unique_id=1971512321]
+layout_mode = 2
+text = "Directory Save Path:"
+label_settings = SubResource("LabelSettings_vhhin")
+
+[node name="HBoxContainer3" type="HBoxContainer" parent="DuplicateProjectPanel/VBoxContainer" unique_id=451618586]
+custom_minimum_size = Vector2(0, 31)
+layout_mode = 2
+
+[node name="LineEdit2" type="LineEdit" parent="DuplicateProjectPanel/VBoxContainer/HBoxContainer3" unique_id=1055605039]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/normal = ExtResource("7_jak7c")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_vhhin")
+text = "Path/to/dir"
+
+[node name="Button" type="Button" parent="DuplicateProjectPanel/VBoxContainer/HBoxContainer3" unique_id=1593298322]
+custom_minimum_size = Vector2(31, 0)
+layout_mode = 2
+icon = ExtResource("5_vhhin")
+flat = true
+expand_icon = true
+
+[node name="HBoxContainer2" type="HBoxContainer" parent="DuplicateProjectPanel/VBoxContainer" unique_id=1585284376]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="Label3" type="Label" parent="DuplicateProjectPanel/VBoxContainer/HBoxContainer2" unique_id=2106066321]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Create New Folder:"
+label_settings = SubResource("LabelSettings_vhhin")
+
+[node name="CheckButton" type="CheckButton" parent="DuplicateProjectPanel/VBoxContainer/HBoxContainer2" unique_id=785758196]
+layout_mode = 2
+theme_override_styles/focus = SubResource("StyleBoxEmpty_48h6g")
+theme_override_icons/unchecked = SubResource("DPITexture_vhhin")
+
+[node name="CreateProjectButton" type="Button" parent="DuplicateProjectPanel/VBoxContainer" unique_id=1593306685]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_qjc1s")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("7_jak7c")
+text = "Duplicate"
+
+[node name="DeleteProjectPanel" type="Panel" parent="." unique_id=1394404850]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -164.0
+offset_top = -121.0
+offset_right = 164.0
+offset_bottom = 121.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = ExtResource("2_gt6lk")
+script = ExtResource("16_v7rjq")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="DeleteProjectPanel" unique_id=681636386]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.018518519
+anchor_top = 0.021951219
+anchor_right = 0.9814815
+anchor_bottom = 0.9780488
+grow_horizontal = 2
+grow_vertical = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="HBoxContainer" type="HBoxContainer" parent="DeleteProjectPanel/VBoxContainer" unique_id=1979665554]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="DeleteProjectPanel/VBoxContainer/HBoxContainer" unique_id=183573920]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Remove Project"
+label_settings = SubResource("LabelSettings_48h6g")
+horizontal_alignment = 1
+
+[node name="Button" type="Button" parent="DeleteProjectPanel/VBoxContainer/HBoxContainer" unique_id=113907643]
+modulate = Color(1, 0, 0, 1)
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+icon = ExtResource("12_vhhin")
+flat = true
+expand_icon = true
+
+[node name="HSeparator" type="HSeparator" parent="DeleteProjectPanel/VBoxContainer" unique_id=721415382]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_vhhin")
+
+[node name="Label" type="Label" parent="DeleteProjectPanel/VBoxContainer" unique_id=1992717330]
+layout_mode = 2
+text = "\"MyProject\"?"
+label_settings = SubResource("LabelSettings_j4n8e")
+horizontal_alignment = 1
+
+[node name="RemoveFromListing" type="Button" parent="DeleteProjectPanel/VBoxContainer" unique_id=1382811057]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_qjc1s")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("7_jak7c")
+text = "Only Remove From Listing"
+
+[node name="ToRecyleBinButton" type="Button" parent="DeleteProjectPanel/VBoxContainer" unique_id=1688353401]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_qjc1s")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("7_jak7c")
+text = "To Recyle Bin"
+
+[node name="DeleteButton" type="Button" parent="DeleteProjectPanel/VBoxContainer" unique_id=379851295]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_qjc1s")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("7_jak7c")
+text = "To Void (delete forever)"
+
+[node name="FileDialog" type="FileDialog" parent="." unique_id=1754781238]
+oversampling_override = 1.0
+title = "Open a Directory"
+position = Vector2i(256, 144)
+file_mode = 2
+display_mode = 1
+access = 2

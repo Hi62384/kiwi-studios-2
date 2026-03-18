@@ -1,0 +1,105 @@
+[gd_scene format=3 uid="uid://b7urpcwnd0d7e"]
+
+[ext_resource type="Script" uid="uid://bjcilpgjrcr" path="res://scenes/ProjectManager/project_manager_project_display.gd" id="1_ccbv7"]
+[ext_resource type="Texture2D" uid="uid://bops5bhht8eq3" path="res://resources/Images/Logos/ProgramIcon.png" id="1_y4eun"]
+[ext_resource type="SystemFont" uid="uid://bwdt8qysdchp6" path="res://resources/fonts/ReemKufi.tres" id="2_ccbv7"]
+[ext_resource type="SystemFont" uid="uid://fue8lb1oipxq" path="res://resources/fonts/MainFont.tres" id="3_0lffj"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fhdkl"]
+bg_color = Color(0.13834798, 0.15002033, 0.17839307, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.39435276, 0.39435282, 0.39435253, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_1p5a0"]
+content_margin_left = 0.0
+content_margin_top = 4.0
+content_margin_right = 0.0
+content_margin_bottom = 4.0
+color = Color(0.5, 0.5, 0.5, 1)
+thickness = 2
+vertical = true
+
+[sub_resource type="LabelSettings" id="LabelSettings_1p5a0"]
+font = ExtResource("2_ccbv7")
+font_size = 24
+outline_size = 2
+
+[sub_resource type="LabelSettings" id="LabelSettings_jak7c"]
+font = ExtResource("3_0lffj")
+
+[node name="Panel" type="Panel" unique_id=1747909158]
+custom_minimum_size = Vector2(0, 80)
+theme_override_styles/panel = SubResource("StyleBoxFlat_fhdkl")
+script = ExtResource("1_ccbv7")
+
+[node name="SelectedCover" type="ColorRect" parent="." unique_id=638746476]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 1, 1, 0.4)
+
+[node name="ErrorCover" type="ColorRect" parent="." unique_id=2033230772]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.76968664, 0, 0.088484265, 0.4)
+
+[node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=1825292141]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.009111618
+anchor_top = 0.0875
+anchor_right = 0.99088836
+anchor_bottom = 0.9125
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+metadata/_edit_use_anchors_ = true
+
+[node name="TextureRect" type="TextureRect" parent="HBoxContainer" unique_id=129526023]
+custom_minimum_size = Vector2(66, 0)
+layout_mode = 2
+texture = ExtResource("1_y4eun")
+expand_mode = 1
+
+[node name="VSeparator" type="VSeparator" parent="HBoxContainer" unique_id=1596064932]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_1p5a0")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HBoxContainer" unique_id=938245509]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ProjectName" type="Label" parent="HBoxContainer/VBoxContainer" unique_id=1965758133]
+layout_mode = 2
+text = "My New Project"
+label_settings = SubResource("LabelSettings_1p5a0")
+
+[node name="ProjectPath" type="Label" parent="HBoxContainer/VBoxContainer" unique_id=105436970]
+layout_mode = 2
+text = "C:/User/User1/Documents/Animation/"
+label_settings = SubResource("LabelSettings_jak7c")
+
+[node name="Button" type="Button" parent="." unique_id=1528548447]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+flat = true

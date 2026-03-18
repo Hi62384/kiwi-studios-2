@@ -1,0 +1,4 @@
+[gd_resource type="SystemFont" format=3 uid="uid://bwdt8qysdchp6"]
+
+[resource]
+font_names = PackedStringArray("Reem Kufi")
