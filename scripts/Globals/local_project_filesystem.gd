@@ -49,6 +49,10 @@ func _file_system_altered() -> void:
 
 
 
+static func get_ordered_array_of_project_file_paths() -> Array[String]:
+	return _all_files_paths
+
+
 static func get_current_project() -> Project:
 	return StaticData.loaded_project
 

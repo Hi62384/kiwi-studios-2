@@ -82,7 +82,7 @@ offset_left = 18.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(1, 1, 1, 0.05)
+color = Color(0.85882354, 0, 0.007843138, 0.6039216)
 
 [node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=1461148724]
 layout_mode = 2

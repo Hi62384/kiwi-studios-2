@@ -4,5 +4,5 @@
 
 [resource]
 script = ExtResource("1_ted65")
-project_paths = Array[String](["C:/Users/User1/Documents/GodotProjects/Dylan is fat", "C:/Users/User1/Documents/GodotProjects/New Project()"])
+project_paths = Array[String](["C:/Users/User1/Documents/GodotProjects/Dylan is fat", "C:/Users/User1/Documents/GodotProjects/New Project()", "C:/Users/arshy/Documents/New Project()"])
 metadata/_custom_type_script = "uid://dfyq2iv2d23mq"
