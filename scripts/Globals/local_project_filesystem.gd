@@ -10,8 +10,9 @@ static var node: LocalProjectFilesystem
 const _TIME_BETWEEN_SCANS = 3
 func _ready() -> void:
 	node = self
+	FileOperations.flush_project_trash()
 	await get_tree().process_frame
-	_update_root_folder()
+	update_root_folder()
 	
 	#constantly scan filesystem for change
 	while true:
@@ -19,7 +20,7 @@ func _ready() -> void:
 		files_remaining.remove_at(0)
 		var result = _scan_folder_for_change(get_project_root_directory(), files_remaining, 0)
 		if result != files_remaining.size():
-			_file_system_altered()
+			update_root_folder()
 		await get_tree().create_timer(_TIME_BETWEEN_SCANS).timeout
 
 
@@ -28,7 +29,7 @@ func _scan_folder_for_change(folder_path: String, files_remaining: Array[String]
 	for child_folder_path in DirAccess.get_directories_at(folder_path):
 		var effective_path := folder_path.path_join(child_folder_path)
 		if index >= files_remaining.size() or effective_path != files_remaining[index]:
-			_file_system_altered()
+			update_root_folder()
 			return -1  # Early exit
 		index += 1
 		index = _scan_folder_for_change(effective_path, files_remaining, index)
@@ -37,15 +38,11 @@ func _scan_folder_for_change(folder_path: String, files_remaining: Array[String]
 	for child_file_path in DirAccess.get_files_at(folder_path):
 		var effective_path := folder_path.path_join(child_file_path)
 		if index >= files_remaining.size() or effective_path != files_remaining[index]:
-			_file_system_altered()
+			update_root_folder()
 			return -1  # Early exit
 		index += 1
 	return index
 		
-
-
-func _file_system_altered() -> void:
-	_update_root_folder()
 
 
 
@@ -61,15 +58,39 @@ static func get_project_root_directory() -> String:
 	return get_current_project().resource_path.get_base_dir().get_base_dir()   
 
 
+static func get_project_trash_directory() -> String:
+	return get_project_root_directory() + "/.proj/.trash"
+
+
 static func local_to_global_path(local_path) -> String:
 	return get_project_root_directory() + "/" + local_path
+
+
+static func file_exists_in_project_directory(file_absolute_path: String) -> bool:
+	return FileOperations.is_path_inside(get_project_root_directory(), file_absolute_path)
+
+
+static func global_to_local_path(global_path: String) -> String:
+	var project_root_dir: String = get_project_root_directory()
+	if !global_path.contains(project_root_dir):
+		return ""
+	return global_path.substr(project_root_dir.length())
+
+
+
+static func get_sensetive_file_paths() -> Array[String]:
+	var root: String = get_project_root_directory()
+	var proj_folder: String = root + "/.proj"
+	var proj_trash_folder: String = proj_folder + "/.trash"
+	var project_file: String = proj_folder + "/Project.tres"
+	return [root, proj_folder, proj_trash_folder, project_file]
 
 
 static var root_folder: Folder
 
 
 
-static func _update_root_folder() -> void:
+static func update_root_folder() -> void:
 	root_folder = _create_file_tree(get_project_root_directory())
 	node.file_tree_recreated.emit()
 

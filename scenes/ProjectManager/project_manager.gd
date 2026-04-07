@@ -30,7 +30,9 @@ func create_project(path: String, project_name: String) -> void:
 	if _saved_projects.project_paths.has(path): return
 	
 	var proj_path: String = path + "/.proj/"
+	var proj_trash_path: String = proj_path + ".trash/"
 	DirAccess.make_dir_recursive_absolute(proj_path)
+	DirAccess.make_dir_absolute(proj_trash_path)
 	var project: Project = Project.new(project_name)
 	ResourceSaver.save(project, proj_path + "Project.tres")
 	add_project_to_listing(path)
@@ -58,7 +60,7 @@ func unalive_project_directory(path: String, to_recycle_bin: bool) -> void:
 	if !DirAccess.dir_exists_absolute(path): return
 	
 	if to_recycle_bin:
-		FileOperations.move_directory_to_trash(path)
+		FileOperations.move_to_trash(path)
 	else:
 		FileOperations.delete_directory(path)
 	remove_project_from_listing(path)

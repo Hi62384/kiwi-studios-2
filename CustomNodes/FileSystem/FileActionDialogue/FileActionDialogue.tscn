@@ -1,0 +1,126 @@
+[gd_scene format=3 uid="uid://cm431qw86wyvs"]
+
+[ext_resource type="StyleBox" uid="uid://ck4h6q1rp4uqc" path="res://resources/StyleBoxes/Default.tres" id="1_3f31n"]
+[ext_resource type="Script" uid="uid://c0ohimns5kdk7" path="res://CustomNodes/FileSystem/FileActionDialogue/file_action_dialogue.gd" id="2_6g0bl"]
+[ext_resource type="PackedScene" uid="uid://tkaurlpinqd" path="res://CustomNodes/FileSystem/FileActionDialogue/FileActionPanel.tscn" id="2_7p7ll"]
+[ext_resource type="Texture2D" uid="uid://8vmiy3qcy1nq" path="res://resources/Images/BasicImages/Plus.png" id="3_6g0bl"]
+[ext_resource type="Texture2D" uid="uid://cd70en77xwt7j" path="res://resources/Images/ToolImages/Folder.png" id="4_160du"]
+[ext_resource type="Texture2D" uid="uid://cmcyfn1jn63sc" path="res://resources/Images/ToolImages/Rename.png" id="5_noy3a"]
+[ext_resource type="Texture2D" uid="uid://cqwv3phf7hbob" path="res://resources/Images/ToolImages/Copy.png" id="6_hw8ro"]
+[ext_resource type="Texture2D" uid="uid://b25d122d020e7" path="res://resources/Images/ToolImages/TrashCan.png" id="7_58a50"]
+[ext_resource type="Texture2D" uid="uid://h5xgw3ns54ys" path="res://resources/Images/ToolImages/FolderColored.png" id="8_glt53"]
+[ext_resource type="Texture2D" uid="uid://b088kic2mwjwx" path="res://resources/Images/BasicImages/Play.png" id="10_6g0bl"]
+
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_nfivy"]
+content_margin_left = 4.0
+content_margin_top = 0.0
+content_margin_right = 4.0
+content_margin_bottom = 0.0
+color = Color(0.20751235, 0.20751238, 0.20751235, 1)
+
+[node name="Panel" type="Panel" unique_id=988390513]
+offset_left = 34.0
+offset_top = 297.0
+offset_right = 238.0
+offset_bottom = 598.0
+theme_override_styles/panel = ExtResource("1_3f31n")
+script = ExtResource("2_6g0bl")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=1669505057]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.02
+anchor_top = 0.012345679
+anchor_right = 0.98
+anchor_bottom = 0.9876543
+grow_horizontal = 2
+grow_vertical = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="Button8" parent="VBoxContainer" unique_id=440969110 instance=ExtResource("2_7p7ll")]
+layout_mode = 2
+panel_icon = ExtResource("3_6g0bl")
+panel_text = "Create New"
+has_more_options = true
+
+[node name="TextureRect" parent="VBoxContainer/Button8/HBoxContainer" parent_id_path=PackedInt32Array(440969110, 1040980889) index="0" unique_id=308543401]
+texture = ExtResource("3_6g0bl")
+
+[node name="Label" parent="VBoxContainer/Button8/HBoxContainer" parent_id_path=PackedInt32Array(440969110, 1040980889) index="1" unique_id=525360031]
+text = "Create New"
+
+[node name="Button" parent="VBoxContainer/Button8/HBoxContainer" parent_id_path=PackedInt32Array(440969110, 1040980889) index="2" unique_id=1419402624]
+visible = true
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer" unique_id=21006245]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_nfivy")
+
+[node name="Button2" parent="VBoxContainer" unique_id=282367849 instance=ExtResource("2_7p7ll")]
+layout_mode = 2
+panel_icon = ExtResource("4_160du")
+panel_text = "Copy Path"
+
+[node name="Button9" parent="VBoxContainer" unique_id=77592763 instance=ExtResource("2_7p7ll")]
+layout_mode = 2
+panel_icon = ExtResource("4_160du")
+panel_text = "Copy Absolute Path"
+
+[node name="HSeparator2" type="HSeparator" parent="VBoxContainer" unique_id=1339334831]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_nfivy")
+
+[node name="Button10" parent="VBoxContainer" unique_id=2007328142 instance=ExtResource("2_7p7ll")]
+layout_mode = 2
+panel_icon = ExtResource("5_noy3a")
+panel_text = "Rename"
+
+[node name="Button11" parent="VBoxContainer" unique_id=1564460425 instance=ExtResource("2_7p7ll")]
+layout_mode = 2
+panel_icon = ExtResource("6_hw8ro")
+panel_text = "Duplicate"
+
+[node name="Button12" parent="VBoxContainer" unique_id=764113550 instance=ExtResource("2_7p7ll")]
+layout_mode = 2
+panel_icon = ExtResource("7_58a50")
+panel_text = "Delete"
+
+[node name="HSeparator3" type="HSeparator" parent="VBoxContainer" unique_id=369150146]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_nfivy")
+
+[node name="Button13" parent="VBoxContainer" unique_id=1163856599 instance=ExtResource("2_7p7ll")]
+layout_mode = 2
+panel_icon = ExtResource("8_glt53")
+panel_text = "Show In File Manager"
+
+[node name="Button14" parent="VBoxContainer" unique_id=78112363 instance=ExtResource("2_7p7ll")]
+layout_mode = 2
+panel_icon = ExtResource("10_6g0bl")
+panel_text = "Open In External Program"
+
+[node name="CreateNewPanel" type="Panel" parent="." unique_id=222382993]
+visible = false
+layout_mode = 0
+offset_left = 205.0
+offset_right = 369.0
+offset_bottom = 34.0
+theme_override_styles/panel = ExtResource("1_3f31n")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CreateNewPanel" unique_id=288317597]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.02
+anchor_top = 0.0588235
+anchor_right = 0.98
+anchor_bottom = 0.9411765
+grow_horizontal = 2
+grow_vertical = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="Button8" parent="CreateNewPanel/VBoxContainer" unique_id=1630639279 instance=ExtResource("2_7p7ll")]
+layout_mode = 2
+panel_icon = ExtResource("4_160du")
+panel_text = "Folder"
+
+[editable path="VBoxContainer/Button8"]

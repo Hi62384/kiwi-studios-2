@@ -1,0 +1,61 @@
+[gd_scene format=3 uid="uid://tkaurlpinqd"]
+
+[ext_resource type="StyleBox" uid="uid://bwq7q8kmumxnk" path="res://resources/StyleBoxes/button.tres" id="1_nqywq"]
+[ext_resource type="Script" uid="uid://b7rja2mjbms6m" path="res://CustomNodes/FileSystem/FileActionDialogue/file_action_panel.gd" id="2_y8axd"]
+[ext_resource type="Texture2D" uid="uid://mwmlqweqemfk" path="res://resources/Images/ToolImages/FileColored.png" id="3_rr7mf"]
+[ext_resource type="Texture2D" uid="uid://bdblvy7bf8xgn" path="res://resources/Images/BasicImages/PointerRight.png" id="3_y8axd"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_b72ha"]
+
+[sub_resource type="SystemFont" id="SystemFont_1iba3"]
+font_names = PackedStringArray("Reem Kufi")
+subpixel_positioning = 0
+
+[sub_resource type="LabelSettings" id="LabelSettings_yxlcp"]
+font = SubResource("SystemFont_1iba3")
+font_size = 14
+
+[node name="Button2" type="Button" unique_id=440969110]
+custom_minimum_size = Vector2(0, 30)
+offset_right = 200.0
+offset_bottom = 20.0
+theme_override_styles/normal = ExtResource("1_nqywq")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_b72ha")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_b72ha")
+script = ExtResource("2_y8axd")
+panel_icon = ExtResource("3_rr7mf")
+panel_text = "aaaaaaa"
+
+[node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=1040980889]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.027777778
+anchor_top = 0.125
+anchor_right = 0.9722222
+anchor_bottom = 0.875
+grow_horizontal = 2
+grow_vertical = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="TextureRect" type="TextureRect" parent="HBoxContainer" unique_id=308543401]
+custom_minimum_size = Vector2(15, 15)
+layout_mode = 2
+texture = ExtResource("3_rr7mf")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="HBoxContainer" unique_id=525360031]
+layout_mode = 2
+text = "aaaaaaa"
+label_settings = SubResource("LabelSettings_yxlcp")
+
+[node name="Button" type="Button" parent="HBoxContainer" unique_id=1419402624]
+visible = false
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+size_flags_horizontal = 10
+mouse_filter = 2
+icon = ExtResource("3_y8axd")
+flat = true
+icon_alignment = 1
+expand_icon = true

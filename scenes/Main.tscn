@@ -5,18 +5,14 @@
 [ext_resource type="Texture2D" uid="uid://bulj6t4c6udx2" path="res://Workspaces/SceneWorkspace/Icon.png" id="2_0bbpv"]
 [ext_resource type="Texture2D" uid="uid://8vmiy3qcy1nq" path="res://resources/Images/BasicImages/Plus.png" id="3_rarhs"]
 [ext_resource type="StyleBox" uid="uid://ck4h6q1rp4uqc" path="res://resources/StyleBoxes/Default.tres" id="4_rarhs"]
-[ext_resource type="Script" uid="uid://k2xqavmy8y6v" path="res://Workspaces/SceneWorkspace/scripts/ui/filesystem/file_system.gd" id="5_cvmbd"]
-[ext_resource type="StyleBox" uid="uid://bwq7q8kmumxnk" path="res://resources/StyleBoxes/button.tres" id="5_mwfav"]
 [ext_resource type="Texture2D" uid="uid://dkgsc8c5o2tq3" path="res://resources/Images/BasicImages/Undo.png" id="5_nxtc6"]
-[ext_resource type="Texture2D" uid="uid://clq7w7fh0dkga" path="res://resources/Images/ToolImages/Spyglass.png" id="6_3p2gp"]
+[ext_resource type="PackedScene" uid="uid://vmu5rxoalk8x" path="res://CustomNodes/FileSystem/file_system.tscn" id="6_3p2gp"]
 [ext_resource type="Texture2D" uid="uid://dln4iaiin0dr1" path="res://resources/Images/BasicImages/Redo.png" id="6_jlsqs"]
 [ext_resource type="Texture2D" uid="uid://b088kic2mwjwx" path="res://resources/Images/BasicImages/Play.png" id="7_q8u5g"]
 [ext_resource type="Texture2D" uid="uid://bb8df5qnn7eat" path="res://resources/Images/BasicImages/EncircledMinus.png" id="8_lhr70"]
 [ext_resource type="Texture2D" uid="uid://8cur2hvvbfrg" path="res://resources/Images/ToolImages/Magnet.png" id="8_q8u5g"]
-[ext_resource type="Script" uid="uid://plyim2uw3aj1" path="res://Workspaces/SceneWorkspace/scripts/ui/filesystem/file_system_files_selector.gd" id="9_bb450"]
 [ext_resource type="Texture2D" uid="uid://c1qwvi4i47ll6" path="res://resources/Images/ToolImages/Scissors.png" id="9_lhr70"]
 [ext_resource type="Texture2D" uid="uid://p66slynp1u67" path="res://resources/Images/BasicImages/EncircledPlus.png" id="9_wp0k4"]
-[ext_resource type="Texture2D" uid="uid://bdblvy7bf8xgn" path="res://resources/Images/BasicImages/PointerRight.png" id="10_nfivy"]
 [ext_resource type="Texture2D" uid="uid://b25d122d020e7" path="res://resources/Images/ToolImages/TrashCan.png" id="12_mwfav"]
 [ext_resource type="Texture2D" uid="uid://cqwv3phf7hbob" path="res://resources/Images/ToolImages/Copy.png" id="14_cvmbd"]
 
@@ -29,26 +25,6 @@ bg_color = Color(0.23874435, 0.23874438, 0.23874435, 0.6)
 border_width_top = 2
 border_color = Color(1, 1, 1, 0.75)
 corner_detail = 1
-
-[sub_resource type="LabelSettings" id="LabelSettings_ft6cd"]
-font = ExtResource("1_rvslj")
-font_size = 12
-
-[sub_resource type="StyleBoxLine" id="StyleBoxLine_3p2gp"]
-content_margin_left = 4.0
-content_margin_top = 0.0
-content_margin_right = 4.0
-content_margin_bottom = 0.0
-color = Color(0.13333334, 0.16470589, 0.1882353, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1nqs0"]
-
-[sub_resource type="SystemFont" id="SystemFont_1iba3"]
-font_names = PackedStringArray("Reem Kufi")
-
-[sub_resource type="LabelSettings" id="LabelSettings_yxlcp"]
-font = SubResource("SystemFont_1iba3")
-font_size = 10
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_vcsgt"]
 viewport_path = NodePath("SubViewport")
@@ -251,118 +227,8 @@ split_offset = 300
 layout_mode = 2
 theme_override_styles/panel = ExtResource("4_rarhs")
 
-[node name="FileSystem" type="Panel" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer" unique_id=1218093177]
+[node name="FileSystem" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer" unique_id=963438061 instance=ExtResource("6_3p2gp")]
 layout_mode = 2
-theme_override_styles/panel = ExtResource("4_rarhs")
-script = ExtResource("5_cvmbd")
-text_settings = SubResource("LabelSettings_ft6cd")
-panel_style = ExtResource("4_rarhs")
-
-[node name="VBoxContainer" type="VBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem" unique_id=1199202215]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.01923077
-anchor_top = 0.025531914
-anchor_right = 0.9807692
-anchor_bottom = 0.9744681
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="HBoxContainer" type="HBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/VBoxContainer" unique_id=374071083]
-custom_minimum_size = Vector2(0, 25)
-layout_mode = 2
-
-[node name="LineEdit" type="LineEdit" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/VBoxContainer/HBoxContainer" unique_id=1136410498]
-custom_minimum_size = Vector2(0, 25)
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 10
-theme_override_styles/normal = ExtResource("5_mwfav")
-placeholder_text = "Filter Files..."
-
-[node name="TextureRect" type="TextureRect" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/VBoxContainer/HBoxContainer" unique_id=1041555911]
-custom_minimum_size = Vector2(25, 0)
-layout_mode = 2
-texture = ExtResource("6_3p2gp")
-expand_mode = 1
-
-[node name="HSeparator" type="HSeparator" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/VBoxContainer" unique_id=1034842302]
-layout_mode = 2
-theme_override_styles/separator = SubResource("StyleBoxLine_3p2gp")
-
-[node name="Panel" type="Panel" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/VBoxContainer" unique_id=473328030]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="ScrollContainer" type="ScrollContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/VBoxContainer/Panel" unique_id=843643610]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_styles/panel = ExtResource("4_rarhs")
-
-[node name="VBoxContainer" type="VBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/VBoxContainer/Panel/ScrollContainer" unique_id=1865610396]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/separation = 0
-
-[node name="FilesSelector" type="Node" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem" unique_id=1777227038]
-script = ExtResource("9_bb450")
-
-[node name="Node" type="Node" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem" unique_id=474971253]
-
-[node name="Panel" type="Panel" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/Node" unique_id=457529309]
-offset_left = 34.0
-offset_top = 327.0
-offset_right = 184.0
-offset_bottom = 570.0
-theme_override_styles/panel = ExtResource("4_rarhs")
-
-[node name="VBoxContainer" type="VBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/Node/Panel" unique_id=1097937849]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.02
-anchor_top = 0.012345679
-anchor_right = 0.98
-anchor_bottom = 0.9876543
-grow_horizontal = 2
-grow_vertical = 2
-metadata/_edit_use_anchors_ = true
-
-[node name="Button" type="Button" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/Node/Panel/VBoxContainer" unique_id=1895476494]
-custom_minimum_size = Vector2(0, 20)
-layout_mode = 2
-theme_override_styles/normal = SubResource("StyleBoxFlat_1nqs0")
-
-[node name="HBoxContainer" type="HBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/Node/Panel/VBoxContainer/Button" unique_id=1926490294]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="TextureRect" type="TextureRect" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/Node/Panel/VBoxContainer/Button/HBoxContainer" unique_id=1250976402]
-custom_minimum_size = Vector2(20, 20)
-layout_mode = 2
-texture = ExtResource("3_rarhs")
-expand_mode = 1
-
-[node name="Label" type="Label" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/Node/Panel/VBoxContainer/Button/HBoxContainer" unique_id=506146204]
-layout_mode = 2
-text = "Create New"
-label_settings = SubResource("LabelSettings_yxlcp")
-
-[node name="Button" type="Button" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem/Node/Panel/VBoxContainer/Button/HBoxContainer" unique_id=1877944811]
-custom_minimum_size = Vector2(20, 0)
-layout_mode = 2
-size_flags_horizontal = 8
-icon = ExtResource("10_nfivy")
-flat = true
-expand_icon = true
 
 [node name="VSplitContainer2" type="VSplitContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer" unique_id=1995103816]
 layout_mode = 2

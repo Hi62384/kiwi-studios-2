@@ -10,22 +10,44 @@ var _selected_expandable_buttons: Array[ExpandableButton]
 
 
 func _ready() -> void:
-	LocalProjectFilesystem.node.file_tree_recreated.connect(func():
-		_selected_expandable_buttons = []
-		)
+	LocalProjectFilesystem.node.file_tree_recreated.connect(clear_selected)
+
+
+
+func clear_selected() -> void:
+	_selected_expandable_buttons = []
+
+
+
+func get_selected_expandable_buttons() -> Array[ExpandableButton]:
+	return _selected_expandable_buttons
 
 
 
 #if the file/folders parent is selected, dont include the parent/folder. Else, include the parent
 func get_expandable_buttons_top_selected_files() -> Array[ExpandableButton]:
-	var top_selected_folders: Array[String] = []
+	var top_selected_folders: Array[ExpandableButton] = []
 	
-	#for selected_expandable_button: ExpandableButton in _selected_expandable_buttons:
-	#	for expandable_button_to_check: ExpandableButton in _selected_expandable_buttons:
-			
-	#	pass
+	var folders: Array[ExpandableButton] = []
+	for expandable_button: ExpandableButton in _selected_expandable_buttons:
+		if expandable_button.get_meta("path").get_extension() == "":
+			folders.append(expandable_button)
 	
-	return []
+	for selected_expandable_button: ExpandableButton in _selected_expandable_buttons:
+		var add_selected_expandable_button: bool = true
+		var selected_expandable_button_path: String = selected_expandable_button.get_meta("path")
+		for expandable_button_to_check: ExpandableButton in folders:
+			if selected_expandable_button == expandable_button_to_check: continue
+			var expandable_button_to_check_path: String = expandable_button_to_check.get_meta("path")
+			#if current expandable button is inside expandable button to check, continue
+			if FileOperations.is_path_inside(expandable_button_to_check_path, selected_expandable_button_path):
+				add_selected_expandable_button = false
+				break
+		
+		if add_selected_expandable_button:
+			top_selected_folders.append(selected_expandable_button)
+	
+	return top_selected_folders
 
 
 
@@ -101,14 +123,14 @@ func _get_expandable_button_to_shift_connect_to(expandable_button: ExpandableBut
 
 func _toggle_select_expandable_buttons(expandable_buttons: Array[ExpandableButton]) -> void:
 	for expandable_button: ExpandableButton in expandable_buttons:
-		if _expandable_button_is_selected(expandable_button):
+		if expandable_button_is_selected(expandable_button):
 			_deselect_expandable_buttons([expandable_button])
 		else:
 			_select_expandable_buttons([expandable_button])
 
 
 
-func _expandable_button_is_selected(expandable_button: ExpandableButton) -> bool:
+func expandable_button_is_selected(expandable_button: ExpandableButton) -> bool:
 	return _selected_expandable_buttons.has(expandable_button)
 
 
@@ -127,6 +149,13 @@ func _select_expandable_buttons(expandable_buttons: Array[ExpandableButton]) -> 
 	for expandable_button: ExpandableButton in expandable_buttons:
 		expandable_button.get_cover_color_rect().visible = true
 		_selected_expandable_buttons.append(expandable_button)
+
+
+func handle_input_for_right_clicked_file(expandable_button: ExpandableButton) -> void:
+	if expandable_button_is_selected(expandable_button):
+		return
+	_deselect_all_expandable_buttons()
+	_select_expandable_buttons([expandable_button])
 
 
 func handle_input_for_clicked_file(expandable_button: ExpandableButton) -> void:

@@ -60,7 +60,6 @@ _source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"32\" height=\"16\">
 
 [sub_resource type="Resource" id="Resource_6ohh5"]
 script = ExtResource("13_1p5a0")
-node = NodePath("VBoxContainer/LineEdit")
 property_name = "text"
 tag = "NewProjectName"
 metadata/_custom_type_script = "uid://cbwugyqv7rtpg"

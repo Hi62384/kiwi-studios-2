@@ -2,7 +2,9 @@
 -setup timeline uiAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 -project creation menu (new scene)AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 -project filesystem uiAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
--project filesystem
+-project filesystemAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-project filesystem undo/redo
+-focus system
 -actor properties primitives
 -actor properties objects
 -actor properties image object

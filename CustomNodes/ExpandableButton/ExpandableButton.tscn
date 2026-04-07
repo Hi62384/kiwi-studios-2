@@ -64,9 +64,9 @@ label_settings = SubResource("LabelSettings_bb450")
 [node name="MainButton" type="Button" parent="Panel" unique_id=233225735]
 layout_mode = 1
 anchors_preset = -1
+anchor_left = 0.09
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 18.0
 grow_horizontal = 2
 grow_vertical = 2
 flat = true
@@ -78,11 +78,10 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 18.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.85882354, 0, 0.007843138, 0.6039216)
+color = Color(1, 1, 1, 0.25300002)
 
 [node name="HBoxContainer" type="HBoxContainer" parent="." unique_id=1461148724]
 layout_mode = 2

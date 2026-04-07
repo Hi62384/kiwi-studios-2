@@ -1,0 +1,376 @@
+[gd_scene format=3 uid="uid://vmu5rxoalk8x"]
+
+[ext_resource type="StyleBox" uid="uid://ck4h6q1rp4uqc" path="res://resources/StyleBoxes/Default.tres" id="1_s4chj"]
+[ext_resource type="SystemFont" uid="uid://fue8lb1oipxq" path="res://resources/fonts/MainFont.tres" id="2_bwcsr"]
+[ext_resource type="Script" uid="uid://k2xqavmy8y6v" path="res://CustomNodes/FileSystem/file_system.gd" id="2_l5suh"]
+[ext_resource type="StyleBox" uid="uid://bwq7q8kmumxnk" path="res://resources/StyleBoxes/button.tres" id="3_nn77b"]
+[ext_resource type="Texture2D" uid="uid://dkgsc8c5o2tq3" path="res://resources/Images/BasicImages/Undo.png" id="4_ck4ci"]
+[ext_resource type="Texture2D" uid="uid://dln4iaiin0dr1" path="res://resources/Images/BasicImages/Redo.png" id="5_2ajym"]
+[ext_resource type="Script" uid="uid://b5gm21p0e2sbv" path="res://CustomNodes/FileSystem/file_system_callable_actions.gd" id="5_cvybe"]
+[ext_resource type="Script" uid="uid://plyim2uw3aj1" path="res://CustomNodes/FileSystem/file_system_files_selector.gd" id="6_qnik3"]
+[ext_resource type="Script" uid="uid://cpbb83r3o2iah" path="res://scripts/Extra/DialogParamChooser/dialog_param_chooser.gd" id="8_s4chj"]
+[ext_resource type="Script" uid="uid://cbwugyqv7rtpg" path="res://scripts/Extra/DialogParamChooser/dialog_param_chooser_mapping.gd" id="9_bwcsr"]
+[ext_resource type="SystemFont" uid="uid://bwdt8qysdchp6" path="res://resources/fonts/ReemKufi.tres" id="10_nn77b"]
+[ext_resource type="Texture2D" uid="uid://dbllu7xvhjcej" path="res://resources/Images/BasicImages/X.png" id="11_5fp1n"]
+[ext_resource type="Script" uid="uid://biler6763synl" path="res://CustomNodes/FileSystem/file_mover.gd" id="12_bwcsr"]
+[ext_resource type="Script" uid="uid://btkxwby3ldicm" path="res://CustomNodes/FileSystem/file_system_extra_ui.gd" id="12_ck4ci"]
+[ext_resource type="Texture2D" uid="uid://h5xgw3ns54ys" path="res://resources/Images/ToolImages/FolderColored.png" id="13_nn77b"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_ft6cd"]
+font = ExtResource("2_bwcsr")
+font_size = 12
+
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_3p2gp"]
+content_margin_left = 4.0
+content_margin_top = 0.0
+content_margin_right = 4.0
+content_margin_bottom = 0.0
+color = Color(0.13333334, 0.16470589, 0.1882353, 1)
+
+[sub_resource type="Resource" id="Resource_s4chj"]
+script = ExtResource("9_bwcsr")
+node = NodePath("VBoxContainer/LineEdit")
+property_name = "text"
+tag = "NewFileName"
+metadata/_custom_type_script = "uid://cbwugyqv7rtpg"
+
+[sub_resource type="LabelSettings" id="LabelSettings_ln2jk"]
+font = ExtResource("10_nn77b")
+font_size = 24
+
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_ck4ci"]
+color = Color(0.16513005, 0.17298183, 0.2230835, 1)
+thickness = 2
+
+[sub_resource type="LabelSettings" id="LabelSettings_2ajym"]
+font = ExtResource("10_nn77b")
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_sdkdm"]
+
+[sub_resource type="Resource" id="Resource_bwcsr"]
+script = ExtResource("9_bwcsr")
+node = NodePath("VBoxContainer/LineEdit")
+property_name = "text"
+tag = "FolderName"
+metadata/_custom_type_script = "uid://cbwugyqv7rtpg"
+
+[node name="FileSystem" type="Panel" unique_id=963438061]
+custom_minimum_size = Vector2(200, 200)
+theme_override_styles/panel = ExtResource("1_s4chj")
+script = ExtResource("2_l5suh")
+text_settings = SubResource("LabelSettings_ft6cd")
+panel_style = ExtResource("1_s4chj")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=1978893077]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 3.846154
+offset_top = 5.106383
+offset_right = -3.846161
+offset_bottom = -5.1063843
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=194275642]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+
+[node name="Button" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1982606148]
+custom_minimum_size = Vector2(25, 0)
+layout_mode = 2
+icon = ExtResource("4_ck4ci")
+flat = true
+expand_icon = true
+
+[node name="Button2" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=2129926066]
+custom_minimum_size = Vector2(25, 0)
+layout_mode = 2
+icon = ExtResource("5_2ajym")
+flat = true
+expand_icon = true
+
+[node name="LineEdit" type="LineEdit" parent="VBoxContainer/HBoxContainer" unique_id=1795170328]
+custom_minimum_size = Vector2(0, 25)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 10
+theme_override_styles/normal = ExtResource("3_nn77b")
+placeholder_text = "Filter Files..."
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer" unique_id=294765490]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_3p2gp")
+
+[node name="Panel" type="Panel" parent="VBoxContainer" unique_id=1113091138]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ScrollContainer" type="ScrollContainer" parent="VBoxContainer/Panel" unique_id=1465691577]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = ExtResource("1_s4chj")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/Panel/ScrollContainer" unique_id=228384930]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 0
+
+[node name="FilesSelector" type="Node" parent="." unique_id=857298164]
+script = ExtResource("6_qnik3")
+
+[node name="FileSystemCallableActions" type="Node" parent="." unique_id=1845290717]
+script = ExtResource("5_cvybe")
+
+[node name="FileMover" type="Node" parent="." unique_id=1245026766]
+script = ExtResource("12_bwcsr")
+
+[node name="FolderMoverIcon" type="TextureRect" parent="FileMover" unique_id=1774680092]
+visible = false
+offset_right = 15.0
+offset_bottom = 15.0
+mouse_filter = 2
+texture = ExtResource("13_nn77b")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="FileSystemExtraUI" type="Node" parent="." unique_id=2050641250]
+script = ExtResource("12_ck4ci")
+
+[node name="ScreenCover" type="ColorRect" parent="FileSystemExtraUI" unique_id=876470422]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.209)
+
+[node name="RenameFilePanel" type="Panel" parent="FileSystemExtraUI" unique_id=819653950 node_paths=PackedStringArray("close_button", "select_button")]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -164.0
+offset_top = -86.0
+offset_right = 164.0
+offset_bottom = 93.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = ExtResource("1_s4chj")
+script = ExtResource("8_s4chj")
+close_button = NodePath("VBoxContainer/HBoxContainer/Button")
+select_button = NodePath("VBoxContainer/CreateProjectButton")
+mappings = Array[ExtResource("9_bwcsr")]([SubResource("Resource_s4chj")])
+
+[node name="VBoxContainer" type="VBoxContainer" parent="FileSystemExtraUI/RenameFilePanel" unique_id=1364318286]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.018518519
+anchor_top = 0.021951219
+anchor_right = 0.9814815
+anchor_bottom = 0.9780488
+grow_horizontal = 2
+grow_vertical = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="HBoxContainer" type="HBoxContainer" parent="FileSystemExtraUI/RenameFilePanel/VBoxContainer" unique_id=1950597193]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="FileSystemExtraUI/RenameFilePanel/VBoxContainer/HBoxContainer" unique_id=638926811]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Rename File"
+label_settings = SubResource("LabelSettings_ln2jk")
+horizontal_alignment = 1
+
+[node name="Button" type="Button" parent="FileSystemExtraUI/RenameFilePanel/VBoxContainer/HBoxContainer" unique_id=1814208953]
+modulate = Color(1, 0, 0, 1)
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+icon = ExtResource("11_5fp1n")
+flat = true
+expand_icon = true
+
+[node name="HSeparator" type="HSeparator" parent="FileSystemExtraUI/RenameFilePanel/VBoxContainer" unique_id=574383493]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_ck4ci")
+
+[node name="Label" type="Label" parent="FileSystemExtraUI/RenameFilePanel/VBoxContainer" unique_id=1861145530]
+layout_mode = 2
+text = "New Name"
+label_settings = SubResource("LabelSettings_2ajym")
+
+[node name="LineEdit" type="LineEdit" parent="FileSystemExtraUI/RenameFilePanel/VBoxContainer" unique_id=1716922040]
+layout_mode = 2
+theme_override_styles/normal = ExtResource("3_nn77b")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_sdkdm")
+text = "New Project()"
+
+[node name="Control" type="Control" parent="FileSystemExtraUI/RenameFilePanel/VBoxContainer" unique_id=1826084634]
+layout_mode = 2
+
+[node name="CreateProjectButton" type="Button" parent="FileSystemExtraUI/RenameFilePanel/VBoxContainer" unique_id=1535171271]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("10_nn77b")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("3_nn77b")
+text = "Rename"
+
+[node name="CreateFolderPanel" type="Panel" parent="FileSystemExtraUI" unique_id=15410752 node_paths=PackedStringArray("close_button", "select_button")]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -164.0
+offset_top = -86.0
+offset_right = 164.0
+offset_bottom = 93.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = ExtResource("1_s4chj")
+script = ExtResource("8_s4chj")
+close_button = NodePath("VBoxContainer/HBoxContainer/Button")
+select_button = NodePath("VBoxContainer/CreateProjectButton")
+mappings = Array[ExtResource("9_bwcsr")]([SubResource("Resource_bwcsr")])
+
+[node name="VBoxContainer" type="VBoxContainer" parent="FileSystemExtraUI/CreateFolderPanel" unique_id=1894924935]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.018518519
+anchor_top = 0.021951219
+anchor_right = 0.9814815
+anchor_bottom = 0.9780488
+grow_horizontal = 2
+grow_vertical = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="HBoxContainer" type="HBoxContainer" parent="FileSystemExtraUI/CreateFolderPanel/VBoxContainer" unique_id=1156525723]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="FileSystemExtraUI/CreateFolderPanel/VBoxContainer/HBoxContainer" unique_id=1800310925]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Create Folder"
+label_settings = SubResource("LabelSettings_ln2jk")
+horizontal_alignment = 1
+
+[node name="Button" type="Button" parent="FileSystemExtraUI/CreateFolderPanel/VBoxContainer/HBoxContainer" unique_id=1317467178]
+modulate = Color(1, 0, 0, 1)
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+icon = ExtResource("11_5fp1n")
+flat = true
+expand_icon = true
+
+[node name="HSeparator" type="HSeparator" parent="FileSystemExtraUI/CreateFolderPanel/VBoxContainer" unique_id=69798571]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_ck4ci")
+
+[node name="Label" type="Label" parent="FileSystemExtraUI/CreateFolderPanel/VBoxContainer" unique_id=699383179]
+layout_mode = 2
+text = "Folder Name"
+label_settings = SubResource("LabelSettings_2ajym")
+
+[node name="LineEdit" type="LineEdit" parent="FileSystemExtraUI/CreateFolderPanel/VBoxContainer" unique_id=1452044838]
+layout_mode = 2
+theme_override_styles/normal = ExtResource("3_nn77b")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_sdkdm")
+placeholder_text = "Enter Folder Name..."
+
+[node name="Control" type="Control" parent="FileSystemExtraUI/CreateFolderPanel/VBoxContainer" unique_id=713929602]
+layout_mode = 2
+
+[node name="CreateProjectButton" type="Button" parent="FileSystemExtraUI/CreateFolderPanel/VBoxContainer" unique_id=1075991444]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("10_nn77b")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("3_nn77b")
+text = "Create"
+
+[node name="DeleteFilePanel" type="Panel" parent="FileSystemExtraUI" unique_id=1037006703]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -164.0
+offset_top = -91.0
+offset_right = 164.0
+offset_bottom = 98.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = ExtResource("1_s4chj")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="FileSystemExtraUI/DeleteFilePanel" unique_id=126438976]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.018518519
+anchor_top = 0.021951219
+anchor_right = 0.9814815
+anchor_bottom = 0.9780488
+grow_horizontal = 2
+grow_vertical = 2
+metadata/_edit_use_anchors_ = true
+
+[node name="HBoxContainer" type="HBoxContainer" parent="FileSystemExtraUI/DeleteFilePanel/VBoxContainer" unique_id=1745612163]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="FileSystemExtraUI/DeleteFilePanel/VBoxContainer/HBoxContainer" unique_id=1207684426]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Delete Files"
+label_settings = SubResource("LabelSettings_ln2jk")
+horizontal_alignment = 1
+
+[node name="Button" type="Button" parent="FileSystemExtraUI/DeleteFilePanel/VBoxContainer/HBoxContainer" unique_id=1758388568]
+modulate = Color(1, 0, 0, 1)
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+icon = ExtResource("11_5fp1n")
+flat = true
+expand_icon = true
+
+[node name="HSeparator" type="HSeparator" parent="FileSystemExtraUI/DeleteFilePanel/VBoxContainer" unique_id=371159204]
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_ck4ci")
+
+[node name="Label" type="Label" parent="FileSystemExtraUI/DeleteFilePanel/VBoxContainer" unique_id=386025501]
+layout_mode = 2
+text = "Are you sure you want to delete selected?"
+label_settings = SubResource("LabelSettings_2ajym")
+
+[node name="Control" type="Control" parent="FileSystemExtraUI/DeleteFilePanel/VBoxContainer" unique_id=1864269192]
+layout_mode = 2
+
+[node name="DeleteFileButton" type="Button" parent="FileSystemExtraUI/DeleteFilePanel/VBoxContainer" unique_id=858435437]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("10_nn77b")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("3_nn77b")
+text = "Delete"
+
+[node name="ToRecycleBinButton" type="Button" parent="FileSystemExtraUI/DeleteFilePanel/VBoxContainer" unique_id=1843466883]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("10_nn77b")
+theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = ExtResource("3_nn77b")
+text = "To Recyle Bin"

@@ -142,4 +142,4 @@ func remove_project_pressed() -> void:
 
 func open_location_pressed() -> void:
 	if selected_panel_display_is_invalid(): return
-	OS.shell_open(selected_panel_display.project_path.text)
+	FileOperations.open_file(selected_panel_display.project_path.text)

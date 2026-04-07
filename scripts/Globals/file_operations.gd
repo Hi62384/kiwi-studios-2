@@ -23,6 +23,48 @@ const _FILE_TYPE_TO_EXTENSION: Dictionary = {
 	}
 
 
+#is_path_inside("res://folder", "res://folder/file.txt") -> true
+static func is_path_inside(parent_path: String, child_path: String) -> bool:
+	# Normalize slashes (important on Windows)
+	parent_path = parent_path.replace("\\", "/")
+	child_path = child_path.replace("\\", "/")
+	
+	if parent_path == child_path:
+		return true
+	
+	# Clean paths (removes "..", ".", etc.)
+	parent_path = parent_path.simplify_path()
+	child_path = child_path.simplify_path()
+
+	# Ensure proper folder boundary
+	var base := parent_path.rstrip("/") + "/"
+
+	return child_path.begins_with(base)
+
+
+
+static func file_is_sensitive(file_path: String) -> bool:
+	return LocalProjectFilesystem.get_sensetive_file_paths().has(file_path)
+
+
+
+static func path_exists(path: String) -> bool:
+	return FileAccess.file_exists(path) or DirAccess.dir_exists_absolute(path)
+
+
+
+static func get_lowest_directory(path: String) -> String:
+	if path.get_extension() == "":
+		return path
+	return path.get_base_dir()
+
+
+
+static func _update_local_project_filesystem_if_file_in_project(file: String) -> void:
+	if LocalProjectFilesystem.file_exists_in_project_directory(file):
+		LocalProjectFilesystem.update_root_folder()
+
+
 static func file_type_to_extension(file_type: FileType) -> Array:
 	return _FILE_TYPE_TO_EXTENSION.get(file_type)
 
@@ -37,20 +79,126 @@ static func extension_to_file_type(extension: String) -> FileType:
 
 
 static func delete_directory(directory: String) -> void:
+	if file_is_sensitive(directory): return
+	
 	for file in DirAccess.get_files_at(directory):
-		DirAccess.remove_absolute(directory.path_join(file))
+		delete_file(directory.path_join(file))
 	for dir in DirAccess.get_directories_at(directory):
 		delete_directory(directory.path_join(dir))
 	DirAccess.remove_absolute(directory)
+	
+	_update_local_project_filesystem_if_file_in_project(directory)
 
 
 
-static func move_directory_to_trash(dir: String) -> void:
+static func create_folder_at(path: String) -> void:
+	if !dir_path_string_is_valid(path): return
+	path = get_unique_name(path)
+	DirAccess.make_dir_recursive_absolute(path)
+	_update_local_project_filesystem_if_file_in_project(path)
+
+
+
+static func delete_file(file_path: String) -> void:
+	if file_is_sensitive(file_path): return
+	DirAccess.remove_absolute(file_path)
+	_update_local_project_filesystem_if_file_in_project(file_path)
+
+
+
+static func move_to_trash(dir: String) -> void:
+	if file_is_sensitive(dir): return
 	OS.move_to_trash(dir)
+	_update_local_project_filesystem_if_file_in_project(dir)
+
+
+
+static func move_to_project_trash(dir: String) -> void:
+	if file_is_sensitive(dir): return
+	move_absolute(dir, LocalProjectFilesystem.get_project_trash_directory())
+	_update_local_project_filesystem_if_file_in_project(dir)
+
+
+
+#move everything in project trash folder, to system trash folder
+static func flush_project_trash() -> void:
+	var trash_directory: String = LocalProjectFilesystem.get_project_trash_directory()
+	for file in DirAccess.get_files_at(trash_directory):
+		move_to_trash(trash_directory.path_join(file))
+	for dir in DirAccess.get_directories_at(trash_directory):
+		move_to_trash(trash_directory.path_join(dir))
+
+
+
+static func open_file(file: String) -> void:
+	OS.shell_open(file)
+
+
+
+#moves a file or directory to a given dir location
+static func move_absolute(from_path: String, to_dir: String) -> void:
+	if file_is_sensitive(from_path): return
+	if !dir_path_string_is_valid(to_dir): return
+	var file_name: String = from_path.get_file()
+	var new_path: String = to_dir + "/" + file_name
+	if path_exists(new_path): return
+	DirAccess.rename_absolute(from_path, new_path)
+	_update_local_project_filesystem_if_file_in_project(from_path)
+
+
+static func move_files(path_to_move_to: String, files_to_move: Array[String]) -> void:
+	path_to_move_to = get_lowest_directory(path_to_move_to)
+	for file_path: String in files_to_move:
+		if FileOperations.is_path_inside(file_path, path_to_move_to): 
+			continue
+		FileOperations.move_absolute(file_path, path_to_move_to)
+
+
+
+#changes the name of only the file of the given path, and returns new result
+static func get_changed_name_path(path: String, new_name: String) -> String:
+	var base_directory: String = path.get_base_dir()
+	var extension: String = path.get_extension()
+	if extension != "": extension = "." + extension
+	var new_path: String = base_directory + "/" + new_name + extension
+	return new_path
+
+
+
+#adds "-copy" at the end of the paths filename
+static func get_unique_name(path: String) -> String:
+	while path_exists(path):
+		var path_name: String = path.get_basename().get_file()
+		path = get_changed_name_path(path, path_name + "-copy")
+	return path
+
+
+
+
+#renames a file or directory with the new given name. Extension not needed
+static func rename_absolute(path: String, new_name: String) -> void:
+	if file_is_sensitive(path): return
+	if !dir_path_string_is_valid(new_name): return
+	var new_path: String = get_changed_name_path(path, new_name)
+	DirAccess.rename_absolute(path, new_path)
+	_update_local_project_filesystem_if_file_in_project(path)
+
+
+
+static func duplicate_path_absolute(from_path: String, to_path: String) -> void:
+	if from_path.get_extension() == "":
+		duplicate_directory(from_path, to_path)
+	else:
+		duplicate_file(from_path, to_path)
 
 
 
 static func duplicate_directory(from_path: String, to_path: String) -> void:
+	if file_is_sensitive(from_path): return
+	if !dir_path_string_is_valid(to_path): return
+	
+	to_path = get_unique_name(to_path)
+	
 	var dir := DirAccess.open(from_path)
 	if dir == null:
 		push_warning("Error opening source directory: " + from_path)
@@ -79,6 +227,16 @@ static func duplicate_directory(from_path: String, to_path: String) -> void:
 		file_name = dir.get_next()
 
 	dir.list_dir_end()
+	_update_local_project_filesystem_if_file_in_project(from_path)
+
+
+
+static func duplicate_file(from_path: String, to_path: String) -> void:
+	if file_is_sensitive(from_path): return
+	if !dir_path_string_is_valid(to_path): return
+	to_path = get_unique_name(to_path)
+	DirAccess.copy_absolute(from_path, to_path)
+	_update_local_project_filesystem_if_file_in_project(from_path)
 
 
 
@@ -132,7 +290,9 @@ static func dir_path_string_is_valid(path: String) -> bool:
 	if path == "":
 		return false
 	
-	var invalid_chars = ["<",">",'"',"'","\\","//","|","?","*"]
+	path = path.get_basename()
+	
+	var invalid_chars = ["<",">",'"',"'","\\","//","|","?","*","."]
 	
 	for invalid_char: String in invalid_chars:
 		if path.contains(invalid_char):
