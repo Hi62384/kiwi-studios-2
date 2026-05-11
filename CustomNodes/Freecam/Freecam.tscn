@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://nk3th1hepl7n"]
+
+[ext_resource type="Script" uid="uid://65nr6lacg13d" path="res://CustomNodes/Freecam/Freecam.gd" id="1_q8las"]
+
+[node name="Freecam" type="Node3D" unique_id=1750300459]
+script = ExtResource("1_q8las")
+
+[node name="Head" type="Node3D" parent="." unique_id=786684905]
+
+[node name="Camera3D" type="Camera3D" parent="Head" unique_id=505008266]

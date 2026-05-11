@@ -8,13 +8,18 @@
 [ext_resource type="Texture2D" uid="uid://dkgsc8c5o2tq3" path="res://resources/Images/BasicImages/Undo.png" id="5_nxtc6"]
 [ext_resource type="PackedScene" uid="uid://vmu5rxoalk8x" path="res://CustomNodes/FileSystem/file_system.tscn" id="6_3p2gp"]
 [ext_resource type="Texture2D" uid="uid://dln4iaiin0dr1" path="res://resources/Images/BasicImages/Redo.png" id="6_jlsqs"]
+[ext_resource type="Script" uid="uid://cbpyo2oo61yst" path="res://Workspaces/SceneWorkspace/scripts/Viewport/viewport_focusable_key_input.gd" id="7_nfivy"]
 [ext_resource type="Texture2D" uid="uid://b088kic2mwjwx" path="res://resources/Images/BasicImages/Play.png" id="7_q8u5g"]
+[ext_resource type="SystemFont" uid="uid://bwdt8qysdchp6" path="res://resources/fonts/ReemKufi.tres" id="8_1nqs0"]
 [ext_resource type="Texture2D" uid="uid://bb8df5qnn7eat" path="res://resources/Images/BasicImages/EncircledMinus.png" id="8_lhr70"]
 [ext_resource type="Texture2D" uid="uid://8cur2hvvbfrg" path="res://resources/Images/ToolImages/Magnet.png" id="8_q8u5g"]
 [ext_resource type="Texture2D" uid="uid://c1qwvi4i47ll6" path="res://resources/Images/ToolImages/Scissors.png" id="9_lhr70"]
 [ext_resource type="Texture2D" uid="uid://p66slynp1u67" path="res://resources/Images/BasicImages/EncircledPlus.png" id="9_wp0k4"]
 [ext_resource type="Texture2D" uid="uid://b25d122d020e7" path="res://resources/Images/ToolImages/TrashCan.png" id="12_mwfav"]
 [ext_resource type="Texture2D" uid="uid://cqwv3phf7hbob" path="res://resources/Images/ToolImages/Copy.png" id="14_cvmbd"]
+[ext_resource type="PackedScene" uid="uid://nk3th1hepl7n" path="res://CustomNodes/Freecam/Freecam.tscn" id="16_bb450"]
+[ext_resource type="Environment" uid="uid://bngpc7xkudi0e" path="res://resources/environments/DefaultEnvironment.tres" id="17_bb450"]
+[ext_resource type="Script" uid="uid://g3isy00e4xs5" path="res://scripts/Extra/thumbnail_renderer.gd" id="17_ft6cd"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0bbpv"]
 content_margin_left = 10.0
@@ -27,9 +32,39 @@ border_color = Color(1, 1, 1, 0.75)
 corner_detail = 1
 
 [sub_resource type="ViewportTexture" id="ViewportTexture_vcsgt"]
-viewport_path = NodePath("SubViewport")
+viewport_path = NodePath("MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/World/SubViewport")
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_rarhs"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nfivy"]
+bg_color = Color(0.103904866, 0.19808325, 0.23934755, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 0, 0, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1nqs0"]
+bg_color = Color(0.44560075, 0.63360727, 0.702059, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0, 0, 0, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="LabelSettings" id="LabelSettings_1iba3"]
+font = ExtResource("8_1nqs0")
+font_size = 18
+outline_size = 2
+outline_color = Color(0, 0, 0, 1)
 
 [sub_resource type="LabelSettings" id="LabelSettings_nxtc6"]
 font = ExtResource("1_rvslj")
@@ -107,6 +142,22 @@ corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 corner_detail = 6
 
+[sub_resource type="BoxMesh" id="BoxMesh_bb450"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_bb450"]
+
+[sub_resource type="Sky" id="Sky_nfivy"]
+sky_material = SubResource("ProceduralSkyMaterial_bb450")
+
+[sub_resource type="Environment" id="Environment_1nqs0"]
+background_mode = 2
+sky = SubResource("Sky_nfivy")
+
+[sub_resource type="World3D" id="World3D_ft6cd"]
+environment = ExtResource("17_bb450")
+
+[sub_resource type="SphereMesh" id="SphereMesh_cvmbd"]
+
 [node name="Node3D" type="Node3D" unique_id=2065210094]
 
 [node name="System" type="Node" parent="." unique_id=58761063]
@@ -142,7 +193,7 @@ grow_vertical = 2
 [node name="HBoxContainer" type="HBoxContainer" parent="MainUI/ColorRect/VBoxContainer" unique_id=379461578]
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
-theme_override_constants/separation = 4
+theme_override_constants/separation = 8
 
 [node name="Control" type="Control" parent="MainUI/ColorRect/VBoxContainer/HBoxContainer" unique_id=1821897476]
 custom_minimum_size = Vector2(10, 0)
@@ -152,6 +203,12 @@ layout_mode = 2
 layout_mode = 2
 theme_override_fonts/font = ExtResource("1_rvslj")
 text = "Project"
+flat = true
+
+[node name="EditorButton" type="Button" parent="MainUI/ColorRect/VBoxContainer/HBoxContainer" unique_id=1682172999]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("1_rvslj")
+text = "Editor"
 flat = true
 
 [node name="Tabs" type="TabBar" parent="MainUI/ColorRect/VBoxContainer" unique_id=1183290878]
@@ -275,6 +332,45 @@ theme_override_styles/hover = SubResource("StyleBoxEmpty_rarhs")
 theme_override_styles/disabled = SubResource("StyleBoxEmpty_rarhs")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_rarhs")
 flat = true
+
+[node name="ViewportFocusableKeyInput" type="Control" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/HSplitContainer/VBoxContainer/Viewport" unique_id=2068624122]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("7_nfivy")
+
+[node name="FreecamSpeedBar" type="ProgressBar" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/HSplitContainer/VBoxContainer/Viewport" unique_id=1920368441]
+visible = false
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -255.0
+offset_right = 255.0
+offset_bottom = 27.0
+grow_horizontal = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_nfivy")
+theme_override_styles/fill = SubResource("StyleBoxFlat_1nqs0")
+max_value = 1.0
+step = 0.001
+value = 0.395
+show_percentage = false
+
+[node name="FreecamSpeedLabel" type="Label" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/HSplitContainer/VBoxContainer/Viewport/FreecamSpeedBar" unique_id=1953313895]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 2.0
+offset_top = -11.5
+offset_right = 167.0
+offset_bottom = 11.5
+grow_vertical = 2
+text = "Freecam Speed: 5m/s"
+label_settings = SubResource("LabelSettings_1iba3")
 
 [node name="PropertiesPanel" type="Panel" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/HSplitContainer" unique_id=1678925762]
 layout_mode = 2
@@ -480,7 +576,41 @@ theme_override_styles/grabber = SubResource("StyleBoxFlat_cvmbd")
 max_value = 1.02
 page = 0.02
 
-[node name="SubViewport" type="SubViewport" parent="." unique_id=2141570855]
+[node name="World" type="Node3D" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace" unique_id=659808753]
+
+[node name="SubViewport" type="SubViewport" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/World" unique_id=905143526]
 size = Vector2i(1920, 1080)
 
-[node name="Camera3D" type="Camera3D" parent="SubViewport" unique_id=1822734749]
+[node name="Freecam" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/World/SubViewport" unique_id=1750300459 instance=ExtResource("16_bb450")]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/World/SubViewport" unique_id=595959760]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3.4650602)
+mesh = SubResource("BoxMesh_bb450")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/World/SubViewport" unique_id=1448817400]
+environment = SubResource("Environment_1nqs0")
+
+[node name="ThumbnailRenderer" type="Node3D" parent="." unique_id=947828421]
+script = ExtResource("17_ft6cd")
+
+[node name="SubViewport" type="SubViewport" parent="ThumbnailRenderer" unique_id=949090201]
+own_world_3d = true
+world_3d = SubResource("World3D_ft6cd")
+size = Vector2i(256, 256)
+
+[node name="Camera3D" type="Camera3D" parent="ThumbnailRenderer/SubViewport" unique_id=1556617333]
+cull_mask = 1
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="ThumbnailRenderer/SubViewport" unique_id=1101741898]
+transform = Transform3D(0.2999502, 0.6830127, -0.66597563, -0.4999999, 0.70710677, 0.50000006, 0.8124222, 0.1830126, 0.5536032, 0, 0, 0)
+light_cull_mask = 4293918721
+
+[node name="SphereRenderer" type="MeshInstance3D" parent="ThumbnailRenderer/SubViewport" unique_id=1142599916]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.85577077)
+mesh = SubResource("SphereMesh_cvmbd")
+
+[node name="ObjectHolder" type="MeshInstance3D" parent="ThumbnailRenderer/SubViewport" unique_id=1609173796]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.8942313)
+layers = 524289
+
+[editable path="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/World/SubViewport/Freecam"]

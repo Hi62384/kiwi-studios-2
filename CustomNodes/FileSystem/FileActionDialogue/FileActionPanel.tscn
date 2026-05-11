@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://b7rja2mjbms6m" path="res://CustomNodes/FileSystem/FileActionDialogue/file_action_panel.gd" id="2_y8axd"]
 [ext_resource type="Texture2D" uid="uid://mwmlqweqemfk" path="res://resources/Images/ToolImages/FileColored.png" id="3_rr7mf"]
 [ext_resource type="Texture2D" uid="uid://bdblvy7bf8xgn" path="res://resources/Images/BasicImages/PointerRight.png" id="3_y8axd"]
+[ext_resource type="SystemFont" uid="uid://fue8lb1oipxq" path="res://resources/fonts/MainFont.tres" id="5_wox5d"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_b72ha"]
 
@@ -14,6 +15,11 @@ subpixel_positioning = 0
 [sub_resource type="LabelSettings" id="LabelSettings_yxlcp"]
 font = SubResource("SystemFont_1iba3")
 font_size = 14
+
+[sub_resource type="LabelSettings" id="LabelSettings_h6ywr"]
+font = ExtResource("5_wox5d")
+font_size = 9
+font_color = Color(0.36408392, 0.36408395, 0.36408392, 1)
 
 [node name="Button2" type="Button" unique_id=440969110]
 custom_minimum_size = Vector2(0, 30)
@@ -59,3 +65,15 @@ icon = ExtResource("3_y8axd")
 flat = true
 icon_alignment = 1
 expand_icon = true
+
+[node name="key_shortcut" type="Label" parent="." unique_id=1001589289]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -8.0
+grow_horizontal = 2
+grow_vertical = 0
+label_settings = SubResource("LabelSettings_h6ywr")
+horizontal_alignment = 1

@@ -13,10 +13,14 @@ const FileSystemCallableActions = preload("uid://b5gm21p0e2sbv")
 
 @onready var container: VBoxContainer = $VBoxContainer/Panel/ScrollContainer/VBoxContainer
 @onready var files_selector: FileSystemFilesSelector = $FilesSelector
-@onready var extra_file_ui: FileSystemExtraUi = $FileActions
+@onready var file_system_extra_ui: FileSystemExtraUi = $FileSystemExtraUI
 @onready var file_mover: FileMover = $FileMover
 @onready var file_search_line_edit: LineEdit = $VBoxContainer/HBoxContainer/LineEdit
-@onready var file_system_actions: FileSystemCallableActions = $FileSystemActions
+@onready var file_system_callable_actions: FileSystemCallableActions = $FileSystemCallableActions
+
+
+@onready var undo_button: Button = $VBoxContainer/HBoxContainer/undo_button
+@onready var redo_button: Button = $VBoxContainer/HBoxContainer/redo_button
 
 var _expanded_folders: Array[String]
 var _ordered_expandable_buttons: Array[ExpandableButton]
@@ -30,6 +34,9 @@ func _ready() -> void:
 		update_filesystem_display()
 		)
 	
+	undo_button.pressed.connect(file_system_callable_actions.undo)
+	redo_button.pressed.connect(file_system_callable_actions.redo)
+
 
 
 #creates array for _filtered_files_to_display of all individual files/folders that should be filtered
@@ -88,7 +95,7 @@ func update_filesystem_display() -> void:
 	_style_expandable_button(
 		expandable_button,
 		root_folder.path.get_file(),
-		FileOperations.get_file_thumbnail(root_folder.path)
+		await FileOperations.get_file_thumbnail(root_folder.path)
 	)
 	
 	update_folder_display(root_folder, expandable_button)
@@ -117,7 +124,7 @@ func update_folder_display(folder: LocalProjectFilesystem.Folder, expandable_but
 		_style_expandable_button(
 			child_expandable_button,
 			file.path.get_file(),
-			FileOperations.get_file_thumbnail(file.path),
+			await FileOperations.get_file_thumbnail(file.path),
 			file is LocalProjectFilesystem.Folder
 		)
 		
@@ -191,7 +198,7 @@ func file_pressed(expandable_button: ExpandableButton) -> void:
 
 func file_right_clicked(expandable_button: ExpandableButton) -> void:
 	files_selector.handle_input_for_right_clicked_file(expandable_button)
-	extra_file_ui.display_operations(expandable_button)
+	file_system_extra_ui.display_operations(expandable_button)
 
 
 

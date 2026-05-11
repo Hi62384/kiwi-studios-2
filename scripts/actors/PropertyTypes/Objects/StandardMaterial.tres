@@ -1,0 +1,458 @@
+[gd_resource type="Resource" script_class="ActorObjectProperty" format=3 uid="uid://qir6gthb5qof"]
+
+[ext_resource type="Resource" uid="uid://l5slfqy66r8e" path="res://scripts/actors/PropertyTypes/Objects/BaseMaterial.tres" id="1_hegcf"]
+[ext_resource type="Script" uid="uid://4qi1sbfai47e" path="res://scripts/actors/PropertyTypes/PropertyReference.gd" id="1_rg8y4"]
+[ext_resource type="Script" uid="uid://3frrqduvjscg" path="res://scripts/actors/PropertyTypes/PropertyReferenceGroup.gd" id="2_hegcf"]
+[ext_resource type="Script" uid="uid://cx3pq3yh2agge" path="res://scripts/actors/PropertyTypes/Properties/SelectableIntProperty.gd" id="3_qn477"]
+[ext_resource type="Script" uid="uid://crpiy56otettq" path="res://scripts/actors/PropertyTypes/Properties/BoolProperty.gd" id="4_wj5n5"]
+[ext_resource type="Script" uid="uid://ck081ocysgk2d" path="res://scripts/actors/PropertyTypes/Properties/ColorProperty.gd" id="5_lp53y"]
+[ext_resource type="Script" uid="uid://mgxfmpo0r6s7" path="res://scripts/actors/PropertyTypes/Properties/ImageProperty.gd" id="6_2lkma"]
+[ext_resource type="Script" uid="uid://cx7xpy50pvfx" path="res://scripts/actors/PropertyTypes/Properties/FloatProperty.gd" id="7_1e1gy"]
+[ext_resource type="Script" uid="uid://d0ryugtnswjx5" path="res://scripts/actors/PropertyTypes/ActorObjectProperty.gd" id="8_2ghcp"]
+
+[sub_resource type="Resource" id="Resource_tqtg0"]
+script = ExtResource("2_hegcf")
+group_name = "Transparency"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_xaxc5"]
+script = ExtResource("3_qn477")
+options = Array[String](["Disabled", "Alpha", "Alpha Scissor", "Alpha Hash", "Depth Prepass"])
+metadata/_custom_type_script = "uid://cx3pq3yh2agge"
+
+[sub_resource type="Resource" id="Resource_f1yie"]
+script = ExtResource("1_rg8y4")
+display_name = "Transparency"
+property = SubResource("Resource_xaxc5")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_v4vkg"]
+script = ExtResource("3_qn477")
+options = Array[String](["Mix", "Add", "Subtract", "Multiply", "Premultiplied Alpha"])
+metadata/_custom_type_script = "uid://cx3pq3yh2agge"
+
+[sub_resource type="Resource" id="Resource_yiui0"]
+script = ExtResource("1_rg8y4")
+display_name = "Blend Mode"
+property = SubResource("Resource_v4vkg")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_ybxpt"]
+script = ExtResource("3_qn477")
+options = Array[String](["back", "front", "disabled"])
+metadata/_custom_type_script = "uid://cx3pq3yh2agge"
+
+[sub_resource type="Resource" id="Resource_ge4gh"]
+script = ExtResource("1_rg8y4")
+display_name = "Cull Mode"
+property = SubResource("Resource_ybxpt")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_8keou"]
+script = ExtResource("4_wj5n5")
+metadata/_custom_type_script = "uid://crpiy56otettq"
+
+[sub_resource type="Resource" id="Resource_8oxuo"]
+script = ExtResource("1_rg8y4")
+display_name = "No Depth Test"
+property = SubResource("Resource_8keou")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_7t8f5"]
+script = ExtResource("4_wj5n5")
+metadata/_custom_type_script = "uid://crpiy56otettq"
+
+[sub_resource type="Resource" id="Resource_vs6d8"]
+script = ExtResource("1_rg8y4")
+display_name = "Inverted Depth Test"
+property = SubResource("Resource_7t8f5")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_4e1ru"]
+script = ExtResource("2_hegcf")
+group_name = "Shading"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_g0013"]
+script = ExtResource("3_qn477")
+options = Array[String](["Burley", "Lambert", "Lambert Wrap", "Toon"])
+metadata/_custom_type_script = "uid://cx3pq3yh2agge"
+
+[sub_resource type="Resource" id="Resource_laa20"]
+script = ExtResource("1_rg8y4")
+display_name = "Diffuse Mode"
+property = SubResource("Resource_g0013")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_1r6lj"]
+script = ExtResource("3_qn477")
+options = Array[String](["SchlickGGX", "Toon", "Disabled"])
+metadata/_custom_type_script = "uid://cx3pq3yh2agge"
+
+[sub_resource type="Resource" id="Resource_0uqvq"]
+script = ExtResource("1_rg8y4")
+display_name = "Specular Mode"
+property = SubResource("Resource_1r6lj")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_10tue"]
+script = ExtResource("3_qn477")
+options = Array[String](["Unshaded", "Per-Pixel", "Per-Vertex"])
+metadata/_custom_type_script = "uid://cx3pq3yh2agge"
+
+[sub_resource type="Resource" id="Resource_4xe2s"]
+script = ExtResource("1_rg8y4")
+display_name = "Shading Mode"
+property = SubResource("Resource_10tue")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_2qwnv"]
+script = ExtResource("4_wj5n5")
+metadata/_custom_type_script = "uid://crpiy56otettq"
+
+[sub_resource type="Resource" id="Resource_u18le"]
+script = ExtResource("1_rg8y4")
+display_name = "Disable Ambient Light"
+property = SubResource("Resource_2qwnv")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_4wjux"]
+script = ExtResource("4_wj5n5")
+metadata/_custom_type_script = "uid://crpiy56otettq"
+
+[sub_resource type="Resource" id="Resource_8kkvj"]
+script = ExtResource("1_rg8y4")
+display_name = "Disable Fog"
+property = SubResource("Resource_4wjux")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_5jif0"]
+script = ExtResource("2_hegcf")
+group_name = "Albedo"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_rhpc7"]
+script = ExtResource("5_lp53y")
+_value = Color(1, 1, 1, 1)
+metadata/_custom_type_script = "uid://ck081ocysgk2d"
+
+[sub_resource type="Resource" id="Resource_rx53d"]
+script = ExtResource("1_rg8y4")
+display_name = "Color"
+property = SubResource("Resource_rhpc7")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_6paww"]
+script = ExtResource("6_2lkma")
+metadata/_custom_type_script = "uid://mgxfmpo0r6s7"
+
+[sub_resource type="Resource" id="Resource_df08l"]
+script = ExtResource("1_rg8y4")
+display_name = "Texture"
+property = SubResource("Resource_6paww")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_lce6n"]
+script = ExtResource("2_hegcf")
+group_name = "Metallic"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_6neov"]
+script = ExtResource("7_1e1gy")
+min_max_range = Vector2(0, 1)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_e01cy"]
+script = ExtResource("1_rg8y4")
+display_name = "Metallic"
+property = SubResource("Resource_6neov")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_kc5tx"]
+script = ExtResource("7_1e1gy")
+_value = 0.5
+min_max_range = Vector2(0, 1)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_p0cva"]
+script = ExtResource("1_rg8y4")
+display_name = "Specular"
+property = SubResource("Resource_kc5tx")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_54rqb"]
+script = ExtResource("6_2lkma")
+metadata/_custom_type_script = "uid://mgxfmpo0r6s7"
+
+[sub_resource type="Resource" id="Resource_5rljp"]
+script = ExtResource("1_rg8y4")
+display_name = "Albedo Texture"
+property = SubResource("Resource_54rqb")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_r2axb"]
+script = ExtResource("2_hegcf")
+group_name = "Roughness"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_v1bek"]
+script = ExtResource("7_1e1gy")
+_value = 0.5
+min_max_range = Vector2(0, 1)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_yijsw"]
+script = ExtResource("1_rg8y4")
+display_name = "Roughness"
+property = SubResource("Resource_v1bek")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_jainp"]
+script = ExtResource("6_2lkma")
+metadata/_custom_type_script = "uid://mgxfmpo0r6s7"
+
+[sub_resource type="Resource" id="Resource_n5w5x"]
+script = ExtResource("1_rg8y4")
+display_name = "Roughness Texture"
+property = SubResource("Resource_jainp")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_cgdh3"]
+script = ExtResource("2_hegcf")
+group_name = "Emission"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_n6xcf"]
+script = ExtResource("5_lp53y")
+metadata/_custom_type_script = "uid://ck081ocysgk2d"
+
+[sub_resource type="Resource" id="Resource_1dv4v"]
+script = ExtResource("1_rg8y4")
+display_name = "Emission"
+property = SubResource("Resource_n6xcf")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_8r2lm"]
+script = ExtResource("7_1e1gy")
+_value = 1.0
+min_max_range = Vector2(0, 100)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_p0xfk"]
+script = ExtResource("1_rg8y4")
+display_name = "Emission Energy"
+property = SubResource("Resource_8r2lm")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_by6jt"]
+script = ExtResource("4_wj5n5")
+metadata/_custom_type_script = "uid://crpiy56otettq"
+
+[sub_resource type="Resource" id="Resource_gussq"]
+script = ExtResource("1_rg8y4")
+display_name = "Emission Multiply"
+property = SubResource("Resource_by6jt")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_03i0g"]
+script = ExtResource("6_2lkma")
+metadata/_custom_type_script = "uid://mgxfmpo0r6s7"
+
+[sub_resource type="Resource" id="Resource_6p3tj"]
+script = ExtResource("1_rg8y4")
+display_name = "Emission Texture"
+property = SubResource("Resource_03i0g")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_owelb"]
+script = ExtResource("2_hegcf")
+group_name = "Normal Map"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_u56m3"]
+script = ExtResource("7_1e1gy")
+_value = 1.0
+min_max_range = Vector2(-50, 50)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_0iwop"]
+script = ExtResource("1_rg8y4")
+display_name = "Normal Map Strength"
+property = SubResource("Resource_u56m3")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_fvs3y"]
+script = ExtResource("6_2lkma")
+metadata/_custom_type_script = "uid://mgxfmpo0r6s7"
+
+[sub_resource type="Resource" id="Resource_gqrmu"]
+script = ExtResource("1_rg8y4")
+display_name = "Normal Map Texture"
+property = SubResource("Resource_fvs3y")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_3trml"]
+script = ExtResource("6_2lkma")
+metadata/_custom_type_script = "uid://mgxfmpo0r6s7"
+
+[sub_resource type="Resource" id="Resource_s3frp"]
+script = ExtResource("1_rg8y4")
+display_name = "Bent Normal Map Texture"
+property = SubResource("Resource_3trml")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_1wpja"]
+script = ExtResource("2_hegcf")
+group_name = "Rim"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_n4e87"]
+script = ExtResource("7_1e1gy")
+min_max_range = Vector2(0, 1)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_nukv4"]
+script = ExtResource("1_rg8y4")
+display_name = "Rim"
+property = SubResource("Resource_n4e87")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_kb4us"]
+script = ExtResource("7_1e1gy")
+_value = 0.5
+min_max_range = Vector2(0, 1)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_lygvs"]
+script = ExtResource("1_rg8y4")
+display_name = "Rim Tint"
+property = SubResource("Resource_kb4us")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_pecu3"]
+script = ExtResource("6_2lkma")
+metadata/_custom_type_script = "uid://mgxfmpo0r6s7"
+
+[sub_resource type="Resource" id="Resource_bb5y6"]
+script = ExtResource("1_rg8y4")
+display_name = "Rim Texture"
+property = SubResource("Resource_pecu3")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_orp3b"]
+script = ExtResource("2_hegcf")
+group_name = "Clearcoat"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_xflmv"]
+script = ExtResource("4_wj5n5")
+metadata/_custom_type_script = "uid://crpiy56otettq"
+
+[sub_resource type="Resource" id="Resource_3xv3g"]
+script = ExtResource("1_rg8y4")
+display_name = "Clearcoat Enabled"
+property = SubResource("Resource_xflmv")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_fixdn"]
+script = ExtResource("7_1e1gy")
+_value = 1.0
+min_max_range = Vector2(0, 1)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_mo5mq"]
+script = ExtResource("1_rg8y4")
+display_name = "Clearcoat"
+property = SubResource("Resource_fixdn")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_7eaf1"]
+script = ExtResource("7_1e1gy")
+_value = 0.5
+min_max_range = Vector2(0, 1)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_dp2s8"]
+script = ExtResource("1_rg8y4")
+display_name = "Clearcoat Roughness"
+property = SubResource("Resource_7eaf1")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_2s4ty"]
+script = ExtResource("6_2lkma")
+metadata/_custom_type_script = "uid://mgxfmpo0r6s7"
+
+[sub_resource type="Resource" id="Resource_6cxvx"]
+script = ExtResource("1_rg8y4")
+display_name = "Clearcoat Texture"
+property = SubResource("Resource_2s4ty")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_c1pu8"]
+script = ExtResource("2_hegcf")
+group_name = "Subsurface Scattering"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_pw4r7"]
+script = ExtResource("7_1e1gy")
+min_max_range = Vector2(0, 1)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_o5etg"]
+script = ExtResource("1_rg8y4")
+display_name = "Subsurface Strength"
+property = SubResource("Resource_pw4r7")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_f2g7r"]
+script = ExtResource("4_wj5n5")
+metadata/_custom_type_script = "uid://crpiy56otettq"
+
+[sub_resource type="Resource" id="Resource_iqis4"]
+script = ExtResource("1_rg8y4")
+display_name = "Skin Mode"
+property = SubResource("Resource_f2g7r")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_jbgiv"]
+script = ExtResource("6_2lkma")
+metadata/_custom_type_script = "uid://mgxfmpo0r6s7"
+
+[sub_resource type="Resource" id="Resource_i5o5a"]
+script = ExtResource("1_rg8y4")
+display_name = "Subsurface Scattering Texture"
+property = SubResource("Resource_jbgiv")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_pas5i"]
+script = ExtResource("2_hegcf")
+group_name = "Billboard"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_b6la8"]
+script = ExtResource("3_qn477")
+options = Array[String](["Disabled", "Enabled", "Y-Billboard", "Particle Billboard"])
+metadata/_custom_type_script = "uid://cx3pq3yh2agge"
+
+[sub_resource type="Resource" id="Resource_vsw5k"]
+script = ExtResource("1_rg8y4")
+display_name = "Billboard Mode"
+property = SubResource("Resource_b6la8")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_bj435"]
+script = ExtResource("4_wj5n5")
+metadata/_custom_type_script = "uid://crpiy56otettq"
+
+[sub_resource type="Resource" id="Resource_ceb7w"]
+script = ExtResource("1_rg8y4")
+display_name = "Billboard Keep Scale"
+property = SubResource("Resource_bj435")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[resource]
+script = ExtResource("8_2ghcp")
+object_name = "StandardMaterial"
+inherits_object = ExtResource("1_hegcf")
+property_references = Array[ExtResource("1_rg8y4")]([SubResource("Resource_tqtg0"), SubResource("Resource_f1yie"), SubResource("Resource_yiui0"), SubResource("Resource_ge4gh"), SubResource("Resource_8oxuo"), SubResource("Resource_vs6d8"), SubResource("Resource_4e1ru"), SubResource("Resource_laa20"), SubResource("Resource_0uqvq"), SubResource("Resource_4xe2s"), SubResource("Resource_u18le"), SubResource("Resource_8kkvj"), SubResource("Resource_5jif0"), SubResource("Resource_rx53d"), SubResource("Resource_df08l"), SubResource("Resource_lce6n"), SubResource("Resource_e01cy"), SubResource("Resource_p0cva"), SubResource("Resource_5rljp"), SubResource("Resource_r2axb"), SubResource("Resource_yijsw"), SubResource("Resource_n5w5x"), SubResource("Resource_cgdh3"), SubResource("Resource_1dv4v"), SubResource("Resource_p0xfk"), SubResource("Resource_gussq"), SubResource("Resource_6p3tj"), SubResource("Resource_owelb"), SubResource("Resource_0iwop"), SubResource("Resource_gqrmu"), SubResource("Resource_s3frp"), SubResource("Resource_1wpja"), SubResource("Resource_nukv4"), SubResource("Resource_lygvs"), SubResource("Resource_bb5y6"), SubResource("Resource_orp3b"), SubResource("Resource_3xv3g"), SubResource("Resource_mo5mq"), SubResource("Resource_dp2s8"), SubResource("Resource_6cxvx"), SubResource("Resource_c1pu8"), SubResource("Resource_o5etg"), SubResource("Resource_iqis4"), SubResource("Resource_i5o5a"), SubResource("Resource_pas5i"), SubResource("Resource_vsw5k"), SubResource("Resource_ceb7w")])
+metadata/_custom_type_script = "uid://d0ryugtnswjx5"

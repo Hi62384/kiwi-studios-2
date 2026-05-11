@@ -4,6 +4,7 @@ extends Button
 @onready var icon_texture_rect: TextureRect = $HBoxContainer/TextureRect
 @onready var text_label: Label = $HBoxContainer/Label
 @onready var more_options_button: Button = $HBoxContainer/Button
+@onready var key_shortcut: Label = $key_shortcut
 
 @export var panel_icon: Texture2D:
 	set(v):
@@ -22,6 +23,15 @@ extends Button
 			await ready
 		
 		text_label.text = panel_text
+
+@export var key_shortcut_text: String:
+	set(v):
+		key_shortcut_text = v
+		
+		if !is_node_ready():
+			await ready
+		
+		key_shortcut.text = key_shortcut_text
 
 @export var has_more_options: bool = false:
 	set(v):

@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://dfmf8hoaarppx"]
+
+[ext_resource type="Script" uid="uid://w2tgx263lg4a" path="res://scripts/actors/Actors/Point3D/Point3DActor.gd" id="1_620uw"]
+[ext_resource type="Resource" uid="uid://2tqfxkgir3ya" path="res://scripts/actors/Actors/Point3D/Point3DRes.tres" id="2_b31sw"]
+
+[node name="Point3dActor" type="Node3D" unique_id=31268588]
+script = ExtResource("1_620uw")
+object_property = ExtResource("2_b31sw")

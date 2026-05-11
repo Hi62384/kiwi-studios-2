@@ -5,6 +5,8 @@ extends Node
 const FILE_COLORED_TEXTURE = preload("uid://mwmlqweqemfk")
 const FOLDER_COLORED_TEXTURE = preload("uid://h5xgw3ns54ys")
 const SPEAKER_TEXTURE = preload("uid://dcqki3r6v5dxo")
+const ThumbnailRenderer = preload("uid://g3isy00e4xs5")
+const CUBE_TEXTURE = preload("uid://bw47linn7yref")
 
 
 
@@ -13,14 +15,32 @@ enum FileType {
 	IMAGE,
 	AUDIO,
 	MODEL,
+	MESH,
+	GDSCRIPT,
+	GDSHADER,
+	ENVIRONMENT,
+	MATERIAL3D,
 }
 
 
 const _FILE_TYPE_TO_EXTENSION: Dictionary = {
 		FileType.IMAGE : ['png','jpg'],
 		FileType.AUDIO : ['mp3','wav'],
-		FileType.MODEL : ['fbx','glb','gltf']
+		FileType.MODEL : ['fbx','glb','gltf'],
+		FileType.GDSCRIPT: ['gd'],
+		FileType.GDSHADER: ['gdshader'],
+		FileType.ENVIRONMENT: ['tres'],
+		FileType.MATERIAL3D: ['tres'],
+		FileType.MESH: ['tres'],
 	}
+
+
+const _TRES_NAME_TO_FILE_TYPE: Dictionary = {
+	"Environment" : FileType.ENVIRONMENT,
+	"StandardMaterial3D" : FileType.MATERIAL3D,
+	"ArrayMesh" : FileType.MESH,
+}
+
 
 
 #is_path_inside("res://folder", "res://folder/file.txt") -> true
@@ -69,12 +89,54 @@ static func file_type_to_extension(file_type: FileType) -> Array:
 	return _FILE_TYPE_TO_EXTENSION.get(file_type)
 
 
-static func extension_to_file_type(extension: String) -> FileType:
+
+static func _get_tres_type(path: String) -> String:
+	var file := FileAccess.open(path, FileAccess.READ)
+	# Read first line (header)
+	var first_line := file.get_line()
+	file.close()
+	
+	var regex := RegEx.new()
+	
+	# 1. Try script_class first (custom resources)
+	regex.compile('script_class="([^"]+)"')
+	var result := regex.search(first_line)
+	if result:
+		return result.get_string(1)
+
+	# 2. Fallback to built-in type
+	regex.compile('type="([^"]+)"')
+	result = regex.search(first_line)
+	if result:
+		return result.get_string(1)
+
+	return ""
+
+
+
+
+
+
+
+static func get_type_of_file(file_path: String) -> FileType:
+	var extension: String = file_path.get_extension()
+	if extension == "": return FileType.FOLDER
+	elif extension == "tres":
+		var resource_name = _TRES_NAME_TO_FILE_TYPE.get(_get_tres_type(file_path))
+		if resource_name == null:
+			return FileType.FOLDER
+		return _TRES_NAME_TO_FILE_TYPE[_get_tres_type(file_path)]
+	
+	
 	for key: FileType in _FILE_TYPE_TO_EXTENSION.keys():
-		for _extension: String in _FILE_TYPE_TO_EXTENSION[key]:
-			if _extension == extension:
-				return key
+		var arr: Array = _FILE_TYPE_TO_EXTENSION[key]
+		
+		if arr.has(extension):
+			return key
+		
 	return FileType.FOLDER
+
+
 
 
 
@@ -138,7 +200,6 @@ static func open_file(file: String) -> void:
 #moves a file or directory to a given dir location
 static func move_absolute(from_path: String, to_dir: String) -> void:
 	if file_is_sensitive(from_path): return
-	if !dir_path_string_is_valid(to_dir): return
 	var file_name: String = from_path.get_file()
 	var new_path: String = to_dir + "/" + file_name
 	if path_exists(new_path): return
@@ -306,12 +367,15 @@ static func get_file_thumbnail(file: String) -> Texture2D:
 	if !(FileAccess.file_exists(file) or DirAccess.dir_exists_absolute(file)):
 		return null
 	
-	var file_type: FileType = extension_to_file_type(file.get_extension())
+	var file_type: FileType = get_type_of_file(file)
 	
 	if DirAccess.dir_exists_absolute(file): return FOLDER_COLORED_TEXTURE
 	elif file_type == FileType.IMAGE: return load_image(file)
 	elif file_type == FileType.AUDIO: return SPEAKER_TEXTURE
-	
+	elif file_type == FileType.MODEL: return CUBE_TEXTURE
+	elif file_type == FileType.MESH: return CUBE_TEXTURE
+	elif file_type == FileType.ENVIRONMENT: return await ThumbnailRenderer.render_environment(ResourceLoader.load(file))
+	elif file_type == FileType.MATERIAL3D: return await ThumbnailRenderer.render_material(ResourceLoader.load(file))
 	return FILE_COLORED_TEXTURE
 
 

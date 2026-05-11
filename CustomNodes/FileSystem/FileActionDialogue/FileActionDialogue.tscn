@@ -19,7 +19,7 @@ content_margin_bottom = 0.0
 color = Color(0.20751235, 0.20751238, 0.20751235, 1)
 
 [node name="Panel" type="Panel" unique_id=988390513]
-offset_left = 34.0
+offset_left = 20.0
 offset_top = 297.0
 offset_right = 238.0
 offset_bottom = 598.0
@@ -49,9 +49,6 @@ texture = ExtResource("3_6g0bl")
 [node name="Label" parent="VBoxContainer/Button8/HBoxContainer" parent_id_path=PackedInt32Array(440969110, 1040980889) index="1" unique_id=525360031]
 text = "Create New"
 
-[node name="Button" parent="VBoxContainer/Button8/HBoxContainer" parent_id_path=PackedInt32Array(440969110, 1040980889) index="2" unique_id=1419402624]
-visible = true
-
 [node name="HSeparator" type="HSeparator" parent="VBoxContainer" unique_id=21006245]
 layout_mode = 2
 theme_override_styles/separator = SubResource("StyleBoxLine_nfivy")
@@ -60,11 +57,13 @@ theme_override_styles/separator = SubResource("StyleBoxLine_nfivy")
 layout_mode = 2
 panel_icon = ExtResource("4_160du")
 panel_text = "Copy Path"
+key_shortcut_text = "Ctrl + C"
 
 [node name="Button9" parent="VBoxContainer" unique_id=77592763 instance=ExtResource("2_7p7ll")]
 layout_mode = 2
 panel_icon = ExtResource("4_160du")
 panel_text = "Copy Absolute Path"
+key_shortcut_text = "Ctrl + Shift + C"
 
 [node name="HSeparator2" type="HSeparator" parent="VBoxContainer" unique_id=1339334831]
 layout_mode = 2
@@ -74,16 +73,19 @@ theme_override_styles/separator = SubResource("StyleBoxLine_nfivy")
 layout_mode = 2
 panel_icon = ExtResource("5_noy3a")
 panel_text = "Rename"
+key_shortcut_text = "Ctrl + I"
 
 [node name="Button11" parent="VBoxContainer" unique_id=1564460425 instance=ExtResource("2_7p7ll")]
 layout_mode = 2
 panel_icon = ExtResource("6_hw8ro")
 panel_text = "Duplicate"
+key_shortcut_text = "Ctrl + d"
 
 [node name="Button12" parent="VBoxContainer" unique_id=764113550 instance=ExtResource("2_7p7ll")]
 layout_mode = 2
 panel_icon = ExtResource("7_58a50")
 panel_text = "Delete"
+key_shortcut_text = "Backspace"
 
 [node name="HSeparator3" type="HSeparator" parent="VBoxContainer" unique_id=369150146]
 layout_mode = 2
@@ -102,8 +104,8 @@ panel_text = "Open In External Program"
 [node name="CreateNewPanel" type="Panel" parent="." unique_id=222382993]
 visible = false
 layout_mode = 0
-offset_left = 205.0
-offset_right = 369.0
+offset_left = 218.0
+offset_right = 382.0
 offset_bottom = 34.0
 theme_override_styles/panel = ExtResource("1_3f31n")
 

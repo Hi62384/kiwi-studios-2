@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ActorObjectProperty" format=3 uid="uid://l5slfqy66r8e"]
+
+[ext_resource type="Script" uid="uid://4qi1sbfai47e" path="res://scripts/actors/PropertyTypes/PropertyReference.gd" id="1_g8jsi"]
+[ext_resource type="Script" uid="uid://d0ryugtnswjx5" path="res://scripts/actors/PropertyTypes/ActorObjectProperty.gd" id="2_w2su7"]
+
+[resource]
+script = ExtResource("2_w2su7")
+object_name = "Base Material"
+abstract = true
+metadata/_custom_type_script = "uid://d0ryugtnswjx5"

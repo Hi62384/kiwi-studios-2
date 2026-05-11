@@ -3,22 +3,24 @@
 -project creation menu (new scene)AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 -project filesystem uiAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 -project filesystemAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
--project filesystem undo/redo
--focus system
--actor properties primitives
--actor properties objects
--actor properties image object
--actor properties audio object
+-project filesystem undo/redoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-focus systemAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-actor properties primitivesAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-actor properties objectsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-gdscript propertyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-gdshader propertyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-environment objectAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-material 3d objectAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-shader material 3d objectAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 -actors
 -image actor
 -node3d actor
 -light actor
--material 3d object
 -mesh3d actor
 -camera actor
 -directional light actor
--environment object
 -environment actor
+
 -timeline logic and able to create actors
 -creating actors and moving them on timeline
 -changing actors length
@@ -27,6 +29,12 @@
 -display and able to change file properties on inspector
 -renaming actors (on inspector)
 -able to save and load objects in inspector
+
+-able to parent actors
+-able to unparent actors
+-scene tree clicking on actor only shows actor and its children on timeline
+-nested actor parents
+
 -scene tree
 -timeline sections in scene tree
 -dragging from filesystems on timeline to create actors
@@ -37,10 +45,7 @@
 -snapping timeline tool
 
 -remote transform actor
--able to parent actors
--able to unparent actors
--scene tree clicking on actor only shows actor and its children on timeline
--nested actor parents
+
 
 -each actor saves the inspector state
 -audio actor
@@ -77,6 +82,7 @@
 
 -click on actor in viewport to select it
 -3d tools to transform actors
+-3d tools unique to certain actors
 
 -deformation 2d object
 -ability to create viewport tools on an actor

@@ -33,7 +33,7 @@ func _move_selected_files_to_hovered_expandable_button() -> void:
 	var path_to_move_to: String = FileOperations.get_lowest_directory(_hovered_expandable_button.get_meta("path"))
 	var top_level_files: Array[ExpandableButton] = file_system.files_selector.get_expandable_buttons_top_selected_files()
 	var top_level_file_paths: Array[String] = file_system.expandable_button_arr_to_path_arr(top_level_files)
-	file_system.file_system_actions.move_files(path_to_move_to, top_level_file_paths)
+	file_system.file_system_callable_actions.move_files(path_to_move_to, top_level_file_paths)
 
 
 func _properly_position_folder_mover_icon() -> void:

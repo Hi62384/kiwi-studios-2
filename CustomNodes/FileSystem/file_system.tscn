@@ -15,6 +15,7 @@
 [ext_resource type="Script" uid="uid://biler6763synl" path="res://CustomNodes/FileSystem/file_mover.gd" id="12_bwcsr"]
 [ext_resource type="Script" uid="uid://btkxwby3ldicm" path="res://CustomNodes/FileSystem/file_system_extra_ui.gd" id="12_ck4ci"]
 [ext_resource type="Texture2D" uid="uid://h5xgw3ns54ys" path="res://resources/Images/ToolImages/FolderColored.png" id="13_nn77b"]
+[ext_resource type="Script" uid="uid://5b3es4pagcpo" path="res://CustomNodes/FileSystem/file_system_key_inputs.gd" id="16_ck4ci"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_ft6cd"]
 font = ExtResource("2_bwcsr")
@@ -77,14 +78,14 @@ grow_vertical = 2
 custom_minimum_size = Vector2(0, 25)
 layout_mode = 2
 
-[node name="Button" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1982606148]
+[node name="undo_button" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1982606148]
 custom_minimum_size = Vector2(25, 0)
 layout_mode = 2
 icon = ExtResource("4_ck4ci")
 flat = true
 expand_icon = true
 
-[node name="Button2" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=2129926066]
+[node name="redo_button" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=2129926066]
 custom_minimum_size = Vector2(25, 0)
 layout_mode = 2
 icon = ExtResource("5_2ajym")
@@ -374,3 +375,12 @@ theme_override_fonts/font = ExtResource("10_nn77b")
 theme_override_font_sizes/font_size = 24
 theme_override_styles/normal = ExtResource("3_nn77b")
 text = "To Recyle Bin"
+
+[node name="FocusableKeyInput" type="Control" parent="." unique_id=189670455]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("16_ck4ci")

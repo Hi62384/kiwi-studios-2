@@ -1,0 +1,568 @@
+[gd_resource type="Resource" script_class="ActorObjectProperty" format=3 uid="uid://bw54rq140cx8k"]
+
+[ext_resource type="Script" uid="uid://4qi1sbfai47e" path="res://scripts/actors/PropertyTypes/PropertyReference.gd" id="1_g5p1w"]
+[ext_resource type="Script" uid="uid://3frrqduvjscg" path="res://scripts/actors/PropertyTypes/PropertyReferenceGroup.gd" id="2_7i001"]
+[ext_resource type="Script" uid="uid://d0ryugtnswjx5" path="res://scripts/actors/PropertyTypes/ActorObjectProperty.gd" id="2_ob510"]
+[ext_resource type="Script" uid="uid://cx3pq3yh2agge" path="res://scripts/actors/PropertyTypes/Properties/SelectableIntProperty.gd" id="3_l7b7n"]
+[ext_resource type="Script" uid="uid://ck081ocysgk2d" path="res://scripts/actors/PropertyTypes/Properties/ColorProperty.gd" id="4_2862q"]
+[ext_resource type="Script" uid="uid://6s31sd2buphd" path="res://scripts/Extra/cute_condition.gd" id="5_glxbp"]
+[ext_resource type="Script" uid="uid://cx7xpy50pvfx" path="res://scripts/actors/PropertyTypes/Properties/FloatProperty.gd" id="6_l7b7n"]
+[ext_resource type="Script" uid="uid://mgxfmpo0r6s7" path="res://scripts/actors/PropertyTypes/Properties/ImageProperty.gd" id="7_glxbp"]
+[ext_resource type="Script" uid="uid://baxkewkw673d0" path="res://scripts/actors/PropertyTypes/Properties/GdshaderProperty.gd" id="8_d8c7h"]
+[ext_resource type="Script" uid="uid://bkhp0hgshw5ln" path="res://scripts/actors/PropertyTypes/Properties/Vector3Property.gd" id="9_d8c7h"]
+[ext_resource type="Script" uid="uid://crpiy56otettq" path="res://scripts/actors/PropertyTypes/Properties/BoolProperty.gd" id="10_4yj8x"]
+
+[sub_resource type="Resource" id="Resource_d8c7h"]
+script = ExtResource("2_7i001")
+group_name = "Sky"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_4yj8x"]
+script = ExtResource("3_l7b7n")
+options = Array[String](["Procedural", "Image", "Solid Color", "Shader"])
+metadata/_custom_type_script = "uid://cx3pq3yh2agge"
+
+[sub_resource type="Resource" id="Resource_7i001"]
+script = ExtResource("1_g5p1w")
+display_name = "Sky Type"
+property = SubResource("Resource_4yj8x")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_o27sq"]
+script = ExtResource("6_l7b7n")
+_value = 1.0
+min_max_range = Vector2(0, inf)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_h3n43"]
+script = ExtResource("1_g5p1w")
+display_name = "Sky Energy"
+property = SubResource("Resource_o27sq")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_js4eo"]
+script = ExtResource("6_l7b7n")
+min_max_range = Vector2(0, 180)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_0xi5j"]
+script = ExtResource("1_g5p1w")
+display_name = "FOV"
+property = SubResource("Resource_js4eo")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_j7rgj"]
+script = ExtResource("9_d8c7h")
+metadata/_custom_type_script = "uid://bkhp0hgshw5ln"
+
+[sub_resource type="Resource" id="Resource_nb35n"]
+script = ExtResource("1_g5p1w")
+display_name = "Rotation"
+property = SubResource("Resource_j7rgj")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_0svlj"]
+script = ExtResource("4_2862q")
+_value = Color(0.22410375, 0.74303514, 0.9999998, 1)
+metadata/_custom_type_script = "uid://ck081ocysgk2d"
+
+[sub_resource type="Resource" id="Resource_yel63"]
+script = ExtResource("5_glxbp")
+compare_value = [0]
+metadata/_custom_type_script = "uid://6s31sd2buphd"
+
+[sub_resource type="Resource" id="Resource_5fr8c"]
+script = ExtResource("1_g5p1w")
+display_name = "Sky Top Color"
+property = SubResource("Resource_0svlj")
+property_reference_visible = SubResource("Resource_7i001")
+property_reference_condition = SubResource("Resource_yel63")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_l7b7n"]
+script = ExtResource("4_2862q")
+_value = Color(0.70327336, 0.7908579, 0.84381574, 1)
+metadata/_custom_type_script = "uid://ck081ocysgk2d"
+
+[sub_resource type="Resource" id="Resource_2862q"]
+script = ExtResource("1_g5p1w")
+display_name = "Sky Horizon Color"
+property = SubResource("Resource_l7b7n")
+property_reference_visible = SubResource("Resource_7i001")
+property_reference_condition = SubResource("Resource_yel63")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_glxbp"]
+script = ExtResource("4_2862q")
+_value = Color(0.37992314, 0.31748882, 0.24623016, 1)
+metadata/_custom_type_script = "uid://ck081ocysgk2d"
+
+[sub_resource type="Resource" id="Resource_blncf"]
+script = ExtResource("1_g5p1w")
+display_name = "Ground Color"
+property = SubResource("Resource_glxbp")
+property_reference_visible = SubResource("Resource_7i001")
+property_reference_condition = SubResource("Resource_yel63")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_tlbnl"]
+script = ExtResource("6_l7b7n")
+_value = 0.15
+min_max_range = Vector2(0, 5)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_04h2d"]
+script = ExtResource("1_g5p1w")
+display_name = "Sky Curve"
+property = SubResource("Resource_tlbnl")
+property_reference_visible = SubResource("Resource_7i001")
+property_reference_condition = SubResource("Resource_yel63")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_ufd8g"]
+script = ExtResource("6_l7b7n")
+_value = 0.02
+min_max_range = Vector2(0, 5)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_7wvho"]
+script = ExtResource("1_g5p1w")
+display_name = "Ground Curve"
+property = SubResource("Resource_ufd8g")
+property_reference_visible = SubResource("Resource_7i001")
+property_reference_condition = SubResource("Resource_yel63")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_fwim5"]
+script = ExtResource("6_l7b7n")
+_value = 30.0
+min_max_range = Vector2(0, 180)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_fp74q"]
+script = ExtResource("1_g5p1w")
+display_name = "Sun Angle Max"
+property = SubResource("Resource_fwim5")
+property_reference_visible = SubResource("Resource_7i001")
+property_reference_condition = SubResource("Resource_yel63")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_neuvy"]
+script = ExtResource("6_l7b7n")
+_value = 0.15
+min_max_range = Vector2(0, 10)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_4ssne"]
+script = ExtResource("1_g5p1w")
+display_name = "Sun Curve"
+property = SubResource("Resource_neuvy")
+property_reference_visible = SubResource("Resource_7i001")
+property_reference_condition = SubResource("Resource_yel63")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_qylen"]
+script = ExtResource("7_glxbp")
+metadata/_custom_type_script = "uid://mgxfmpo0r6s7"
+
+[sub_resource type="Resource" id="Resource_vv8fn"]
+script = ExtResource("5_glxbp")
+compare_value = [1]
+metadata/_custom_type_script = "uid://6s31sd2buphd"
+
+[sub_resource type="Resource" id="Resource_idapy"]
+script = ExtResource("1_g5p1w")
+display_name = "Sky Image"
+property = SubResource("Resource_qylen")
+property_reference_visible = SubResource("Resource_7i001")
+property_reference_condition = SubResource("Resource_vv8fn")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_mp6xx"]
+script = ExtResource("4_2862q")
+_value = Color(0.542318, 0.542318, 0.542318, 1)
+metadata/_custom_type_script = "uid://ck081ocysgk2d"
+
+[sub_resource type="Resource" id="Resource_qk700"]
+script = ExtResource("5_glxbp")
+compare_value = [2]
+metadata/_custom_type_script = "uid://6s31sd2buphd"
+
+[sub_resource type="Resource" id="Resource_epkdr"]
+script = ExtResource("1_g5p1w")
+display_name = "Sky Color"
+property = SubResource("Resource_mp6xx")
+property_reference_visible = SubResource("Resource_7i001")
+property_reference_condition = SubResource("Resource_qk700")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_hha4v"]
+script = ExtResource("8_d8c7h")
+metadata/_custom_type_script = "uid://baxkewkw673d0"
+
+[sub_resource type="Resource" id="Resource_jdq21"]
+script = ExtResource("5_glxbp")
+compare_value = [3]
+metadata/_custom_type_script = "uid://6s31sd2buphd"
+
+[sub_resource type="Resource" id="Resource_pigu3"]
+script = ExtResource("1_g5p1w")
+display_name = "Sky Shader"
+property = SubResource("Resource_hha4v")
+property_reference_visible = SubResource("Resource_7i001")
+property_reference_condition = SubResource("Resource_jdq21")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_5y155"]
+script = ExtResource("2_7i001")
+group_name = "Ambient Light"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_u2osj"]
+script = ExtResource("4_2862q")
+metadata/_custom_type_script = "uid://ck081ocysgk2d"
+
+[sub_resource type="Resource" id="Resource_1hipp"]
+script = ExtResource("1_g5p1w")
+display_name = "Ambient Light Color"
+property = SubResource("Resource_u2osj")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_3uley"]
+script = ExtResource("6_l7b7n")
+_value = 1.0
+min_max_range = Vector2(0, inf)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_88ura"]
+script = ExtResource("1_g5p1w")
+display_name = "Ambient Light Energy"
+property = SubResource("Resource_3uley")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_qtses"]
+script = ExtResource("6_l7b7n")
+min_max_range = Vector2(0, 1)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_ovo0o"]
+script = ExtResource("1_g5p1w")
+display_name = "Ambient Light Sky Contribution"
+property = SubResource("Resource_qtses")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_q8quh"]
+script = ExtResource("2_7i001")
+group_name = "Reflected Light"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_ktyug"]
+script = ExtResource("3_l7b7n")
+options = Array[String](["Background", "Disabled", "Sky"])
+metadata/_custom_type_script = "uid://cx3pq3yh2agge"
+
+[sub_resource type="Resource" id="Resource_254db"]
+script = ExtResource("1_g5p1w")
+display_name = "Reflected Light"
+property = SubResource("Resource_ktyug")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_vurhl"]
+script = ExtResource("2_7i001")
+group_name = "World Lighting"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_k5smo"]
+script = ExtResource("10_4yj8x")
+metadata/_custom_type_script = "uid://crpiy56otettq"
+
+[sub_resource type="Resource" id="Resource_w3nbn"]
+script = ExtResource("1_g5p1w")
+display_name = "SSR"
+property = SubResource("Resource_k5smo")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_22rbf"]
+script = ExtResource("10_4yj8x")
+metadata/_custom_type_script = "uid://crpiy56otettq"
+
+[sub_resource type="Resource" id="Resource_ijgje"]
+script = ExtResource("1_g5p1w")
+display_name = "SSIL"
+property = SubResource("Resource_22rbf")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_ui1bx"]
+script = ExtResource("10_4yj8x")
+metadata/_custom_type_script = "uid://crpiy56otettq"
+
+[sub_resource type="Resource" id="Resource_fu8f6"]
+script = ExtResource("1_g5p1w")
+display_name = "SSAO"
+property = SubResource("Resource_ui1bx")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_6qmo6"]
+script = ExtResource("10_4yj8x")
+metadata/_custom_type_script = "uid://crpiy56otettq"
+
+[sub_resource type="Resource" id="Resource_u7v8v"]
+script = ExtResource("1_g5p1w")
+display_name = "SDFGI"
+property = SubResource("Resource_6qmo6")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_arwhb"]
+script = ExtResource("2_7i001")
+group_name = "Glow"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_l06xv"]
+script = ExtResource("10_4yj8x")
+metadata/_custom_type_script = "uid://crpiy56otettq"
+
+[sub_resource type="Resource" id="Resource_npej8"]
+script = ExtResource("1_g5p1w")
+display_name = "Normalized"
+property = SubResource("Resource_l06xv")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_ciwwr"]
+script = ExtResource("6_l7b7n")
+_value = 0.3
+min_max_range = Vector2(0, 8)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_6fqv4"]
+script = ExtResource("1_g5p1w")
+display_name = "Intensity"
+property = SubResource("Resource_ciwwr")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_s8opj"]
+script = ExtResource("6_l7b7n")
+_value = 1.0
+min_max_range = Vector2(0, 2)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_k1ofq"]
+script = ExtResource("1_g5p1w")
+display_name = "Strength"
+property = SubResource("Resource_s8opj")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_mv6ig"]
+script = ExtResource("6_l7b7n")
+min_max_range = Vector2(0, 1)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_mi2cw"]
+script = ExtResource("1_g5p1w")
+display_name = "Bloom"
+property = SubResource("Resource_mv6ig")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_lijit"]
+script = ExtResource("3_l7b7n")
+options = Array[String](["Additive", "Screen", "Softlight", "Replace", "Mix"])
+metadata/_custom_type_script = "uid://cx3pq3yh2agge"
+
+[sub_resource type="Resource" id="Resource_h6i07"]
+script = ExtResource("1_g5p1w")
+display_name = "Blend Mode"
+property = SubResource("Resource_lijit")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_ywrao"]
+script = ExtResource("2_7i001")
+group_name = "Fog"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_t1k2t"]
+script = ExtResource("4_2862q")
+_value = Color(0.5914576, 0.66461986, 0.7227353, 1)
+metadata/_custom_type_script = "uid://ck081ocysgk2d"
+
+[sub_resource type="Resource" id="Resource_bu220"]
+script = ExtResource("1_g5p1w")
+display_name = "Fog Light Color"
+property = SubResource("Resource_t1k2t")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_5ba4f"]
+script = ExtResource("6_l7b7n")
+_value = 1.0
+min_max_range = Vector2(0, 20)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_s64hb"]
+script = ExtResource("1_g5p1w")
+display_name = "Fog Light Energy"
+property = SubResource("Resource_5ba4f")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_71swc"]
+script = ExtResource("6_l7b7n")
+min_max_range = Vector2(0, 10)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_45qbs"]
+script = ExtResource("1_g5p1w")
+display_name = "Fog Sun Scatter"
+property = SubResource("Resource_71swc")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_opy5j"]
+script = ExtResource("6_l7b7n")
+_value = 0.01
+min_max_range = Vector2(0, 5)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_dra04"]
+script = ExtResource("1_g5p1w")
+display_name = "Fog Density"
+property = SubResource("Resource_opy5j")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_a3kim"]
+script = ExtResource("6_l7b7n")
+min_max_range = Vector2(0, 1)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_cnlug"]
+script = ExtResource("1_g5p1w")
+display_name = "Fog Aerial Perspective"
+property = SubResource("Resource_a3kim")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_8tmww"]
+script = ExtResource("6_l7b7n")
+_value = 1.0
+min_max_range = Vector2(1, 0)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_7cm02"]
+script = ExtResource("1_g5p1w")
+display_name = "Fog Sky Affect"
+property = SubResource("Resource_8tmww")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_w13db"]
+script = ExtResource("6_l7b7n")
+min_max_range = Vector2(-1024, 1024)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_715mo"]
+script = ExtResource("1_g5p1w")
+display_name = "Fog Height"
+property = SubResource("Resource_w13db")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_vpj80"]
+script = ExtResource("6_l7b7n")
+min_max_range = Vector2(-50, 50)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_74aly"]
+script = ExtResource("1_g5p1w")
+display_name = "Fog Height Density"
+property = SubResource("Resource_vpj80")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_x1csu"]
+script = ExtResource("2_7i001")
+group_name = "Volumetric Fog"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_521p2"]
+script = ExtResource("6_l7b7n")
+_value = 1.0
+min_max_range = Vector2(0, 16)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_wgaaw"]
+script = ExtResource("1_g5p1w")
+display_name = "GI Inject"
+property = SubResource("Resource_521p2")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_15x2q"]
+script = ExtResource("6_l7b7n")
+_value = 0.2
+min_max_range = Vector2(-0.9, 0.9)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_eukao"]
+script = ExtResource("1_g5p1w")
+display_name = "Anistropy"
+property = SubResource("Resource_15x2q")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_bpugd"]
+script = ExtResource("6_l7b7n")
+_value = 64.0
+min_max_range = Vector2(0, 4096)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_fc547"]
+script = ExtResource("1_g5p1w")
+display_name = "Length"
+property = SubResource("Resource_bpugd")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_we73c"]
+script = ExtResource("6_l7b7n")
+_value = 1.0
+min_max_range = Vector2(0, 1)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_hjrwx"]
+script = ExtResource("1_g5p1w")
+display_name = "Sky Affect"
+property = SubResource("Resource_we73c")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_tbf1w"]
+script = ExtResource("2_7i001")
+group_name = "Filters"
+metadata/_custom_type_script = "uid://3frrqduvjscg"
+
+[sub_resource type="Resource" id="Resource_4feye"]
+script = ExtResource("6_l7b7n")
+_value = 1.0
+min_max_range = Vector2(0, inf)
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_6fkv0"]
+script = ExtResource("1_g5p1w")
+display_name = "Lightness"
+property = SubResource("Resource_4feye")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_h1ocd"]
+script = ExtResource("6_l7b7n")
+_value = 1.0
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_4u7bj"]
+script = ExtResource("1_g5p1w")
+display_name = "Contrast"
+property = SubResource("Resource_h1ocd")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[sub_resource type="Resource" id="Resource_3p0ra"]
+script = ExtResource("6_l7b7n")
+_value = 1.0
+metadata/_custom_type_script = "uid://cx7xpy50pvfx"
+
+[sub_resource type="Resource" id="Resource_dan3m"]
+script = ExtResource("1_g5p1w")
+display_name = "Saturation"
+property = SubResource("Resource_3p0ra")
+metadata/_custom_type_script = "uid://4qi1sbfai47e"
+
+[resource]
+script = ExtResource("2_ob510")
+object_name = "Environment"
+property_references = Array[ExtResource("1_g5p1w")]([SubResource("Resource_d8c7h"), SubResource("Resource_7i001"), SubResource("Resource_h3n43"), SubResource("Resource_0xi5j"), SubResource("Resource_nb35n"), SubResource("Resource_5fr8c"), SubResource("Resource_2862q"), SubResource("Resource_blncf"), SubResource("Resource_04h2d"), SubResource("Resource_7wvho"), SubResource("Resource_fp74q"), SubResource("Resource_4ssne"), SubResource("Resource_idapy"), SubResource("Resource_epkdr"), SubResource("Resource_pigu3"), SubResource("Resource_5y155"), SubResource("Resource_1hipp"), SubResource("Resource_88ura"), SubResource("Resource_ovo0o"), SubResource("Resource_q8quh"), SubResource("Resource_254db"), SubResource("Resource_vurhl"), SubResource("Resource_w3nbn"), SubResource("Resource_ijgje"), SubResource("Resource_fu8f6"), SubResource("Resource_u7v8v"), SubResource("Resource_arwhb"), SubResource("Resource_npej8"), SubResource("Resource_6fqv4"), SubResource("Resource_k1ofq"), SubResource("Resource_mi2cw"), SubResource("Resource_h6i07"), SubResource("Resource_ywrao"), SubResource("Resource_bu220"), SubResource("Resource_s64hb"), SubResource("Resource_45qbs"), SubResource("Resource_dra04"), SubResource("Resource_cnlug"), SubResource("Resource_7cm02"), SubResource("Resource_715mo"), SubResource("Resource_74aly"), SubResource("Resource_x1csu"), SubResource("Resource_wgaaw"), SubResource("Resource_eukao"), SubResource("Resource_fc547"), SubResource("Resource_hjrwx"), SubResource("Resource_tbf1w"), SubResource("Resource_6fkv0"), SubResource("Resource_4u7bj"), SubResource("Resource_dan3m")])
+metadata/_custom_type_script = "uid://d0ryugtnswjx5"
