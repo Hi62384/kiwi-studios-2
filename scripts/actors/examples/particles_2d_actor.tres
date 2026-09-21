@@ -1,0 +1,212 @@
+[gd_resource type="Resource" script_class="ActorDefinition" format=3 uid="uid://oqek5hnm3r6x"]
+
+[ext_resource type="Script" uid="uid://cfphk6n07ph5o" path="res://scripts/actors/core/actor_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="2"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/ui_actor.tscn" id="3"]
+[ext_resource type="Texture2D" uid="uid://b474fsms6eref" path="res://resources/Images/ActorIcons/Particles2D.svg" id="4"]
+
+[sub_resource type="Resource" id="position"]
+script = ExtResource("2")
+id = &"position"
+label = "Position"
+value_type = 5
+animatable = true
+options = {
+"default": Vector2(0, 0),
+"group": "Transform",
+"suffix": " px"
+}
+
+[sub_resource type="Resource" id="rotation"]
+script = ExtResource("2")
+id = &"rotation"
+label = "Rotation"
+value_type = 3
+animatable = true
+options = {
+"default": 0.0,
+"group": "Transform",
+"suffix": " °"
+}
+
+[sub_resource type="Resource" id="scale"]
+script = ExtResource("2")
+id = &"scale"
+label = "Scale"
+value_type = 5
+animatable = true
+options = {
+"default": Vector2(1, 1),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="size"]
+script = ExtResource("2")
+id = &"size"
+label = "Selection Bounds"
+value_type = 5
+options = {
+"default": Vector2(160, 160),
+"group": "Editor",
+"suffix": " px"
+}
+
+[sub_resource type="Resource" id="emitting"]
+script = ExtResource("2")
+id = &"emitting"
+label = "Emitting"
+value_type = 1
+animatable = true
+options = {
+"default": true,
+"group": "Emission"
+}
+
+[sub_resource type="Resource" id="amount"]
+script = ExtResource("2")
+id = &"amount"
+label = "Amount"
+value_type = 2
+options = {
+"default": 64,
+"group": "Emission",
+"max": 4096,
+"min": 1
+}
+
+[sub_resource type="Resource" id="lifetime"]
+script = ExtResource("2")
+id = &"lifetime"
+label = "Lifetime"
+value_type = 3
+animatable = true
+options = {
+"default": 1.0,
+"group": "Emission",
+"max": 30.0,
+"min": 0.05,
+"suffix": " s"
+}
+
+[sub_resource type="Resource" id="one_shot"]
+script = ExtResource("2")
+id = &"one_shot"
+label = "One Shot"
+value_type = 1
+options = {
+"default": false,
+"group": "Emission"
+}
+
+[sub_resource type="Resource" id="explosiveness"]
+script = ExtResource("2")
+id = &"explosiveness"
+label = "Explosiveness"
+value_type = 3
+animatable = true
+options = {
+"default": 0.0,
+"group": "Emission",
+"max": 1.0,
+"min": 0.0
+}
+
+[sub_resource type="Resource" id="direction"]
+script = ExtResource("2")
+id = &"direction"
+label = "Direction"
+value_type = 3
+animatable = true
+options = {
+"default": -90.0,
+"group": "Motion",
+"max": 360.0,
+"min": -360.0,
+"suffix": " °"
+}
+
+[sub_resource type="Resource" id="spread"]
+script = ExtResource("2")
+id = &"spread"
+label = "Spread"
+value_type = 3
+animatable = true
+options = {
+"default": 30.0,
+"group": "Motion",
+"max": 180.0,
+"min": 0.0,
+"suffix": " °"
+}
+
+[sub_resource type="Resource" id="velocity"]
+script = ExtResource("2")
+id = &"velocity"
+label = "Velocity"
+value_type = 3
+animatable = true
+options = {
+"default": 120.0,
+"group": "Motion",
+"max": 2000.0,
+"min": 0.0,
+"suffix": " px/s"
+}
+
+[sub_resource type="Resource" id="gravity"]
+script = ExtResource("2")
+id = &"gravity"
+label = "Gravity"
+value_type = 5
+animatable = true
+options = {
+"default": Vector2(0, 98),
+"group": "Motion"
+}
+
+[sub_resource type="Resource" id="color"]
+script = ExtResource("2")
+id = &"color"
+label = "Color"
+value_type = 20
+animatable = true
+options = {
+"default": Color(1, 1, 1, 1),
+"group": "Appearance"
+}
+
+[sub_resource type="Resource" id="particle_size"]
+script = ExtResource("2")
+id = &"particle_size"
+label = "Particle Size"
+value_type = 3
+animatable = true
+options = {
+"default": 1.0,
+"group": "Appearance",
+"max": 20.0,
+"min": 0.05
+}
+
+[sub_resource type="Resource" id="canvas_material"]
+script = ExtResource("2")
+id = &"material"
+label = "Canvas Shader"
+object_type = &"canvas_shader_material"
+options = {
+"accepted_object_types": PackedStringArray("canvas_shader_material"),
+"default": null,
+"extensions": PackedStringArray("tres", "res"),
+"file_resource_mode": "editable",
+"group": "Appearance"
+}
+
+[resource]
+script = ExtResource("1")
+type_id = &"particles_2d"
+display_name = "2D Particles"
+category = "Media"
+description = "Screen-space particles for sparks, dust, snow, confetti, and transitions."
+icon = ExtResource("4")
+properties = Array[ExtResource("2")]([SubResource("position"), SubResource("rotation"), SubResource("scale"), SubResource("size"), SubResource("emitting"), SubResource("amount"), SubResource("lifetime"), SubResource("one_shot"), SubResource("explosiveness"), SubResource("direction"), SubResource("spread"), SubResource("velocity"), SubResource("gravity"), SubResource("color"), SubResource("particle_size"), SubResource("canvas_material")])
+runtime_scene = ExtResource("3")

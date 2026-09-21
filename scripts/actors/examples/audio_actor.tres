@@ -1,0 +1,110 @@
+[gd_resource type="Resource" script_class="ActorDefinition" format=3 uid="uid://cq34737u1f0jf"]
+
+[ext_resource type="Script" uid="uid://cfphk6n07ph5o" path="res://scripts/actors/core/actor_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="2"]
+[ext_resource type="Texture2D" uid="uid://db6jsym4km521" path="res://resources/Images/ActorIcons/Audio.svg" id="3"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/audio_actor.tscn" id="4"]
+
+[sub_resource type="Resource" id="source"]
+script = ExtResource("2")
+id = &"audio"
+label = "Audio"
+value_type = 4
+options = {
+"default": "",
+"extensions": PackedStringArray("wav", "mp3", "ogg", "flac"),
+"file_picker": true,
+"group": "Source",
+"no_keyframes": true,
+"prompt_on_create": true
+}
+
+[sub_resource type="Resource" id="speed"]
+script = ExtResource("2")
+id = &"speed"
+label = "Speed"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Playback",
+"max": 4.0,
+"min": 0.25,
+"no_keyframes": true,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="pitch"]
+script = ExtResource("2")
+id = &"pitch"
+label = "Pitch"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Playback",
+"max": 4.0,
+"min": 0.25,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="volume"]
+script = ExtResource("2")
+id = &"volume_db"
+label = "Volume"
+value_type = 3
+options = {
+"default": 0.0,
+"group": "Playback",
+"max": 12.0,
+"min": -60.0,
+"suffix": " dB"
+}
+
+[sub_resource type="Resource" id="muted"]
+script = ExtResource("2")
+id = &"muted"
+label = "Muted"
+value_type = 1
+options = {
+"default": false,
+"group": "Playback"
+}
+
+[sub_resource type="Resource" id="fade_in"]
+script = ExtResource("2")
+id = &"fade_in"
+label = "Fade In"
+value_type = 3
+options = {
+"default": 0.0,
+"group": "Fades",
+"max": 10.0,
+"min": 0.0,
+"no_keyframes": true,
+"step": 0.01,
+"suffix": " s"
+}
+
+[sub_resource type="Resource" id="fade_out"]
+script = ExtResource("2")
+id = &"fade_out"
+label = "Fade Out"
+value_type = 3
+options = {
+"default": 0.0,
+"group": "Fades",
+"max": 10.0,
+"min": 0.0,
+"no_keyframes": true,
+"step": 0.01,
+"suffix": " s"
+}
+
+[resource]
+script = ExtResource("1")
+type_id = &"audio"
+display_name = "Audio"
+category = "Media"
+description = "Audio clip with source-bounded trimming, waveform and independent speed and pitch."
+icon = ExtResource("3")
+properties = Array[ExtResource("2")]([SubResource("source"), SubResource("speed"), SubResource("pitch"), SubResource("volume"), SubResource("muted"), SubResource("fade_in"), SubResource("fade_out")])
+runtime_scene = ExtResource("4")

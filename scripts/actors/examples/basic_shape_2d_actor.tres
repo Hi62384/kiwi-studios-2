@@ -1,0 +1,115 @@
+[gd_resource type="Resource" script_class="ActorDefinition" format=3 uid="uid://f3mwyvb2pink"]
+
+[ext_resource type="Script" uid="uid://cfphk6n07ph5o" path="res://scripts/actors/core/actor_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="2"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/ui_actor.tscn" id="3"]
+[ext_resource type="Texture2D" uid="uid://bqvpik5imkobw" path="res://resources/Images/ActorIcons/Shape2D.svg" id="4"]
+
+[sub_resource type="Resource" id="position"]
+script = ExtResource("2")
+id = &"position"
+label = "Position"
+value_type = 5
+options = {
+"default": Vector2(0, 0),
+"group": "Transform",
+"suffix": " px"
+}
+
+[sub_resource type="Resource" id="rotation"]
+script = ExtResource("2")
+id = &"rotation"
+label = "Rotation"
+value_type = 3
+options = {
+"default": 0.0,
+"group": "Transform",
+"suffix": " °"
+}
+
+[sub_resource type="Resource" id="scale"]
+script = ExtResource("2")
+id = &"scale"
+label = "Scale"
+value_type = 5
+options = {
+"default": Vector2(1, 1),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="size"]
+script = ExtResource("2")
+id = &"size"
+label = "Size"
+value_type = 5
+options = {
+"default": Vector2(400, 240),
+"group": "Layout",
+"suffix": " px"
+}
+
+[sub_resource type="Resource" id="shape"]
+script = ExtResource("2")
+id = &"shape"
+label = "Shape"
+value_type = 2
+options = {
+"choices": ["Rectangle", "Ellipse", "Triangle", "Diamond", "Star"],
+"default": 0,
+"group": "Shape"
+}
+
+[sub_resource type="Resource" id="color"]
+script = ExtResource("2")
+id = &"color"
+label = "Fill Color"
+value_type = 20
+options = {
+"default": Color(0.3, 0.8, 0.7, 1),
+"group": "Appearance"
+}
+
+[sub_resource type="Resource" id="outline_size"]
+script = ExtResource("2")
+id = &"outline_size"
+label = "Outline Width"
+value_type = 3
+options = {
+"default": 0.0,
+"group": "Appearance",
+"max": 32.0,
+"min": 0.0
+}
+
+[sub_resource type="Resource" id="outline_color"]
+script = ExtResource("2")
+id = &"outline_color"
+label = "Outline Color"
+value_type = 20
+options = {
+"default": Color(1, 1, 1, 1),
+"group": "Appearance"
+}
+
+[sub_resource type="Resource" id="canvas_material"]
+script = ExtResource("2")
+id = &"material"
+label = "Canvas Shader"
+object_type = &"canvas_shader_material"
+options = {
+"accepted_object_types": PackedStringArray("canvas_shader_material"),
+"default": null,
+"extensions": PackedStringArray("tres", "res"),
+"file_resource_mode": "editable",
+"group": "Appearance"
+}
+
+[resource]
+script = ExtResource("1")
+type_id = &"basic_shape_2d"
+display_name = "2D Basic Shape"
+category = "Shapes"
+description = "Screen-space basic shape with editable pixel transforms."
+icon = ExtResource("4")
+properties = Array[ExtResource("2")]([SubResource("position"), SubResource("rotation"), SubResource("scale"), SubResource("size"), SubResource("shape"), SubResource("color"), SubResource("outline_size"), SubResource("outline_color"), SubResource("canvas_material")])
+runtime_scene = ExtResource("3")

@@ -1,0 +1,138 @@
+[gd_resource type="Resource" script_class="ActorDefinition" format=3 uid="uid://frgfgk8j5t22"]
+
+[ext_resource type="Script" uid="uid://cfphk6n07ph5o" path="res://scripts/actors/core/actor_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="2"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/basic_actor.tscn" id="3"]
+[ext_resource type="Texture2D" uid="uid://cuyyjb0b463em" path="res://resources/Images/ActorIcons/ReflectionProbe.svg" id="4"]
+
+[sub_resource type="Resource" id="position"]
+script = ExtResource("2")
+id = &"position"
+label = "Position"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(0, 0, -3),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="rotation"]
+script = ExtResource("2")
+id = &"rotation"
+label = "Rotation"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(0, 0, 0),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="scale"]
+script = ExtResource("2")
+id = &"scale"
+label = "Scale"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(1, 1, 1),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="probe_size"]
+script = ExtResource("2")
+id = &"probe_size"
+label = "Capture Size"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(6, 4, 6),
+"group": "Probe"
+}
+
+[sub_resource type="Resource" id="origin_offset"]
+script = ExtResource("2")
+id = &"origin_offset"
+label = "Origin Offset"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(0, 0, 0),
+"group": "Probe"
+}
+
+[sub_resource type="Resource" id="intensity"]
+script = ExtResource("2")
+id = &"intensity"
+label = "Intensity"
+value_type = 3
+animatable = true
+options = {
+"default": 1.0,
+"group": "Probe",
+"max": 16.0,
+"min": 0.0
+}
+
+[sub_resource type="Resource" id="max_distance"]
+script = ExtResource("2")
+id = &"max_distance"
+label = "Max Distance"
+value_type = 3
+animatable = true
+options = {
+"default": 0.0,
+"group": "Probe",
+"max": 10000.0,
+"min": 0.0
+}
+
+[sub_resource type="Resource" id="box_projection"]
+script = ExtResource("2")
+id = &"box_projection"
+label = "Box Projection"
+value_type = 1
+options = {
+"default": true,
+"group": "Rendering"
+}
+
+[sub_resource type="Resource" id="interior"]
+script = ExtResource("2")
+id = &"interior"
+label = "Interior"
+value_type = 1
+options = {
+"default": false,
+"group": "Rendering"
+}
+
+[sub_resource type="Resource" id="shadows"]
+script = ExtResource("2")
+id = &"shadows"
+label = "Shadows"
+value_type = 1
+options = {
+"default": false,
+"group": "Rendering"
+}
+
+[sub_resource type="Resource" id="update_mode"]
+script = ExtResource("2")
+id = &"update_mode"
+label = "Update Mode"
+value_type = 2
+options = {
+"choices": ["Once", "Always"],
+"default": 0,
+"group": "Rendering"
+}
+
+[resource]
+script = ExtResource("1")
+type_id = &"reflection_probe"
+display_name = "Reflection Probe"
+category = "Lighting"
+description = "Captures nearby scenery for localized reflections on 3D materials."
+icon = ExtResource("4")
+properties = Array[ExtResource("2")]([SubResource("position"), SubResource("rotation"), SubResource("scale"), SubResource("probe_size"), SubResource("origin_offset"), SubResource("intensity"), SubResource("max_distance"), SubResource("box_projection"), SubResource("interior"), SubResource("shadows"), SubResource("update_mode")])
+runtime_scene = ExtResource("3")

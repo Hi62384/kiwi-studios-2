@@ -5,21 +5,17 @@
 [ext_resource type="Texture2D" uid="uid://bulj6t4c6udx2" path="res://Workspaces/SceneWorkspace/Icon.png" id="2_0bbpv"]
 [ext_resource type="Texture2D" uid="uid://8vmiy3qcy1nq" path="res://resources/Images/BasicImages/Plus.png" id="3_rarhs"]
 [ext_resource type="StyleBox" uid="uid://ck4h6q1rp4uqc" path="res://resources/StyleBoxes/Default.tres" id="4_rarhs"]
-[ext_resource type="Texture2D" uid="uid://dkgsc8c5o2tq3" path="res://resources/Images/BasicImages/Undo.png" id="5_nxtc6"]
 [ext_resource type="PackedScene" uid="uid://vmu5rxoalk8x" path="res://CustomNodes/FileSystem/file_system.tscn" id="6_3p2gp"]
-[ext_resource type="Texture2D" uid="uid://dln4iaiin0dr1" path="res://resources/Images/BasicImages/Redo.png" id="6_jlsqs"]
 [ext_resource type="Script" uid="uid://cbpyo2oo61yst" path="res://Workspaces/SceneWorkspace/scripts/Viewport/viewport_focusable_key_input.gd" id="7_nfivy"]
-[ext_resource type="Texture2D" uid="uid://b088kic2mwjwx" path="res://resources/Images/BasicImages/Play.png" id="7_q8u5g"]
 [ext_resource type="SystemFont" uid="uid://bwdt8qysdchp6" path="res://resources/fonts/ReemKufi.tres" id="8_1nqs0"]
-[ext_resource type="Texture2D" uid="uid://bb8df5qnn7eat" path="res://resources/Images/BasicImages/EncircledMinus.png" id="8_lhr70"]
-[ext_resource type="Texture2D" uid="uid://8cur2hvvbfrg" path="res://resources/Images/ToolImages/Magnet.png" id="8_q8u5g"]
-[ext_resource type="Texture2D" uid="uid://c1qwvi4i47ll6" path="res://resources/Images/ToolImages/Scissors.png" id="9_lhr70"]
-[ext_resource type="Texture2D" uid="uid://p66slynp1u67" path="res://resources/Images/BasicImages/EncircledPlus.png" id="9_wp0k4"]
-[ext_resource type="Texture2D" uid="uid://b25d122d020e7" path="res://resources/Images/ToolImages/TrashCan.png" id="12_mwfav"]
-[ext_resource type="Texture2D" uid="uid://cqwv3phf7hbob" path="res://resources/Images/ToolImages/Copy.png" id="14_cvmbd"]
 [ext_resource type="PackedScene" uid="uid://nk3th1hepl7n" path="res://CustomNodes/Freecam/Freecam.tscn" id="16_bb450"]
 [ext_resource type="Environment" uid="uid://bngpc7xkudi0e" path="res://resources/environments/DefaultEnvironment.tres" id="17_bb450"]
 [ext_resource type="Script" uid="uid://g3isy00e4xs5" path="res://scripts/Extra/thumbnail_renderer.gd" id="17_ft6cd"]
+[ext_resource type="PackedScene" path="res://Workspaces/SceneWorkspace/Timeline.tscn" id="18_timeline"]
+[ext_resource type="Script" uid="uid://dhjdsvokesp8a" path="res://Workspaces/SceneWorkspace/scripts/ShaderEditor/shader_code_editor.gd" id="19_shader_editor"]
+[ext_resource type="Script" path="res://scripts/Extra/scene_menu_button.gd" id="20_scene_menu"]
+[ext_resource type="Script" path="res://scripts/Extra/scene_tabs.gd" id="21_scene_tabs"]
+[ext_resource type="Script" path="res://scripts/Extra/scene_export_button.gd" id="22_scene_export"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0bbpv"]
 content_margin_left = 10.0
@@ -66,84 +62,6 @@ font_size = 18
 outline_size = 2
 outline_color = Color(0, 0, 0, 1)
 
-[sub_resource type="LabelSettings" id="LabelSettings_nxtc6"]
-font = ExtResource("1_rvslj")
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_wp0k4"]
-content_margin_left = 4.0
-content_margin_right = 4.0
-content_margin_bottom = 4.0
-bg_color = Color(0.23633423, 0.23633423, 0.2363342, 1)
-corner_radius_top_left = 4
-corner_radius_top_right = 4
-corner_radius_bottom_right = 4
-corner_radius_bottom_left = 4
-corner_detail = 6
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nxtc6"]
-border_width_left = 1
-border_color = Color(0.24598399, 0.24598396, 0.24598375, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qmy6f"]
-content_margin_left = 4.0
-content_margin_top = 4.0
-content_margin_right = 4.0
-content_margin_bottom = 4.0
-bg_color = Color(0.18431373, 0.18431373, 0.18431373, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-corner_detail = 6
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mwfav"]
-content_margin_left = 4.0
-content_margin_top = 4.0
-content_margin_right = 4.0
-content_margin_bottom = 4.0
-bg_color = Color(0.38422894, 0.384229, 0.38422883, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0, 0, 0, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-corner_detail = 6
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_3p2gp"]
-content_margin_left = 0.0
-content_margin_top = 4.0
-content_margin_right = 0.0
-content_margin_bottom = 4.0
-bg_color = Color(0.18431373, 0.18431373, 0.18431373, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-corner_detail = 6
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cvmbd"]
-content_margin_left = 4.0
-content_margin_top = 4.0
-content_margin_right = 4.0
-content_margin_bottom = 4.0
-bg_color = Color(0.38422894, 0.384229, 0.38422883, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0, 0, 0, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-corner_detail = 6
-
-[sub_resource type="BoxMesh" id="BoxMesh_bb450"]
-
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_bb450"]
 
 [sub_resource type="Sky" id="Sky_nfivy"]
@@ -157,6 +75,8 @@ sky = SubResource("Sky_nfivy")
 environment = ExtResource("17_bb450")
 
 [sub_resource type="SphereMesh" id="SphereMesh_cvmbd"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bjd11"]
 
 [node name="Node3D" type="Node3D" unique_id=2065210094]
 
@@ -215,13 +135,7 @@ flat = true
 layout_mode = 2
 theme_override_constants/icon_max_width = 22
 theme_override_styles/tab_selected = SubResource("StyleBoxFlat_0bbpv")
-current_tab = 0
-tab_count = 3
-tab_0/title = "Main Scene"
-tab_0/icon = ExtResource("2_0bbpv")
-tab_1/title = "My Image"
-tab_1/icon = ExtResource("2_0bbpv")
-tab_2/icon = ExtResource("3_rarhs")
+script = ExtResource("21_scene_tabs")
 
 [node name="HSeparator" type="HSeparator" parent="MainUI/ColorRect/VBoxContainer" unique_id=1719653633]
 layout_mode = 2
@@ -260,29 +174,32 @@ layout_mode = 2
 theme_override_fonts/font = ExtResource("1_rvslj")
 text = "Scene"
 flat = true
+script = ExtResource("20_scene_menu")
 
 [node name="Button2" type="Button" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HBoxContainer" unique_id=1959265251]
 layout_mode = 2
 theme_override_fonts/font = ExtResource("1_rvslj")
 text = "Export"
 flat = true
+script = ExtResource("22_scene_export")
 
 [node name="HSplitContainer" type="HSplitContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer" unique_id=198996611]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/autohide = 1
-split_offsets = PackedInt32Array(260)
-split_offset = 260
+split_offsets = PackedInt32Array(220)
+split_offset = 220
 
 [node name="VSplitContainer" type="VSplitContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer" unique_id=1457734263]
 layout_mode = 2
 theme_override_constants/separation = 6
-split_offsets = PackedInt32Array(300)
-split_offset = 300
+split_offsets = PackedInt32Array(220)
+split_offset = 220
 
-[node name="SceneTree" type="Panel" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer" unique_id=1728582224]
+[node name="ShaderEditor" type="PanelContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer" unique_id=1728582224]
 layout_mode = 2
 theme_override_styles/panel = ExtResource("4_rarhs")
+script = ExtResource("19_shader_editor")
 
 [node name="FileSystem" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer" unique_id=963438061 instance=ExtResource("6_3p2gp")]
 layout_mode = 2
@@ -290,8 +207,8 @@ layout_mode = 2
 [node name="VSplitContainer2" type="VSplitContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer" unique_id=1995103816]
 layout_mode = 2
 theme_override_constants/separation = 6
-split_offsets = PackedInt32Array(375)
-split_offset = 375
+split_offsets = PackedInt32Array(560)
+split_offset = 560
 
 [node name="HSplitContainer" type="HSplitContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2" unique_id=1014842777]
 layout_mode = 2
@@ -308,7 +225,7 @@ theme_override_styles/panel = ExtResource("4_rarhs")
 layout_mode = 2
 
 [node name="ViewportToolbar" type="Panel" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/HSplitContainer/VBoxContainer" unique_id=1701094341]
-custom_minimum_size = Vector2(0, 40)
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 theme_override_styles/panel = ExtResource("4_rarhs")
 
@@ -376,205 +293,8 @@ label_settings = SubResource("LabelSettings_1iba3")
 layout_mode = 2
 theme_override_styles/panel = ExtResource("4_rarhs")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2" unique_id=173959756]
+[node name="ActorTimeline" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2" unique_id=1933623058 instance=ExtResource("18_timeline")]
 layout_mode = 2
-
-[node name="TimelineToolbar" type="Panel" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer" unique_id=736517592]
-custom_minimum_size = Vector2(0, 35)
-layout_mode = 2
-theme_override_styles/panel = ExtResource("4_rarhs")
-
-[node name="HBoxContainer" type="HBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar" unique_id=147851338]
-custom_minimum_size = Vector2(100, 0)
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="HBoxContainer2" type="HBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer" unique_id=259111778]
-custom_minimum_size = Vector2(100, 0)
-layout_mode = 2
-
-[node name="UndoButton" type="Button" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/HBoxContainer2" unique_id=206916009]
-custom_minimum_size = Vector2(35, 0)
-layout_mode = 2
-icon = ExtResource("5_nxtc6")
-flat = true
-expand_icon = true
-
-[node name="RedoButton" type="Button" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/HBoxContainer2" unique_id=10631329]
-custom_minimum_size = Vector2(35, 0)
-layout_mode = 2
-icon = ExtResource("6_jlsqs")
-flat = true
-expand_icon = true
-
-[node name="PlayButton" type="Button" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/HBoxContainer2" unique_id=1132961713]
-custom_minimum_size = Vector2(35, 0)
-layout_mode = 2
-icon = ExtResource("7_q8u5g")
-flat = true
-expand_icon = true
-
-[node name="TimelinePointerTimeDisplay" type="Label" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/HBoxContainer2" unique_id=606782392]
-layout_mode = 2
-text = "18:33:14"
-label_settings = SubResource("LabelSettings_nxtc6")
-
-[node name="HBoxContainer" type="HBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/HBoxContainer2" unique_id=307845550]
-layout_mode = 2
-
-[node name="TextureRect" type="TextureRect" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/HBoxContainer2/HBoxContainer" unique_id=385152691]
-modulate = Color(0.2363343, 0.2363342, 0.2363342, 1)
-custom_minimum_size = Vector2(15, 0)
-layout_mode = 2
-texture = ExtResource("8_lhr70")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="TimelineScaleSlider" type="HSlider" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/HBoxContainer2/HBoxContainer" unique_id=79140713]
-custom_minimum_size = Vector2(50, 0)
-layout_mode = 2
-size_flags_vertical = 4
-theme_override_styles/slider = SubResource("StyleBoxFlat_wp0k4")
-theme_override_styles/grabber_area = SubResource("StyleBoxFlat_wp0k4")
-value = 50.0
-
-[node name="TextureRect2" type="TextureRect" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/HBoxContainer2/HBoxContainer" unique_id=1602885179]
-modulate = Color(0.23633423, 0.23633423, 0.2363342, 1)
-custom_minimum_size = Vector2(15, 0)
-layout_mode = 2
-texture = ExtResource("9_wp0k4")
-expand_mode = 1
-stretch_mode = 5
-
-[node name="VSeparator" type="VSeparator" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer" unique_id=497222946]
-layout_mode = 2
-theme_override_styles/separator = SubResource("StyleBoxFlat_nxtc6")
-
-[node name="Control" type="Control" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer" unique_id=817255252]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="MainTimelineToolbar" type="HBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/Control" unique_id=224781297]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-size_flags_horizontal = 3
-
-[node name="MagnetButton" type="Button" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/Control/MainTimelineToolbar" unique_id=1674012370]
-modulate = Color(0.23392558, 0.2339254, 0.23392543, 1)
-custom_minimum_size = Vector2(35, 0)
-layout_mode = 2
-icon = ExtResource("8_q8u5g")
-flat = true
-expand_icon = true
-
-[node name="SnipButton" type="Button" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/Control/MainTimelineToolbar" unique_id=1826863706]
-modulate = Color(0.23392558, 0.2339254, 0.23392543, 1)
-custom_minimum_size = Vector2(35, 0)
-layout_mode = 2
-icon = ExtResource("9_lhr70")
-flat = true
-expand_icon = true
-
-[node name="ActorTimelineToolbar" type="HBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/Control" unique_id=1756037937]
-visible = false
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-size_flags_horizontal = 3
-
-[node name="DeleteButton" type="Button" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/Control/ActorTimelineToolbar" unique_id=1358148006]
-modulate = Color(0.587932, 0, 0.009498604, 1)
-custom_minimum_size = Vector2(28, 0)
-layout_mode = 2
-icon = ExtResource("12_mwfav")
-flat = true
-expand_icon = true
-
-[node name="CopyButton" type="Button" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/TimelineToolbar/HBoxContainer/Control/ActorTimelineToolbar" unique_id=717372481]
-custom_minimum_size = Vector2(35, 0)
-layout_mode = 2
-icon = ExtResource("14_cvmbd")
-flat = true
-expand_icon = true
-
-[node name="Panel" type="Panel" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer" unique_id=1382774943]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_styles/panel = ExtResource("4_rarhs")
-
-[node name="VBoxContainer" type="VBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/Panel" unique_id=889830203]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="ColorRect" type="ColorRect" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/Panel/VBoxContainer" unique_id=337723332]
-custom_minimum_size = Vector2(0, 30)
-layout_mode = 2
-color = Color(0.1607402, 0.19874915, 0.23028484, 1)
-
-[node name="TimelinePointer" type="ColorRect" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/Panel/VBoxContainer/ColorRect" unique_id=1926219064]
-layout_mode = 1
-anchors_preset = -1
-anchor_left = 0.499
-anchor_right = 0.50100005
-anchor_bottom = 3.7330003
-offset_left = -0.040008545
-offset_right = 0.03994751
-offset_bottom = 0.009994507
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="TimelineTimebar" type="Button" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/Panel/VBoxContainer/ColorRect" unique_id=895889300]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-flat = true
-
-[node name="HBoxContainer" type="HBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/Panel/VBoxContainer" unique_id=114423798]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="TimelineVScrollBar" type="VScrollBar" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/Panel/VBoxContainer/HBoxContainer" unique_id=1345097683]
-layout_mode = 2
-theme_override_styles/scroll = SubResource("StyleBoxFlat_qmy6f")
-theme_override_styles/grabber = SubResource("StyleBoxFlat_mwfav")
-max_value = 1.2
-page = 0.2
-value = 1.0
-
-[node name="VBoxContainer" type="VBoxContainer" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/Panel/VBoxContainer/HBoxContainer" unique_id=1818841341]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="Timeline" type="Button" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/Panel/VBoxContainer/HBoxContainer/VBoxContainer" unique_id=482761839]
-clip_contents = true
-layout_mode = 2
-size_flags_vertical = 3
-flat = true
-
-[node name="TimelineHScrollBar" type="HScrollBar" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer2/VBoxContainer/Panel/VBoxContainer/HBoxContainer/VBoxContainer" unique_id=45864541]
-layout_mode = 2
-theme_override_styles/scroll = SubResource("StyleBoxFlat_3p2gp")
-theme_override_styles/grabber = SubResource("StyleBoxFlat_cvmbd")
-max_value = 1.02
-page = 0.02
 
 [node name="World" type="Node3D" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace" unique_id=659808753]
 
@@ -582,10 +302,6 @@ page = 0.02
 size = Vector2i(1920, 1080)
 
 [node name="Freecam" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/World/SubViewport" unique_id=1750300459 instance=ExtResource("16_bb450")]
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/World/SubViewport" unique_id=595959760]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3.4650602)
-mesh = SubResource("BoxMesh_bb450")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/World/SubViewport" unique_id=1448817400]
 environment = SubResource("Environment_1nqs0")
@@ -612,5 +328,8 @@ mesh = SubResource("SphereMesh_cvmbd")
 [node name="ObjectHolder" type="MeshInstance3D" parent="ThumbnailRenderer/SubViewport" unique_id=1609173796]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.8942313)
 layers = 524289
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1862516478]
+material_override = SubResource("StandardMaterial3D_bjd11")
 
 [editable path="MainUI/ColorRect/VBoxContainer/WorkspaceContainer/SceneWorkspace/World/SubViewport/Freecam"]

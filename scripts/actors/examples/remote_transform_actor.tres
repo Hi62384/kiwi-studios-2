@@ -1,0 +1,96 @@
+[gd_resource type="Resource" script_class="ActorDefinition" format=3 uid="uid://bcuk7qsc0k76j"]
+
+[ext_resource type="Script" uid="uid://cfphk6n07ph5o" path="res://scripts/actors/core/actor_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="2"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/point_actor.tscn" id="3"]
+[ext_resource type="Texture2D" uid="uid://si2ics04534f" path="res://resources/Images/ActorIcons/RemoteTransform.svg" id="4"]
+
+[sub_resource type="Resource" id="position"]
+script = ExtResource("2")
+id = &"position"
+label = "Position"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(0, 0, 0),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="rotation"]
+script = ExtResource("2")
+id = &"rotation"
+label = "Rotation"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(0, 0, 0),
+"group": "Transform",
+"suffix": " °"
+}
+
+[sub_resource type="Resource" id="scale"]
+script = ExtResource("2")
+id = &"scale"
+label = "Scale"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(1, 1, 1),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="remote_actor"]
+script = ExtResource("2")
+id = &"remote_actor"
+label = "Remote Actor"
+value_type = 4
+options = {
+"actor_dimension": "3d",
+"actor_reference": true,
+"default": "",
+"group": "Remote Transform",
+"no_keyframes": true
+}
+
+[sub_resource type="Resource" id="set_position"]
+script = ExtResource("2")
+id = &"set_position"
+label = "Set Position"
+value_type = 1
+animatable = true
+options = {
+"default": true,
+"group": "Remote Transform"
+}
+
+[sub_resource type="Resource" id="set_rotation"]
+script = ExtResource("2")
+id = &"set_rotation"
+label = "Set Rotation"
+value_type = 1
+animatable = true
+options = {
+"default": true,
+"group": "Remote Transform"
+}
+
+[sub_resource type="Resource" id="set_scale"]
+script = ExtResource("2")
+id = &"set_scale"
+label = "Set Scale"
+value_type = 1
+animatable = true
+options = {
+"default": true,
+"group": "Remote Transform"
+}
+
+[resource]
+script = ExtResource("1")
+type_id = &"remote_transform"
+display_name = "Remote Transform"
+category = "Utilities"
+description = "Live-links selected position, rotation, and scale channels to another 3D actor."
+icon = ExtResource("4")
+properties = Array[ExtResource("2")]([SubResource("position"), SubResource("rotation"), SubResource("scale"), SubResource("remote_actor"), SubResource("set_position"), SubResource("set_rotation"), SubResource("set_scale")])
+runtime_scene = ExtResource("3")

@@ -1,0 +1,62 @@
+[gd_resource type="Resource" script_class="ActorDefinition" format=3 uid="uid://bplenevhuv2cb"]
+
+[ext_resource type="Script" uid="uid://cfphk6n07ph5o" path="res://scripts/actors/core/actor_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="2"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/ui_actor.tscn" id="3"]
+[ext_resource type="Texture2D" uid="uid://dixaa2rnmw4cc" path="res://resources/Images/ActorIcons/Anchor2D.svg" id="4"]
+
+[sub_resource type="Resource" id="position"]
+script = ExtResource("2")
+id = &"position"
+label = "Position"
+value_type = 5
+animatable = true
+options = {
+"default": Vector2(0, 0),
+"group": "Transform",
+"suffix": " px"
+}
+
+[sub_resource type="Resource" id="rotation"]
+script = ExtResource("2")
+id = &"rotation"
+label = "Rotation"
+value_type = 3
+animatable = true
+options = {
+"default": 0.0,
+"group": "Transform",
+"suffix": " °"
+}
+
+[sub_resource type="Resource" id="scale"]
+script = ExtResource("2")
+id = &"scale"
+label = "Scale"
+value_type = 5
+animatable = true
+options = {
+"default": Vector2(1, 1),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="size"]
+script = ExtResource("2")
+id = &"size"
+label = "Selection Size"
+value_type = 5
+options = {
+"default": Vector2(48, 48),
+"group": "Editor",
+"suffix": " px"
+}
+
+[resource]
+script = ExtResource("1")
+type_id = &"point_2d"
+display_name = "2D Anchor"
+category = "Utilities"
+description = "An invisible screen-space transform for grouping and animating UI actors."
+icon = ExtResource("4")
+properties = Array[ExtResource("2")]([SubResource("position"), SubResource("rotation"), SubResource("scale"), SubResource("size")])
+runtime_scene = ExtResource("3")

@@ -1,0 +1,2526 @@
+[gd_resource type="Resource" script_class="ActorCatalog" format=3 uid="uid://cdul6hhj8hjjh"]
+
+[ext_resource type="Script" uid="uid://fca57ycc0nxh" path="res://scripts/actors/core/actor_catalog.gd" id="1_catalog"]
+[ext_resource type="Script" uid="uid://cfphk6n07ph5o" path="res://scripts/actors/core/actor_definition.gd" id="2_definition"]
+[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="3_property"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/point_actor.tscn" id="4_point"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/basic_actor.tscn" id="5_basic"]
+[ext_resource type="Texture2D" uid="uid://cmxiq1dc5owie" path="res://resources/Images/ActorIcons/Point3D.svg" id="6_point_icon"]
+[ext_resource type="Texture2D" uid="uid://bqyo3gxs050o8" path="res://resources/Images/ActorIcons/BasicShape.svg" id="7_shape_icon"]
+[ext_resource type="Texture2D" uid="uid://bdk8dcjiwkowb" path="res://resources/Images/ActorIcons/BasicMesh.svg" id="8_mesh_icon"]
+[ext_resource type="Texture2D" uid="uid://sggjs2aljtcs" path="res://resources/Images/ActorIcons/Text3D.svg" id="9_text_icon"]
+[ext_resource type="Texture2D" uid="uid://cw3m5mpdgbwdj" path="res://resources/Images/ActorIcons/SunLight.svg" id="10_sun_icon"]
+[ext_resource type="Texture2D" uid="uid://c8h68u2akibax" path="res://resources/Images/ActorIcons/Camera3D.svg" id="11_camera_icon"]
+[ext_resource type="Texture2D" uid="uid://cowytgpx5ry56" path="res://resources/Images/ActorIcons/Image3D.svg" id="12_image_icon"]
+[ext_resource type="Script" uid="uid://ct1qlalxsv4yb" path="res://scripts/actors/core/actor_object_definition.gd" id="13_object_definition"]
+[ext_resource type="Texture2D" uid="uid://dfuhig4sd0al1" path="res://resources/Images/ActorIcons/Light3D.svg" id="14_light_icon"]
+[ext_resource type="Texture2D" uid="uid://cj0j7picdhqjm" path="res://resources/Images/ActorIcons/WorldEnvironment.svg" id="15_world_icon"]
+[ext_resource type="Resource" uid="uid://cq34737u1f0jf" path="res://scripts/actors/examples/audio_actor.tres" id="16_audio"]
+[ext_resource type="Resource" uid="uid://drkra4e7hxeim" path="res://scripts/actors/examples/video_actor.tres" id="17_video"]
+[ext_resource type="Resource" uid="uid://70yblcc2yqh6" path="res://scripts/actors/examples/text_settings.tres" id="18_text_settings"]
+[ext_resource type="Resource" uid="uid://dhju34ltuu627" path="res://scripts/actors/examples/text_2d_actor.tres" id="19_text2d"]
+[ext_resource type="Resource" uid="uid://bfk3ymkf1h860" path="res://scripts/actors/examples/image_2d_actor.tres" id="20_image2d"]
+[ext_resource type="Resource" uid="uid://f3mwyvb2pink" path="res://scripts/actors/examples/basic_shape_2d_actor.tres" id="21_shape2d"]
+[ext_resource type="Resource" uid="uid://dmyscf0j5o0hv" path="res://scripts/actors/examples/video_2d_actor.tres" id="22_video2d"]
+[ext_resource type="Resource" uid="uid://bplenevhuv2cb" path="res://scripts/actors/examples/point_2d_actor.tres" id="23_point2d"]
+[ext_resource type="Resource" uid="uid://cdgdehaamlkri" path="res://scripts/actors/examples/decal_actor.tres" id="24_decal"]
+[ext_resource type="Resource" uid="uid://bkp7dev8jws4k" path="res://scripts/actors/examples/particles_3d_actor.tres" id="25_particles"]
+[ext_resource type="Resource" uid="uid://ci6toxr11jev6" path="res://scripts/actors/examples/line_2d_actor.tres" id="26_line2d"]
+[ext_resource type="Resource" uid="uid://oqek5hnm3r6x" path="res://scripts/actors/examples/particles_2d_actor.tres" id="27_particles2d"]
+[ext_resource type="Resource" uid="uid://csbc7ervc7dux" path="res://scripts/actors/examples/fog_volume_actor.tres" id="28_fog"]
+[ext_resource type="Resource" uid="uid://frgfgk8j5t22" path="res://scripts/actors/examples/reflection_probe_actor.tres" id="29_probe"]
+[ext_resource type="Resource" uid="uid://bcuk7qsc0k76j" path="res://scripts/actors/examples/remote_transform_actor.tres" id="30_remote"]
+
+[sub_resource type="Resource" id="position_origin"]
+script = ExtResource("3_property")
+id = &"position"
+label = "Position"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(0, 0, 0),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="rotation_zero"]
+script = ExtResource("3_property")
+id = &"rotation"
+label = "Rotation"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(0, 0, 0),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="scale_one"]
+script = ExtResource("3_property")
+id = &"scale"
+label = "Scale"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(1, 1, 1),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="point"]
+script = ExtResource("2_definition")
+type_id = &"point_3d"
+display_name = "3D Point"
+category = "Utilities"
+description = "A transform anchor for positioning and grouping."
+icon = ExtResource("6_point_icon")
+properties = Array[ExtResource("3_property")]([SubResource("position_origin"), SubResource("rotation_zero"), SubResource("scale_one")])
+runtime_scene = ExtResource("4_point")
+
+[sub_resource type="Resource" id="position_visible"]
+script = ExtResource("3_property")
+id = &"position"
+label = "Position"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(0, 0, -3),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="shape_kind"]
+script = ExtResource("3_property")
+id = &"shape"
+label = "Shape"
+value_type = 2
+options = {
+"choices": ["Box", "Sphere", "Cylinder", "Capsule", "Plane", "Prism", "Quad", "Torus"],
+"controls_group_visibility": {
+"Box": [0],
+"Capsule": [3],
+"Cylinder": [2],
+"Plane / Quad": [4, 6],
+"Prism": [5],
+"Sphere": [1],
+"Torus": [7]
+},
+"default": 0,
+"group": "Geometry",
+"refresh_inspector": true
+}
+
+[sub_resource type="Resource" id="shape_flip_faces"]
+script = ExtResource("3_property")
+id = &"flip_faces"
+label = "Flip Faces"
+value_type = 1
+options = {
+"default": false,
+"group": "Geometry"
+}
+
+[sub_resource type="Resource" id="shape_add_uv2"]
+script = ExtResource("3_property")
+id = &"add_uv2"
+label = "Add UV2"
+value_type = 1
+options = {
+"default": false,
+"group": "Geometry"
+}
+
+[sub_resource type="Resource" id="shape_uv2_padding"]
+script = ExtResource("3_property")
+id = &"uv2_padding"
+label = "UV2 Padding"
+value_type = 3
+options = {
+"default": 2.0,
+"group": "Geometry",
+"max": 64.0,
+"min": 0.0,
+"step": 0.1
+}
+
+[sub_resource type="Resource" id="box_size"]
+script = ExtResource("3_property")
+id = &"box_size"
+label = "Box Size"
+value_type = 9
+options = {
+"default": Vector3(1, 1, 1),
+"group": "Box"
+}
+
+[sub_resource type="Resource" id="box_subdivide_width"]
+script = ExtResource("3_property")
+id = &"box_subdivide_width"
+label = "Subdivide Width"
+value_type = 2
+options = {
+"default": 0,
+"group": "Box",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="box_subdivide_height"]
+script = ExtResource("3_property")
+id = &"box_subdivide_height"
+label = "Subdivide Height"
+value_type = 2
+options = {
+"default": 0,
+"group": "Box",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="box_subdivide_depth"]
+script = ExtResource("3_property")
+id = &"box_subdivide_depth"
+label = "Subdivide Depth"
+value_type = 2
+options = {
+"default": 0,
+"group": "Box",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="sphere_radius"]
+script = ExtResource("3_property")
+id = &"sphere_radius"
+label = "Radius"
+value_type = 3
+options = {
+"default": 0.5,
+"group": "Sphere",
+"max": 1000.0,
+"min": 0.001,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="sphere_height"]
+script = ExtResource("3_property")
+id = &"sphere_height"
+label = "Height"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Sphere",
+"max": 1000.0,
+"min": 0.001,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="sphere_radial_segments"]
+script = ExtResource("3_property")
+id = &"sphere_radial_segments"
+label = "Radial Segments"
+value_type = 2
+options = {
+"default": 64,
+"group": "Sphere",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="sphere_rings"]
+script = ExtResource("3_property")
+id = &"sphere_rings"
+label = "Rings"
+value_type = 2
+options = {
+"default": 32,
+"group": "Sphere",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="sphere_hemisphere"]
+script = ExtResource("3_property")
+id = &"sphere_hemisphere"
+label = "Hemisphere"
+value_type = 1
+options = {
+"default": false,
+"group": "Sphere"
+}
+
+[sub_resource type="Resource" id="cylinder_top_radius"]
+script = ExtResource("3_property")
+id = &"cylinder_top_radius"
+label = "Top Radius"
+value_type = 3
+options = {
+"default": 0.5,
+"group": "Cylinder",
+"max": 1000.0,
+"min": 0.001,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="cylinder_bottom_radius"]
+script = ExtResource("3_property")
+id = &"cylinder_bottom_radius"
+label = "Bottom Radius"
+value_type = 3
+options = {
+"default": 0.5,
+"group": "Cylinder",
+"max": 1000.0,
+"min": 0.001,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="cylinder_height"]
+script = ExtResource("3_property")
+id = &"cylinder_height"
+label = "Height"
+value_type = 3
+options = {
+"default": 2.0,
+"group": "Cylinder",
+"max": 1000.0,
+"min": 0.001,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="cylinder_radial_segments"]
+script = ExtResource("3_property")
+id = &"cylinder_radial_segments"
+label = "Radial Segments"
+value_type = 2
+options = {
+"default": 64,
+"group": "Cylinder",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="cylinder_rings"]
+script = ExtResource("3_property")
+id = &"cylinder_rings"
+label = "Rings"
+value_type = 2
+options = {
+"default": 4,
+"group": "Cylinder",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="cylinder_cap_top"]
+script = ExtResource("3_property")
+id = &"cylinder_cap_top"
+label = "Cap Top"
+value_type = 1
+options = {
+"default": true,
+"group": "Cylinder"
+}
+
+[sub_resource type="Resource" id="cylinder_cap_bottom"]
+script = ExtResource("3_property")
+id = &"cylinder_cap_bottom"
+label = "Cap Bottom"
+value_type = 1
+options = {
+"default": true,
+"group": "Cylinder"
+}
+
+[sub_resource type="Resource" id="capsule_radius"]
+script = ExtResource("3_property")
+id = &"capsule_radius"
+label = "Radius"
+value_type = 3
+options = {
+"default": 0.5,
+"group": "Capsule",
+"max": 1000.0,
+"min": 0.001,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="capsule_height"]
+script = ExtResource("3_property")
+id = &"capsule_height"
+label = "Height"
+value_type = 3
+options = {
+"default": 2.0,
+"group": "Capsule",
+"max": 1000.0,
+"min": 0.001,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="capsule_radial_segments"]
+script = ExtResource("3_property")
+id = &"capsule_radial_segments"
+label = "Radial Segments"
+value_type = 2
+options = {
+"default": 64,
+"group": "Capsule",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="capsule_rings"]
+script = ExtResource("3_property")
+id = &"capsule_rings"
+label = "Rings"
+value_type = 2
+options = {
+"default": 8,
+"group": "Capsule",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="plane_size"]
+script = ExtResource("3_property")
+id = &"plane_size"
+label = "Size"
+value_type = 5
+options = {
+"default": Vector2(1, 1),
+"group": "Plane / Quad"
+}
+
+[sub_resource type="Resource" id="plane_subdivide_width"]
+script = ExtResource("3_property")
+id = &"plane_subdivide_width"
+label = "Subdivide Width"
+value_type = 2
+options = {
+"default": 0,
+"group": "Plane / Quad",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="plane_subdivide_depth"]
+script = ExtResource("3_property")
+id = &"plane_subdivide_depth"
+label = "Subdivide Depth"
+value_type = 2
+options = {
+"default": 0,
+"group": "Plane / Quad",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="plane_orientation"]
+script = ExtResource("3_property")
+id = &"plane_orientation"
+label = "Orientation"
+value_type = 2
+options = {
+"choices": ["Face X", "Face Y", "Face Z"],
+"default": 1,
+"group": "Plane / Quad"
+}
+
+[sub_resource type="Resource" id="prism_size"]
+script = ExtResource("3_property")
+id = &"prism_size"
+label = "Size"
+value_type = 9
+options = {
+"default": Vector3(1, 1, 1),
+"group": "Prism"
+}
+
+[sub_resource type="Resource" id="prism_left_to_right"]
+script = ExtResource("3_property")
+id = &"prism_left_to_right"
+label = "Left To Right"
+value_type = 3
+options = {
+"default": 0.5,
+"group": "Prism",
+"max": 1000.0,
+"min": 0.001,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="prism_subdivide_width"]
+script = ExtResource("3_property")
+id = &"prism_subdivide_width"
+label = "Subdivide Width"
+value_type = 2
+options = {
+"default": 0,
+"group": "Prism",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="prism_subdivide_height"]
+script = ExtResource("3_property")
+id = &"prism_subdivide_height"
+label = "Subdivide Height"
+value_type = 2
+options = {
+"default": 0,
+"group": "Prism",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="prism_subdivide_depth"]
+script = ExtResource("3_property")
+id = &"prism_subdivide_depth"
+label = "Subdivide Depth"
+value_type = 2
+options = {
+"default": 0,
+"group": "Prism",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="torus_inner_radius"]
+script = ExtResource("3_property")
+id = &"torus_inner_radius"
+label = "Inner Radius"
+value_type = 3
+options = {
+"default": 0.5,
+"group": "Torus",
+"max": 1000.0,
+"min": 0.001,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="torus_outer_radius"]
+script = ExtResource("3_property")
+id = &"torus_outer_radius"
+label = "Outer Radius"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Torus",
+"max": 1000.0,
+"min": 0.001,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="torus_rings"]
+script = ExtResource("3_property")
+id = &"torus_rings"
+label = "Rings"
+value_type = 2
+options = {
+"default": 64,
+"group": "Torus",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="torus_ring_segments"]
+script = ExtResource("3_property")
+id = &"torus_ring_segments"
+label = "Ring Segments"
+value_type = 2
+options = {
+"default": 32,
+"group": "Torus",
+"max": 512,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="shared_material"]
+script = ExtResource("3_property")
+id = &"material"
+label = "Material"
+value_type = 24
+object_type = &"material"
+options = {
+"accepted_object_types": ["material", "shader_material"],
+"default": null,
+"extensions": ["tres"],
+"file_resource_mode": "editable",
+"group": "Appearance"
+}
+
+[sub_resource type="Resource" id="shape"]
+script = ExtResource("2_definition")
+type_id = &"basic_shape"
+display_name = "Basic Shape"
+category = "Shapes"
+description = "A configurable primitive with a reusable Material or ShaderMaterial."
+icon = ExtResource("7_shape_icon")
+properties = Array[ExtResource("3_property")]([SubResource("position_visible"), SubResource("rotation_zero"), SubResource("scale_one"), SubResource("shape_kind"), SubResource("shape_flip_faces"), SubResource("shape_add_uv2"), SubResource("shape_uv2_padding"), SubResource("box_size"), SubResource("box_subdivide_width"), SubResource("box_subdivide_height"), SubResource("box_subdivide_depth"), SubResource("sphere_radius"), SubResource("sphere_height"), SubResource("sphere_radial_segments"), SubResource("sphere_rings"), SubResource("sphere_hemisphere"), SubResource("cylinder_top_radius"), SubResource("cylinder_bottom_radius"), SubResource("cylinder_height"), SubResource("cylinder_radial_segments"), SubResource("cylinder_rings"), SubResource("cylinder_cap_top"), SubResource("cylinder_cap_bottom"), SubResource("capsule_radius"), SubResource("capsule_height"), SubResource("capsule_radial_segments"), SubResource("capsule_rings"), SubResource("plane_size"), SubResource("plane_subdivide_width"), SubResource("plane_subdivide_depth"), SubResource("plane_orientation"), SubResource("prism_size"), SubResource("prism_left_to_right"), SubResource("prism_subdivide_width"), SubResource("prism_subdivide_height"), SubResource("prism_subdivide_depth"), SubResource("torus_inner_radius"), SubResource("torus_outer_radius"), SubResource("torus_rings"), SubResource("torus_ring_segments"), SubResource("shared_material")])
+runtime_scene = ExtResource("5_basic")
+
+[sub_resource type="Resource" id="mesh_path"]
+script = ExtResource("3_property")
+id = &"mesh_path"
+label = "Mesh / 3D Model"
+value_type = 4
+options = {
+"default": "",
+"extensions": ["glb", "gltf", "fbx", "obj", "dae", "blend", "mesh", "res", "tres"],
+"file_picker": true,
+"file_resource_mode": "uneditable",
+"group": "Mesh",
+"native_resource_types": ["Mesh", "PackedScene"]
+}
+
+[sub_resource type="Resource" id="mesh_actor"]
+script = ExtResource("2_definition")
+type_id = &"basic_mesh"
+display_name = "Basic Mesh"
+category = "Shapes"
+description = "A project mesh or imported GLB, GLTF, FBX, OBJ, DAE, or Blend model."
+icon = ExtResource("8_mesh_icon")
+properties = Array[ExtResource("3_property")]([SubResource("position_visible"), SubResource("rotation_zero"), SubResource("scale_one"), SubResource("mesh_path"), SubResource("shared_material")])
+runtime_scene = ExtResource("5_basic")
+
+[sub_resource type="Resource" id="text_value"]
+script = ExtResource("3_property")
+id = &"text"
+label = "Text"
+value_type = 4
+options = {
+"default": "Your text",
+"group": "Content"
+}
+
+[sub_resource type="Resource" id="text_settings_property"]
+script = ExtResource("3_property")
+id = &"text_settings"
+label = "Text Settings"
+object_type = &"text_settings"
+options = {
+"accepted_object_types": PackedStringArray("text_settings"),
+"default": null,
+"extensions": PackedStringArray("tres", "res"),
+"file_resource_mode": "editable",
+"group": "Text"
+}
+
+[sub_resource type="Resource" id="text"]
+script = ExtResource("2_definition")
+type_id = &"text_3d"
+display_name = "3D Text"
+category = "Text"
+description = "A spatial title or label with editable text."
+icon = ExtResource("9_text_icon")
+properties = Array[ExtResource("3_property")]([SubResource("position_visible"), SubResource("rotation_zero"), SubResource("scale_one"), SubResource("text_value"), SubResource("text_settings_property")])
+runtime_scene = ExtResource("5_basic")
+
+[sub_resource type="Resource" id="image_scale"]
+script = ExtResource("3_property")
+id = &"scale"
+label = "Scale"
+value_type = 9
+animatable = true
+options = {
+"aspect_ratio_from_image": &"image_path",
+"default": Vector3(1, 1, 1),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="image_path"]
+script = ExtResource("3_property")
+id = &"image_path"
+label = "Image"
+value_type = 24
+object_type = &"image"
+options = {
+"accepted_object_types": ["image", "noise_image"],
+"default": null,
+"extensions": ["tres"],
+"file_picker": true,
+"file_resource_mode": "editable",
+"group": "Image",
+"prompt_extensions": ["png", "jpg", "jpeg", "webp", "bmp", "svg"],
+"prompt_object_property": &"source",
+"prompt_on_create": true
+}
+
+[sub_resource type="Resource" id="image_material"]
+script = ExtResource("3_property")
+id = &"material"
+label = "Material"
+value_type = 24
+object_type = &"material"
+options = {
+"accepted_object_types": ["material", "shader_material"],
+"default": null,
+"extensions": ["tres"],
+"file_resource_mode": "editable",
+"group": "Appearance"
+}
+
+[sub_resource type="Resource" id="image"]
+script = ExtResource("2_definition")
+type_id = &"image_3d"
+display_name = "3D Image"
+category = "Media"
+description = "A filesystem image displayed as a transparent 3D sprite."
+icon = ExtResource("12_image_icon")
+properties = Array[ExtResource("3_property")]([SubResource("position_visible"), SubResource("rotation_zero"), SubResource("image_scale"), SubResource("image_path"), SubResource("image_material")])
+runtime_scene = ExtResource("5_basic")
+
+[sub_resource type="Resource" id="light_rotation"]
+script = ExtResource("3_property")
+id = &"rotation"
+label = "Rotation"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(-45, -30, 0),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="light_type"]
+script = ExtResource("3_property")
+id = &"light_type"
+label = "Type"
+value_type = 2
+options = {
+"choices": ["Directional", "Omni", "Spot"],
+"default": 0,
+"group": "Light"
+}
+
+[sub_resource type="Resource" id="energy"]
+script = ExtResource("3_property")
+id = &"energy"
+label = "Energy"
+value_type = 3
+animatable = true
+options = {
+"default": 1.0,
+"group": "Lighting",
+"max": 20.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="color_white"]
+script = ExtResource("3_property")
+id = &"color"
+label = "Color"
+value_type = 20
+animatable = true
+options = {
+"default": Color(1, 1, 1, 1),
+"group": "Appearance"
+}
+
+[sub_resource type="Resource" id="light_range"]
+script = ExtResource("3_property")
+id = &"range"
+label = "Range"
+value_type = 3
+options = {
+"default": 5.0,
+"group": "Light",
+"max": 1000.0,
+"min": 0.01,
+"step": 0.1
+}
+
+[sub_resource type="Resource" id="spot_angle"]
+script = ExtResource("3_property")
+id = &"spot_angle"
+label = "Spot Angle"
+value_type = 3
+options = {
+"default": 45.0,
+"group": "Light",
+"max": 89.9,
+"min": 0.1,
+"step": 0.1,
+"suffix": "°"
+}
+
+[sub_resource type="Resource" id="light_shadows"]
+script = ExtResource("3_property")
+id = &"shadows"
+label = "Shadows"
+value_type = 1
+options = {
+"default": true,
+"group": "Light"
+}
+
+[sub_resource type="Resource" id="light"]
+script = ExtResource("2_definition")
+type_id = &"light_3d"
+display_name = "3D Light"
+category = "Lighting"
+description = "A directional, omni, or spot light with shadows and range controls."
+icon = ExtResource("14_light_icon")
+properties = Array[ExtResource("3_property")]([SubResource("position_origin"), SubResource("light_rotation"), SubResource("scale_one"), SubResource("light_type"), SubResource("energy"), SubResource("color_white"), SubResource("light_range"), SubResource("spot_angle"), SubResource("light_shadows")])
+runtime_scene = ExtResource("5_basic")
+
+[sub_resource type="Resource" id="dir_indirect_energy"]
+script = ExtResource("3_property")
+id = &"indirect_energy"
+label = "Indirect Energy"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Light",
+"max": 10000.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="dir_volumetric_fog_energy"]
+script = ExtResource("3_property")
+id = &"volumetric_fog_energy"
+label = "Volumetric Fog Energy"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Light",
+"max": 10000.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="dir_angular_distance"]
+script = ExtResource("3_property")
+id = &"angular_distance"
+label = "Angular Distance"
+value_type = 3
+options = {
+"default": 0.5,
+"group": "Light",
+"max": 10000.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="dir_negative"]
+script = ExtResource("3_property")
+id = &"negative"
+label = "Negative"
+value_type = 1
+options = {
+"default": false,
+"group": "Light"
+}
+
+[sub_resource type="Resource" id="dir_specular"]
+script = ExtResource("3_property")
+id = &"specular"
+label = "Specular"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Light",
+"max": 10000.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="dir_shadow_bias"]
+script = ExtResource("3_property")
+id = &"shadow_bias"
+label = "Bias"
+value_type = 3
+options = {
+"default": 0.1,
+"group": "Shadows",
+"max": 10000.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="dir_shadow_normal_bias"]
+script = ExtResource("3_property")
+id = &"shadow_normal_bias"
+label = "Normal Bias"
+value_type = 3
+options = {
+"default": 2.0,
+"group": "Shadows",
+"max": 10000.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="dir_shadow_opacity"]
+script = ExtResource("3_property")
+id = &"shadow_opacity"
+label = "Opacity"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Shadows",
+"max": 10000.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="dir_shadow_blur"]
+script = ExtResource("3_property")
+id = &"shadow_blur"
+label = "Blur"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Shadows",
+"max": 10000.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="dir_shadow_mode"]
+script = ExtResource("3_property")
+id = &"shadow_mode"
+label = "Mode"
+value_type = 2
+options = {
+"choices": ["Orthogonal", "2 Splits", "4 Splits"],
+"default": 2,
+"group": "Shadows"
+}
+
+[sub_resource type="Resource" id="dir_blend_splits"]
+script = ExtResource("3_property")
+id = &"blend_splits"
+label = "Blend Splits"
+value_type = 1
+options = {
+"default": false,
+"group": "Shadows"
+}
+
+[sub_resource type="Resource" id="dir_shadow_max_distance"]
+script = ExtResource("3_property")
+id = &"shadow_max_distance"
+label = "Max Distance"
+value_type = 3
+options = {
+"default": 100.0,
+"group": "Shadows",
+"max": 10000.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="dir_shadow_fade_start"]
+script = ExtResource("3_property")
+id = &"shadow_fade_start"
+label = "Fade Start"
+value_type = 3
+options = {
+"default": 0.8,
+"group": "Shadows",
+"max": 10000.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="dir_sky_mode"]
+script = ExtResource("3_property")
+id = &"sky_mode"
+label = "Sky Mode"
+value_type = 2
+options = {
+"choices": ["Light and Sky", "Light Only", "Sky Only"],
+"default": 0,
+"group": "Light"
+}
+
+[sub_resource type="Resource" id="directional_light_actor"]
+script = ExtResource("2_definition")
+type_id = &"directional_light"
+display_name = "Directional Light"
+category = "Lighting"
+description = "A sun-style directional light with cascaded shadow and sky controls."
+icon = ExtResource("10_sun_icon")
+properties = Array[ExtResource("3_property")]([SubResource("position_origin"), SubResource("light_rotation"), SubResource("scale_one"), SubResource("energy"), SubResource("color_white"), SubResource("light_shadows"), SubResource("dir_indirect_energy"), SubResource("dir_volumetric_fog_energy"), SubResource("dir_angular_distance"), SubResource("dir_negative"), SubResource("dir_specular"), SubResource("dir_shadow_bias"), SubResource("dir_shadow_normal_bias"), SubResource("dir_shadow_opacity"), SubResource("dir_shadow_blur"), SubResource("dir_shadow_mode"), SubResource("dir_blend_splits"), SubResource("dir_shadow_max_distance"), SubResource("dir_shadow_fade_start"), SubResource("dir_sky_mode")])
+runtime_scene = ExtResource("5_basic")
+
+[sub_resource type="Resource" id="fov"]
+script = ExtResource("3_property")
+id = &"fov"
+label = "Field of view"
+value_type = 3
+animatable = true
+options = {
+"default": 75.0,
+"group": "Camera",
+"max": 179.0,
+"min": 1.0,
+"step": 0.1
+}
+
+[sub_resource type="Resource" id="camera_canvas_material"]
+script = ExtResource("3_property")
+id = &"material"
+label = "Camera Shader"
+object_type = &"canvas_shader_material"
+options = {
+"accepted_object_types": ["canvas_shader_material"],
+"default": null,
+"extensions": ["tres", "res"],
+"file_resource_mode": "editable",
+"group": "Post-process"
+}
+
+[sub_resource type="Resource" id="camera"]
+script = ExtResource("2_definition")
+type_id = &"camera_3d"
+display_name = "Camera"
+category = "Utilities"
+description = "A perspective camera with an adjustable field of view."
+icon = ExtResource("11_camera_icon")
+properties = Array[ExtResource("3_property")]([SubResource("position_visible"), SubResource("rotation_zero"), SubResource("scale_one"), SubResource("fov"), SubResource("camera_canvas_material")])
+runtime_scene = ExtResource("5_basic")
+
+[sub_resource type="Resource" id="world_environment_resource"]
+script = ExtResource("3_property")
+id = &"environment"
+label = "Environment"
+value_type = 24
+object_type = &"environment"
+options = {
+"accepted_object_types": ["environment"],
+"default": null,
+"extensions": ["tres"],
+"file_resource_mode": "editable",
+"group": "Environment"
+}
+
+[sub_resource type="Resource" id="world"]
+script = ExtResource("2_definition")
+type_id = &"world_environment"
+display_name = "World Environment"
+category = "Lighting"
+description = "Controls the viewport background, ambient light, tonemapping, and fog."
+icon = ExtResource("15_world_icon")
+properties = Array[ExtResource("3_property")]([SubResource("world_environment_resource")])
+runtime_scene = ExtResource("5_basic")
+
+[sub_resource type="Resource" id="image_object_source"]
+script = ExtResource("3_property")
+id = &"source"
+label = "Source"
+value_type = 4
+options = {
+"default": "",
+"extensions": ["png", "jpg", "jpeg", "webp", "bmp", "svg"],
+"file_picker": true,
+"file_resource_mode": "uneditable",
+"group": "Image"
+}
+
+[sub_resource type="Resource" id="image_object_definition"]
+script = ExtResource("13_object_definition")
+type_id = &"image"
+display_name = "Image"
+properties = Array[ExtResource("3_property")]([SubResource("image_object_source")])
+
+[sub_resource type="Resource" id="noise_resolution"]
+script = ExtResource("3_property")
+id = &"resolution"
+label = "Resolution"
+value_type = 2
+options = {
+"choices": ["64 × 64", "128 × 128", "256 × 256", "512 × 512"],
+"default": 2,
+"group": "Image"
+}
+
+[sub_resource type="Resource" id="noise_seamless"]
+script = ExtResource("3_property")
+id = &"seamless"
+label = "Seamless"
+value_type = 1
+options = {
+"default": true,
+"group": "Image"
+}
+
+[sub_resource type="Resource" id="noise_type"]
+script = ExtResource("3_property")
+id = &"noise_type"
+label = "Algorithm"
+value_type = 2
+options = {
+"choices": ["Simplex", "Simplex Smooth", "Cellular", "Perlin", "Value Cubic", "Value"],
+"default": 1,
+"group": "Noise"
+}
+
+[sub_resource type="Resource" id="noise_seed"]
+script = ExtResource("3_property")
+id = &"seed"
+label = "Seed"
+value_type = 2
+options = {
+"default": 0,
+"group": "Noise",
+"max": 2147483647,
+"min": -2147483648,
+"step": 1
+}
+
+[sub_resource type="Resource" id="noise_frequency"]
+script = ExtResource("3_property")
+id = &"frequency"
+label = "Frequency"
+value_type = 3
+options = {
+"default": 0.015,
+"group": "Noise",
+"max": 1.0,
+"min": 0.0001,
+"step": 0.001
+}
+
+[sub_resource type="Resource" id="noise_fractal_type"]
+script = ExtResource("3_property")
+id = &"fractal_type"
+label = "Fractal"
+value_type = 2
+options = {
+"choices": ["None", "FBM", "Ridged", "Ping Pong"],
+"default": 1,
+"group": "Fractal"
+}
+
+[sub_resource type="Resource" id="noise_octaves"]
+script = ExtResource("3_property")
+id = &"octaves"
+label = "Octaves"
+value_type = 2
+options = {
+"default": 5,
+"group": "Fractal",
+"max": 10,
+"min": 1,
+"step": 1
+}
+
+[sub_resource type="Resource" id="noise_lacunarity"]
+script = ExtResource("3_property")
+id = &"lacunarity"
+label = "Lacunarity"
+value_type = 3
+options = {
+"default": 2.0,
+"group": "Fractal",
+"max": 8.0,
+"min": 0.01,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="noise_gain"]
+script = ExtResource("3_property")
+id = &"gain"
+label = "Gain"
+value_type = 3
+options = {
+"default": 0.5,
+"group": "Fractal",
+"max": 2.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="noise_contrast"]
+script = ExtResource("3_property")
+id = &"contrast"
+label = "Contrast"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Color",
+"max": 4.0,
+"min": 0.01,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="noise_invert"]
+script = ExtResource("3_property")
+id = &"invert"
+label = "Invert"
+value_type = 1
+options = {
+"default": false,
+"group": "Color"
+}
+
+[sub_resource type="Resource" id="noise_low_color"]
+script = ExtResource("3_property")
+id = &"low_color"
+label = "Low Color"
+value_type = 20
+options = {
+"default": Color(0, 0, 0, 1),
+"group": "Color"
+}
+
+[sub_resource type="Resource" id="noise_high_color"]
+script = ExtResource("3_property")
+id = &"high_color"
+label = "High Color"
+value_type = 20
+options = {
+"default": Color(1, 1, 1, 1),
+"group": "Color"
+}
+
+[sub_resource type="Resource" id="noise_as_normal_map"]
+script = ExtResource("3_property")
+id = &"as_normal_map"
+label = "Show as Normal Map"
+value_type = 1
+options = {
+"default": false,
+"group": "Output"
+}
+
+[sub_resource type="Resource" id="noise_image_definition"]
+script = ExtResource("13_object_definition")
+type_id = &"noise_image"
+base_type = &"image"
+display_name = "Noise Image"
+properties = Array[ExtResource("3_property")]([SubResource("noise_resolution"), SubResource("noise_seamless"), SubResource("noise_type"), SubResource("noise_seed"), SubResource("noise_frequency"), SubResource("noise_fractal_type"), SubResource("noise_octaves"), SubResource("noise_lacunarity"), SubResource("noise_gain"), SubResource("noise_contrast"), SubResource("noise_invert"), SubResource("noise_low_color"), SubResource("noise_high_color"), SubResource("noise_as_normal_map")])
+
+[sub_resource type="Resource" id="material_tint"]
+script = ExtResource("3_property")
+id = &"tint"
+label = "Tint"
+value_type = 20
+options = {
+"default": Color(1, 1, 1, 1),
+"group": "Surface"
+}
+
+[sub_resource type="Resource" id="material_albedo_map"]
+script = ExtResource("3_property")
+id = &"albedo_map"
+label = "Albedo map"
+value_type = 24
+object_type = &"image"
+options = {
+"accepted_object_types": ["image", "noise_image"],
+"default": null,
+"extensions": ["tres"],
+"file_resource_mode": "editable",
+"group": "Surface"
+}
+
+[sub_resource type="Resource" id="material_opacity"]
+script = ExtResource("3_property")
+id = &"opacity"
+label = "Opacity"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Surface",
+"max": 1.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="material_roughness"]
+script = ExtResource("3_property")
+id = &"roughness"
+label = "Roughness"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Surface",
+"max": 1.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="material_roughness_map"]
+script = ExtResource("3_property")
+id = &"roughness_map"
+label = "Roughness map"
+value_type = 24
+object_type = &"image"
+options = {
+"accepted_object_types": ["image", "noise_image"],
+"default": null,
+"extensions": ["tres"],
+"file_resource_mode": "editable",
+"group": "Surface"
+}
+
+[sub_resource type="Resource" id="material_metallic"]
+script = ExtResource("3_property")
+id = &"metallic"
+label = "Metallic"
+value_type = 3
+options = {
+"default": 0.0,
+"group": "Surface",
+"max": 1.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="material_metallic_map"]
+script = ExtResource("3_property")
+id = &"metallic_map"
+label = "Metallic map"
+value_type = 24
+object_type = &"image"
+options = {
+"accepted_object_types": ["image", "noise_image"],
+"default": null,
+"extensions": ["tres"],
+"file_resource_mode": "editable",
+"group": "Surface"
+}
+
+[sub_resource type="Resource" id="material_specular"]
+script = ExtResource("3_property")
+id = &"specular"
+label = "Specular"
+value_type = 3
+options = {
+"default": 0.5,
+"group": "Surface",
+"max": 1.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="material_specular_map"]
+script = ExtResource("3_property")
+id = &"specular_map"
+label = "Specular map"
+value_type = 24
+object_type = &"image"
+options = {
+"accepted_object_types": ["image", "noise_image"],
+"default": null,
+"extensions": ["tres"],
+"file_resource_mode": "editable",
+"group": "Surface"
+}
+
+[sub_resource type="Resource" id="material_normal_map"]
+script = ExtResource("3_property")
+id = &"normal_map"
+label = "Normal map"
+value_type = 24
+object_type = &"image"
+options = {
+"accepted_object_types": ["image", "noise_image"],
+"default": null,
+"extensions": ["tres"],
+"file_resource_mode": "editable",
+"group": "Normal Map"
+}
+
+[sub_resource type="Resource" id="material_normal_strength"]
+script = ExtResource("3_property")
+id = &"normal_strength"
+label = "Strength"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Normal Map",
+"max": 8.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="material_uv_scale"]
+script = ExtResource("3_property")
+id = &"uv_scale"
+label = "Scale"
+value_type = 5
+options = {
+"default": Vector2(1, 1),
+"group": "UV"
+}
+
+[sub_resource type="Resource" id="material_uv_offset"]
+script = ExtResource("3_property")
+id = &"uv_offset"
+label = "Offset"
+value_type = 5
+options = {
+"default": Vector2(0, 0),
+"group": "UV"
+}
+
+[sub_resource type="Resource" id="material_uv_triplanar"]
+script = ExtResource("3_property")
+id = &"uv_triplanar"
+label = "Triplanar"
+value_type = 1
+options = {
+"default": false,
+"group": "UV"
+}
+
+[sub_resource type="Resource" id="material_uv_world_triplanar"]
+script = ExtResource("3_property")
+id = &"uv_world_triplanar"
+label = "World Triplanar"
+value_type = 1
+options = {
+"default": false,
+"group": "UV"
+}
+
+[sub_resource type="Resource" id="material_emission_enabled"]
+script = ExtResource("3_property")
+id = &"emission_enabled"
+label = "Enabled"
+value_type = 1
+options = {
+"default": false,
+"group": "Emission"
+}
+
+[sub_resource type="Resource" id="material_emission_color"]
+script = ExtResource("3_property")
+id = &"emission_color"
+label = "Color"
+value_type = 20
+options = {
+"default": Color(0, 0, 0, 1),
+"group": "Emission"
+}
+
+[sub_resource type="Resource" id="material_emission_map"]
+script = ExtResource("3_property")
+id = &"emission_map"
+label = "Emission map"
+value_type = 24
+object_type = &"image"
+options = {
+"accepted_object_types": ["image", "noise_image"],
+"default": null,
+"extensions": ["tres"],
+"file_resource_mode": "editable",
+"group": "Emission"
+}
+
+[sub_resource type="Resource" id="material_emission_operator"]
+script = ExtResource("3_property")
+id = &"emission_operator"
+label = "Texture blend"
+value_type = 2
+options = {
+"choices": ["Add", "Multiply"],
+"default": 0,
+"group": "Emission"
+}
+
+[sub_resource type="Resource" id="material_emission_energy"]
+script = ExtResource("3_property")
+id = &"emission_energy"
+label = "Energy"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Emission",
+"max": 32.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="material_unshaded"]
+script = ExtResource("3_property")
+id = &"unshaded"
+label = "Unshaded"
+value_type = 1
+options = {
+"default": false,
+"group": "Shading"
+}
+
+[sub_resource type="Resource" id="material_double_sided"]
+script = ExtResource("3_property")
+id = &"double_sided"
+label = "Double sided"
+value_type = 1
+options = {
+"default": false,
+"group": "Rendering"
+}
+
+[sub_resource type="Resource" id="material_no_depth_test"]
+script = ExtResource("3_property")
+id = &"no_depth_test"
+label = "Disable depth test"
+value_type = 1
+options = {
+"default": false,
+"group": "Rendering"
+}
+
+[sub_resource type="Resource" id="material_definition"]
+script = ExtResource("13_object_definition")
+type_id = &"material"
+display_name = "Material"
+schema_version = 4
+properties = Array[ExtResource("3_property")]([SubResource("material_tint"), SubResource("material_albedo_map"), SubResource("material_opacity"), SubResource("material_roughness"), SubResource("material_roughness_map"), SubResource("material_metallic"), SubResource("material_metallic_map"), SubResource("material_specular"), SubResource("material_specular_map"), SubResource("material_normal_map"), SubResource("material_normal_strength"), SubResource("material_uv_scale"), SubResource("material_uv_offset"), SubResource("material_uv_triplanar"), SubResource("material_uv_world_triplanar"), SubResource("material_emission_enabled"), SubResource("material_emission_color"), SubResource("material_emission_map"), SubResource("material_emission_operator"), SubResource("material_emission_energy"), SubResource("material_unshaded"), SubResource("material_double_sided"), SubResource("material_no_depth_test")])
+
+[sub_resource type="Resource" id="shader_material_shader"]
+script = ExtResource("3_property")
+id = &"shader_path"
+label = "Shader"
+value_type = 4
+options = {
+"create_file": true,
+"default": "",
+"extensions": ["gdshader"],
+"file_picker": true,
+"file_resource_mode": "uneditable",
+"group": "Shader",
+"new_file_name": "New Shader",
+"new_file_template": "shader_type spatial;
+
+void fragment() {
+	ALBEDO = vec3(1.0);
+}
+",
+"refresh_inspector": true
+}
+
+[sub_resource type="Resource" id="shader_material_uniforms"]
+script = ExtResource("3_property")
+id = &"uniforms"
+label = "Uniforms"
+value_type = 27
+options = {
+"default": {},
+"group": "Parameters",
+"shader_uniforms": true
+}
+
+[sub_resource type="Resource" id="shader_material_definition"]
+script = ExtResource("13_object_definition")
+type_id = &"shader_material"
+base_type = &"material"
+display_name = "ShaderMaterial"
+properties = Array[ExtResource("3_property")]([SubResource("shader_material_shader"), SubResource("shader_material_uniforms")])
+
+[sub_resource type="Resource" id="canvas_shader_material_shader"]
+script = ExtResource("3_property")
+id = &"shader_path"
+label = "Shader"
+value_type = 4
+options = {
+"create_file": true,
+"default": "",
+"extensions": ["gdshader"],
+"file_picker": true,
+"file_resource_mode": "uneditable",
+"group": "Shader",
+"new_file_name": "New Canvas Shader",
+"new_file_template": "shader_type canvas_item;
+
+void fragment() {
+	COLOR = texture(TEXTURE, UV);
+}
+",
+"refresh_inspector": true
+}
+
+[sub_resource type="Resource" id="canvas_shader_material_definition"]
+script = ExtResource("13_object_definition")
+type_id = &"canvas_shader_material"
+base_type = &"shader_material"
+display_name = "Canvas ShaderMaterial"
+properties = Array[ExtResource("3_property")]([SubResource("canvas_shader_material_shader"), SubResource("shader_material_uniforms")])
+
+[sub_resource type="Resource" id="fog_shader_material_shader"]
+script = ExtResource("3_property")
+id = &"shader_path"
+label = "Shader"
+value_type = 4
+options = {
+"create_file": true,
+"default": "",
+"extensions": ["gdshader"],
+"file_picker": true,
+"file_resource_mode": "uneditable",
+"group": "Shader",
+"new_file_name": "New Fog Shader",
+"new_file_template": "shader_type fog;
+
+void fog() {
+	DENSITY = 1.0;
+	ALBEDO = vec3(0.75, 0.85, 1.0);
+}
+",
+"refresh_inspector": true
+}
+
+[sub_resource type="Resource" id="fog_shader_material_definition"]
+script = ExtResource("13_object_definition")
+type_id = &"fog_shader_material"
+base_type = &"shader_material"
+display_name = "Fog ShaderMaterial"
+properties = Array[ExtResource("3_property")]([SubResource("fog_shader_material_shader"), SubResource("shader_material_uniforms")])
+
+[sub_resource type="Resource" id="envp_background_mode"]
+script = ExtResource("3_property")
+id = &"background_mode"
+label = "Mode"
+value_type = 2
+options = {
+"choices": ["Color", "Image", "Procedural Sky", "Shader Sky"],
+"default": 0,
+"group": "Background",
+"refresh_inspector": true
+}
+
+[sub_resource type="Resource" id="world_background_color"]
+script = ExtResource("3_property")
+id = &"background_color"
+label = "Background Color"
+value_type = 20
+options = {
+"default": Color(0.125, 0.145, 0.176, 1),
+"group": "Background",
+"visible_when": {
+"property": "background_mode",
+"values": [0]
+}
+}
+
+[sub_resource type="Resource" id="envp_background_image"]
+script = ExtResource("3_property")
+id = &"background_image"
+label = "Image"
+value_type = 24
+object_type = &"image"
+options = {
+"accepted_object_types": ["image", "noise_image"],
+"default": null,
+"extensions": ["tres"],
+"file_resource_mode": "editable",
+"group": "Background",
+"visible_when": {
+"property": "background_mode",
+"values": [1]
+}
+}
+
+[sub_resource type="Resource" id="envp_sky_material"]
+script = ExtResource("3_property")
+id = &"sky_material"
+label = "ShaderMaterial"
+value_type = 24
+object_type = &"shader_material"
+options = {
+"accepted_object_types": ["shader_material"],
+"default": null,
+"extensions": ["tres"],
+"file_resource_mode": "editable",
+"group": "Background",
+"refresh_inspector": true,
+"visible_when": {
+"property": "background_mode",
+"values": [3]
+}
+}
+
+[sub_resource type="Resource" id="world_background_energy"]
+script = ExtResource("3_property")
+id = &"background_energy"
+label = "Background Energy"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Background",
+"max": 16.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_sky_rotation"]
+script = ExtResource("3_property")
+id = &"sky_rotation"
+label = "Rotation"
+value_type = 9
+options = {
+"default": Vector3(0, 0, 0),
+"group": "Background",
+"visible_when": {
+"property": "background_mode",
+"values": [1, 2, 3]
+}
+}
+
+[sub_resource type="Resource" id="envp_sky_top_color"]
+script = ExtResource("3_property")
+id = &"sky_top_color"
+label = "Sky Top Color"
+value_type = 20
+options = {
+"default": Color(0.2196, 0.3529, 0.549, 1),
+"group": "Procedural Sky",
+"visible_when": {
+"property": "background_mode",
+"values": [2]
+}
+}
+
+[sub_resource type="Resource" id="envp_sky_horizon_color"]
+script = ExtResource("3_property")
+id = &"sky_horizon_color"
+label = "Sky Horizon Color"
+value_type = 20
+options = {
+"default": Color(0.8392, 0.9176, 0.9804, 1),
+"group": "Procedural Sky",
+"visible_when": {
+"property": "background_mode",
+"values": [2]
+}
+}
+
+[sub_resource type="Resource" id="envp_sky_curve"]
+script = ExtResource("3_property")
+id = &"sky_curve"
+label = "Sky Curve"
+value_type = 3
+options = {
+"default": 0.15,
+"group": "Procedural Sky",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01,
+"visible_when": {
+"property": "background_mode",
+"values": [2]
+}
+}
+
+[sub_resource type="Resource" id="envp_sky_energy"]
+script = ExtResource("3_property")
+id = &"sky_energy"
+label = "Sky Energy"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Procedural Sky",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01,
+"visible_when": {
+"property": "background_mode",
+"values": [2]
+}
+}
+
+[sub_resource type="Resource" id="envp_ground_bottom_color"]
+script = ExtResource("3_property")
+id = &"ground_bottom_color"
+label = "Ground Bottom Color"
+value_type = 20
+options = {
+"default": Color(0.1569, 0.1843, 0.2392, 1),
+"group": "Procedural Sky",
+"visible_when": {
+"property": "background_mode",
+"values": [2]
+}
+}
+
+[sub_resource type="Resource" id="envp_ground_horizon_color"]
+script = ExtResource("3_property")
+id = &"ground_horizon_color"
+label = "Ground Horizon Color"
+value_type = 20
+options = {
+"default": Color(0.8392, 0.9176, 0.9804, 1),
+"group": "Procedural Sky",
+"visible_when": {
+"property": "background_mode",
+"values": [2]
+}
+}
+
+[sub_resource type="Resource" id="envp_ground_curve"]
+script = ExtResource("3_property")
+id = &"ground_curve"
+label = "Ground Curve"
+value_type = 3
+options = {
+"default": 0.02,
+"group": "Procedural Sky",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01,
+"visible_when": {
+"property": "background_mode",
+"values": [2]
+}
+}
+
+[sub_resource type="Resource" id="envp_ground_energy"]
+script = ExtResource("3_property")
+id = &"ground_energy"
+label = "Ground Energy"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Procedural Sky",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01,
+"visible_when": {
+"property": "background_mode",
+"values": [2]
+}
+}
+
+[sub_resource type="Resource" id="envp_sun_angle_max"]
+script = ExtResource("3_property")
+id = &"sun_angle_max"
+label = "Sun Angle Max"
+value_type = 3
+options = {
+"default": 30.0,
+"group": "Procedural Sky",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01,
+"visible_when": {
+"property": "background_mode",
+"values": [2]
+}
+}
+
+[sub_resource type="Resource" id="envp_sun_curve"]
+script = ExtResource("3_property")
+id = &"sun_curve"
+label = "Sun Curve"
+value_type = 3
+options = {
+"default": 0.15,
+"group": "Procedural Sky",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01,
+"visible_when": {
+"property": "background_mode",
+"values": [2]
+}
+}
+
+[sub_resource type="Resource" id="envp_sky_debanding"]
+script = ExtResource("3_property")
+id = &"sky_debanding"
+label = "Use Debanding"
+value_type = 1
+options = {
+"default": true,
+"group": "Procedural Sky",
+"visible_when": {
+"property": "background_mode",
+"values": [2]
+}
+}
+
+[sub_resource type="Resource" id="envp_ambient_source"]
+script = ExtResource("3_property")
+id = &"ambient_source"
+label = "Source"
+value_type = 2
+options = {
+"choices": ["Background", "Disabled", "Color", "Sky"],
+"default": 2,
+"group": "Ambient Light"
+}
+
+[sub_resource type="Resource" id="world_ambient_color"]
+script = ExtResource("3_property")
+id = &"ambient_color"
+label = "Ambient Color"
+value_type = 20
+options = {
+"default": Color(1, 1, 1, 1),
+"group": "Ambient Light"
+}
+
+[sub_resource type="Resource" id="world_ambient_energy"]
+script = ExtResource("3_property")
+id = &"ambient_energy"
+label = "Ambient Energy"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Ambient Light",
+"max": 16.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_ambient_sky_contribution"]
+script = ExtResource("3_property")
+id = &"ambient_sky_contribution"
+label = "Sky Contribution"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Ambient Light",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_reflected_source"]
+script = ExtResource("3_property")
+id = &"reflected_source"
+label = "Source"
+value_type = 2
+options = {
+"choices": ["Background", "Disabled", "Sky"],
+"default": 0,
+"group": "Reflected Light"
+}
+
+[sub_resource type="Resource" id="world_tone_mapper"]
+script = ExtResource("3_property")
+id = &"tone_mapper"
+label = "Tone Mapper"
+value_type = 2
+options = {
+"choices": ["Linear", "Reinhard", "Filmic", "ACES"],
+"default": 3,
+"group": "Tonemap"
+}
+
+[sub_resource type="Resource" id="world_exposure"]
+script = ExtResource("3_property")
+id = &"exposure"
+label = "Exposure"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Tonemap",
+"max": 16.0,
+"min": 0.01,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_white_point"]
+script = ExtResource("3_property")
+id = &"white_point"
+label = "White Point"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Tonemap",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_ssr_enabled"]
+script = ExtResource("3_property")
+id = &"ssr_enabled"
+label = "Enabled"
+value_type = 1
+options = {
+"default": false,
+"group": "SSR"
+}
+
+[sub_resource type="Resource" id="envp_ssr_max_steps"]
+script = ExtResource("3_property")
+id = &"ssr_max_steps"
+label = "Max Steps"
+value_type = 2
+options = {
+"default": 64,
+"group": "SSR",
+"max": 256,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="envp_ssr_fade_in"]
+script = ExtResource("3_property")
+id = &"ssr_fade_in"
+label = "Fade In"
+value_type = 3
+options = {
+"default": 0.15,
+"group": "SSR",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_ssr_fade_out"]
+script = ExtResource("3_property")
+id = &"ssr_fade_out"
+label = "Fade Out"
+value_type = 3
+options = {
+"default": 2.0,
+"group": "SSR",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_ssr_depth_tolerance"]
+script = ExtResource("3_property")
+id = &"ssr_depth_tolerance"
+label = "Depth Tolerance"
+value_type = 3
+options = {
+"default": 0.2,
+"group": "SSR",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_ssil_enabled"]
+script = ExtResource("3_property")
+id = &"ssil_enabled"
+label = "Enabled"
+value_type = 1
+options = {
+"default": false,
+"group": "SSIL"
+}
+
+[sub_resource type="Resource" id="envp_ssil_radius"]
+script = ExtResource("3_property")
+id = &"ssil_radius"
+label = "Radius"
+value_type = 3
+options = {
+"default": 5.0,
+"group": "SSIL",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_ssil_intensity"]
+script = ExtResource("3_property")
+id = &"ssil_intensity"
+label = "Intensity"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "SSIL",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_ssil_sharpness"]
+script = ExtResource("3_property")
+id = &"ssil_sharpness"
+label = "Sharpness"
+value_type = 3
+options = {
+"default": 0.98,
+"group": "SSIL",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_ssil_normal_rejection"]
+script = ExtResource("3_property")
+id = &"ssil_normal_rejection"
+label = "Normal Rejection"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "SSIL",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_sdfgi_enabled"]
+script = ExtResource("3_property")
+id = &"sdfgi_enabled"
+label = "Enabled"
+value_type = 1
+options = {
+"default": false,
+"group": "SDFGI"
+}
+
+[sub_resource type="Resource" id="envp_sdfgi_use_occlusion"]
+script = ExtResource("3_property")
+id = &"sdfgi_use_occlusion"
+label = "Use Occlusion"
+value_type = 1
+options = {
+"default": false,
+"group": "SDFGI"
+}
+
+[sub_resource type="Resource" id="envp_sdfgi_read_sky_light"]
+script = ExtResource("3_property")
+id = &"sdfgi_read_sky_light"
+label = "Read Sky Light"
+value_type = 1
+options = {
+"default": true,
+"group": "SDFGI"
+}
+
+[sub_resource type="Resource" id="envp_sdfgi_bounce_feedback"]
+script = ExtResource("3_property")
+id = &"sdfgi_bounce_feedback"
+label = "Bounce Feedback"
+value_type = 3
+options = {
+"default": 0.5,
+"group": "SDFGI",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_sdfgi_cascades"]
+script = ExtResource("3_property")
+id = &"sdfgi_cascades"
+label = "Cascades"
+value_type = 2
+options = {
+"default": 4,
+"group": "SDFGI",
+"max": 256,
+"min": 0,
+"step": 1
+}
+
+[sub_resource type="Resource" id="envp_sdfgi_min_cell_size"]
+script = ExtResource("3_property")
+id = &"sdfgi_min_cell_size"
+label = "Min Cell Size"
+value_type = 3
+options = {
+"default": 0.2,
+"group": "SDFGI",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_sdfgi_energy"]
+script = ExtResource("3_property")
+id = &"sdfgi_energy"
+label = "Energy"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "SDFGI",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_glow_enabled"]
+script = ExtResource("3_property")
+id = &"glow_enabled"
+label = "Enabled"
+value_type = 1
+options = {
+"default": false,
+"group": "Glow"
+}
+
+[sub_resource type="Resource" id="envp_glow_intensity"]
+script = ExtResource("3_property")
+id = &"glow_intensity"
+label = "Intensity"
+value_type = 3
+options = {
+"default": 0.8,
+"group": "Glow",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_glow_strength"]
+script = ExtResource("3_property")
+id = &"glow_strength"
+label = "Strength"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Glow",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_glow_mix"]
+script = ExtResource("3_property")
+id = &"glow_mix"
+label = "Mix"
+value_type = 3
+options = {
+"default": 0.05,
+"group": "Glow",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_glow_bloom"]
+script = ExtResource("3_property")
+id = &"glow_bloom"
+label = "Bloom"
+value_type = 3
+options = {
+"default": 0.0,
+"group": "Glow",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_glow_blend_mode"]
+script = ExtResource("3_property")
+id = &"glow_blend_mode"
+label = "Blend Mode"
+value_type = 2
+options = {
+"choices": ["Additive", "Screen", "Softlight", "Replace", "Mix"],
+"default": 2,
+"group": "Glow"
+}
+
+[sub_resource type="Resource" id="envp_glow_hdr_threshold"]
+script = ExtResource("3_property")
+id = &"glow_hdr_threshold"
+label = "HDR Threshold"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Glow",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="world_fog_enabled"]
+script = ExtResource("3_property")
+id = &"fog_enabled"
+label = "Enabled"
+value_type = 1
+options = {
+"default": false,
+"group": "Fog"
+}
+
+[sub_resource type="Resource" id="envp_fog_mode"]
+script = ExtResource("3_property")
+id = &"fog_mode"
+label = "Mode"
+value_type = 2
+options = {
+"choices": ["Exponential", "Depth"],
+"default": 0,
+"group": "Fog"
+}
+
+[sub_resource type="Resource" id="world_fog_color"]
+script = ExtResource("3_property")
+id = &"fog_color"
+label = "Color"
+value_type = 20
+options = {
+"default": Color(0.718, 0.769, 0.839, 1),
+"group": "Fog"
+}
+
+[sub_resource type="Resource" id="envp_fog_light_energy"]
+script = ExtResource("3_property")
+id = &"fog_light_energy"
+label = "Light Energy"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Fog",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_fog_sun_scatter"]
+script = ExtResource("3_property")
+id = &"fog_sun_scatter"
+label = "Sun Scatter"
+value_type = 3
+options = {
+"default": 0.0,
+"group": "Fog",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="world_fog_density"]
+script = ExtResource("3_property")
+id = &"fog_density"
+label = "Density"
+value_type = 3
+options = {
+"default": 0.01,
+"group": "Fog",
+"max": 1.0,
+"min": 0.0,
+"step": 0.001
+}
+
+[sub_resource type="Resource" id="envp_fog_sky_affect"]
+script = ExtResource("3_property")
+id = &"fog_sky_affect"
+label = "Sky Affect"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Fog",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_fog_height"]
+script = ExtResource("3_property")
+id = &"fog_height"
+label = "Height"
+value_type = 3
+options = {
+"default": 0.0,
+"group": "Fog",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_fog_height_density"]
+script = ExtResource("3_property")
+id = &"fog_height_density"
+label = "Height Density"
+value_type = 3
+options = {
+"default": 0.0,
+"group": "Fog",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_volumetric_fog_enabled"]
+script = ExtResource("3_property")
+id = &"volumetric_fog_enabled"
+label = "Enabled"
+value_type = 1
+options = {
+"default": false,
+"group": "Volumetric Fog"
+}
+
+[sub_resource type="Resource" id="envp_volumetric_fog_density"]
+script = ExtResource("3_property")
+id = &"volumetric_fog_density"
+label = "Density"
+value_type = 3
+options = {
+"default": 0.05,
+"group": "Volumetric Fog",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_volumetric_fog_albedo"]
+script = ExtResource("3_property")
+id = &"volumetric_fog_albedo"
+label = "Albedo"
+value_type = 20
+options = {
+"default": Color(1, 1, 1, 1),
+"group": "Volumetric Fog"
+}
+
+[sub_resource type="Resource" id="envp_volumetric_fog_emission"]
+script = ExtResource("3_property")
+id = &"volumetric_fog_emission"
+label = "Emission"
+value_type = 20
+options = {
+"default": Color(0, 0, 0, 1),
+"group": "Volumetric Fog"
+}
+
+[sub_resource type="Resource" id="envp_volumetric_fog_emission_energy"]
+script = ExtResource("3_property")
+id = &"volumetric_fog_emission_energy"
+label = "Emission Energy"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Volumetric Fog",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_volumetric_fog_gi_inject"]
+script = ExtResource("3_property")
+id = &"volumetric_fog_gi_inject"
+label = "GI Inject"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Volumetric Fog",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_volumetric_fog_anisotropy"]
+script = ExtResource("3_property")
+id = &"volumetric_fog_anisotropy"
+label = "Anisotropy"
+value_type = 3
+options = {
+"default": 0.2,
+"group": "Volumetric Fog",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_volumetric_fog_length"]
+script = ExtResource("3_property")
+id = &"volumetric_fog_length"
+label = "Length"
+value_type = 3
+options = {
+"default": 64.0,
+"group": "Volumetric Fog",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_volumetric_fog_detail_spread"]
+script = ExtResource("3_property")
+id = &"volumetric_fog_detail_spread"
+label = "Detail Spread"
+value_type = 3
+options = {
+"default": 2.0,
+"group": "Volumetric Fog",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_volumetric_fog_sky_affect"]
+script = ExtResource("3_property")
+id = &"volumetric_fog_sky_affect"
+label = "Sky Affect"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Volumetric Fog",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_adjustment_enabled"]
+script = ExtResource("3_property")
+id = &"adjustment_enabled"
+label = "Enabled"
+value_type = 1
+options = {
+"default": false,
+"group": "Adjustments"
+}
+
+[sub_resource type="Resource" id="envp_adjustment_brightness"]
+script = ExtResource("3_property")
+id = &"adjustment_brightness"
+label = "Brightness"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Adjustments",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_adjustment_contrast"]
+script = ExtResource("3_property")
+id = &"adjustment_contrast"
+label = "Contrast"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Adjustments",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="envp_adjustment_saturation"]
+script = ExtResource("3_property")
+id = &"adjustment_saturation"
+label = "Saturation"
+value_type = 3
+options = {
+"default": 1.0,
+"group": "Adjustments",
+"max": 1024.0,
+"min": 0.0,
+"step": 0.01
+}
+
+[sub_resource type="Resource" id="environment_definition"]
+script = ExtResource("13_object_definition")
+type_id = &"environment"
+display_name = "Environment"
+properties = Array[ExtResource("3_property")]([SubResource("envp_background_mode"), SubResource("world_background_color"), SubResource("envp_background_image"), SubResource("envp_sky_material"), SubResource("world_background_energy"), SubResource("envp_sky_rotation"), SubResource("envp_sky_top_color"), SubResource("envp_sky_horizon_color"), SubResource("envp_sky_curve"), SubResource("envp_sky_energy"), SubResource("envp_ground_bottom_color"), SubResource("envp_ground_horizon_color"), SubResource("envp_ground_curve"), SubResource("envp_ground_energy"), SubResource("envp_sun_angle_max"), SubResource("envp_sun_curve"), SubResource("envp_sky_debanding"), SubResource("envp_ambient_source"), SubResource("world_ambient_color"), SubResource("world_ambient_energy"), SubResource("envp_ambient_sky_contribution"), SubResource("envp_reflected_source"), SubResource("world_tone_mapper"), SubResource("world_exposure"), SubResource("envp_white_point"), SubResource("envp_ssr_enabled"), SubResource("envp_ssr_max_steps"), SubResource("envp_ssr_fade_in"), SubResource("envp_ssr_fade_out"), SubResource("envp_ssr_depth_tolerance"), SubResource("envp_ssil_enabled"), SubResource("envp_ssil_radius"), SubResource("envp_ssil_intensity"), SubResource("envp_ssil_sharpness"), SubResource("envp_ssil_normal_rejection"), SubResource("envp_sdfgi_enabled"), SubResource("envp_sdfgi_use_occlusion"), SubResource("envp_sdfgi_read_sky_light"), SubResource("envp_sdfgi_bounce_feedback"), SubResource("envp_sdfgi_cascades"), SubResource("envp_sdfgi_min_cell_size"), SubResource("envp_sdfgi_energy"), SubResource("envp_glow_enabled"), SubResource("envp_glow_intensity"), SubResource("envp_glow_strength"), SubResource("envp_glow_mix"), SubResource("envp_glow_bloom"), SubResource("envp_glow_blend_mode"), SubResource("envp_glow_hdr_threshold"), SubResource("world_fog_enabled"), SubResource("envp_fog_mode"), SubResource("world_fog_color"), SubResource("envp_fog_light_energy"), SubResource("envp_fog_sun_scatter"), SubResource("world_fog_density"), SubResource("envp_fog_sky_affect"), SubResource("envp_fog_height"), SubResource("envp_fog_height_density"), SubResource("envp_volumetric_fog_enabled"), SubResource("envp_volumetric_fog_density"), SubResource("envp_volumetric_fog_albedo"), SubResource("envp_volumetric_fog_emission"), SubResource("envp_volumetric_fog_emission_energy"), SubResource("envp_volumetric_fog_gi_inject"), SubResource("envp_volumetric_fog_anisotropy"), SubResource("envp_volumetric_fog_length"), SubResource("envp_volumetric_fog_detail_spread"), SubResource("envp_volumetric_fog_sky_affect"), SubResource("envp_adjustment_enabled"), SubResource("envp_adjustment_brightness"), SubResource("envp_adjustment_contrast"), SubResource("envp_adjustment_saturation")])
+
+[resource]
+script = ExtResource("1_catalog")
+definitions = Array[ExtResource("2_definition")]([SubResource("point"), ExtResource("23_point2d"), ExtResource("30_remote"), SubResource("shape"), ExtResource("21_shape2d"), ExtResource("26_line2d"), SubResource("mesh_actor"), SubResource("text"), ExtResource("19_text2d"), SubResource("image"), ExtResource("20_image2d"), ExtResource("24_decal"), ExtResource("25_particles"), ExtResource("27_particles2d"), SubResource("light"), SubResource("directional_light_actor"), ExtResource("28_fog"), ExtResource("29_probe"), SubResource("camera"), SubResource("world"), ExtResource("16_audio"), ExtResource("17_video"), ExtResource("22_video2d")])
+object_definitions = Array[ExtResource("13_object_definition")]([SubResource("image_object_definition"), SubResource("noise_image_definition"), SubResource("material_definition"), SubResource("shader_material_definition"), SubResource("canvas_shader_material_definition"), SubResource("fog_shader_material_definition"), SubResource("environment_definition"), ExtResource("18_text_settings")])

@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://dk22ixmn3cmrb" path="res://CustomNodes/ExpandableButton/expandable_button.gd" id="1_vlimd"]
 [ext_resource type="Texture2D" uid="uid://bdblvy7bf8xgn" path="res://resources/Images/BasicImages/PointerRight.png" id="2_vlimd"]
 [ext_resource type="SystemFont" uid="uid://fue8lb1oipxq" path="res://resources/fonts/MainFont.tres" id="4_xrkke"]
+[ext_resource type="Script" path="res://CustomNodes/FileSystem/project_file_drag_button.gd" id="5_drag"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_bb450"]
 font = ExtResource("4_xrkke")
@@ -52,12 +53,17 @@ texture = ExtResource("2_vlimd")
 expand_mode = 1
 
 [node name="MainIcon" type="TextureRect" parent="Panel/HBoxContainer" unique_id=1256922798]
+custom_minimum_size = Vector2(20, 20)
 layout_mode = 2
-expand_mode = 3
+expand_mode = 1
+stretch_mode = 5
+mouse_filter = 2
 
 [node name="Text" type="Label" parent="Panel/HBoxContainer" unique_id=98671710]
 layout_mode = 2
 size_flags_horizontal = 3
+text_overrun_behavior = 3
+clip_text = true
 text = "aab"
 label_settings = SubResource("LabelSettings_bb450")
 
@@ -70,6 +76,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 flat = true
+script = ExtResource("5_drag")
 metadata/_edit_use_anchors_ = true
 
 [node name="CoverColorRect" type="ColorRect" parent="Panel" unique_id=18146638]

@@ -1,0 +1,102 @@
+extends SceneTree
+
+func _initialize() -> void:
+	_run.call_deferred()
+
+func _run() -> void:
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = 44100
+	var data := PackedByteArray()
+	data.resize(44100 * 2 * 2)
+	for frame in 88200:
+		data.encode_s16(frame * 2, int(sin(frame * 0.05) * 12000))
+	stream.data = data
+	var path := "user://actor_audio_test.wav"
+	assert(stream.save_to_wav(path) == OK)
+	var registry := ActorRegistry.new()
+	BasicActors.register_all(registry)
+	var definition := registry.get_definition(&"audio")
+	assert(definition != null)
+	var model := ActorTimeline.new()
+	var clip := model.create_actor(definition, 1.0, {&"audio": path})
+	assert(is_equal_approx(clip.duration, 2.0))
+	model.trim_clip(clip.id, 1.5, 1.5)
+	assert(is_equal_approx(clip.source_offset, 0.5))
+	model.trim_clip(clip.id, 1.5, 2.0)
+	assert(is_equal_approx(clip.duration, 1.5))
+	var actor := model.actor_for_id(clip.actor_id)
+	model.edit_property(actor, definition, &"speed", 2.0)
+	assert(is_equal_approx(clip.duration, 0.75))
+	assert(not model.can_place_group({clip.id: {"start": clip.start_time, "duration": 2.0, "offset": 0.5, "layer": clip.layer}}))
+	assert(not model.can_place_group({clip.id: {"start": clip.start_time, "duration": 0.75, "offset": -0.1, "layer": clip.layer}}))
+	var batch := ActorPropertyBatch.new()
+	batch.model = model
+	batch.registry = registry
+	batch.preview(actor, &"speed", 1.0)
+	assert(is_equal_approx(clip.duration, 1.5))
+	batch.finish(actor, &"speed", 2.0, 1.0)
+	model.history.undo()
+	assert(is_equal_approx(clip.duration, 0.75) and is_equal_approx(clip.playback_speed, 2.0))
+	model.history.redo()
+	assert(is_equal_approx(clip.duration, 1.5))
+	assert(is_equal_approx(float(actor.get_value(&"pitch")), 1.0))
+	var wave := ActorAudioSystem._decode(ActorAudio.source(path))
+	assert(wave.size() == 4096 and wave[100] > 0.1)
+	var system := ActorAudioSystem.new()
+	root.add_child(system)
+	system.synchronize(model, 1.6, true)
+	assert(system.players[clip.id].playing)
+	system.synchronize(model, 1.6, false)
+	assert(not system.players[clip.id].playing)
+	system.scrub(model, 1.6)
+	assert(system.players[clip.id].playing)
+	system.scrub(model, 1.55)
+	assert(system.players[clip.id].playing)
+	system._process(0.13)
+	assert(not system.players[clip.id].playing)
+	system.scrub(model, clip.start_time + clip.duration - 0.02)
+	system._process(0.03)
+	assert(not system.players[clip.id].playing)
+	system.scrub(model, 0.0)
+	assert(not system.players[clip.id].playing)
+	actor.values[&"muted"] = true
+	system.scrub(model, 1.6)
+	assert(not system.players[clip.id].playing)
+	actor.values[&"muted"] = false
+	system.scrub(model, 1.6)
+	system.synchronize(model, 1.6, true)
+	system._process(0.2)
+	assert(system.players[clip.id].playing)
+	model.edit_property(actor, definition, &"audio", null)
+	system.synchronize(model, 1.6, true)
+	assert(system.players.is_empty())
+	model.history.undo()
+	assert(is_equal_approx(clip.duration, 1.5) and is_equal_approx(clip.source_offset, 0.5))
+	var right := model.split_clip(clip.id, clip.start_time + 0.5)
+	assert(right != null and is_equal_approx(right.source_offset, 1.0))
+	assert(is_equal_approx(clip.duration + right.duration, 1.5))
+	model.history.undo()
+	assert(model.clips.size() == 1 and is_equal_approx(clip.duration, 1.5))
+	system.free()
+	model.history.clear_history()
+	var editor := load("res://Workspaces/SceneWorkspace/Timeline.tscn").instantiate() as ActorTimelineEditor
+	root.add_child(editor)
+	editor.size = Vector2(1000, 240)
+	var displayed := editor.model.create_actor(editor.registry.get_definition(&"audio"), 0.0, {&"audio": path})
+	assert(displayed != null)
+	editor.canvas.time_selected.emit(0.5)
+	assert(editor.audio_system.players[displayed.id].playing)
+	editor.audio_system._process(0.13)
+	assert(not editor.audio_system.players[displayed.id].playing)
+	for frame in 5: await process_frame
+	var envelope := editor.audio_system.waveform(ActorAudio.source(path))
+	while envelope.is_empty():
+		await process_frame
+		envelope = editor.audio_system.waveform(ActorAudio.source(path))
+	assert(envelope.size() == 4096)
+	editor.free()
+	await process_frame
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	print("Audio test: passed")
+	quit()

@@ -1,0 +1,150 @@
+[gd_resource type="Resource" script_class="ActorDefinition" format=3 uid="uid://csbc7ervc7dux"]
+
+[ext_resource type="Script" uid="uid://cfphk6n07ph5o" path="res://scripts/actors/core/actor_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="2"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/basic_actor.tscn" id="3"]
+[ext_resource type="Texture2D" uid="uid://yqi31q2a3nmr" path="res://resources/Images/ActorIcons/FogVolume.svg" id="4"]
+
+[sub_resource type="Resource" id="position"]
+script = ExtResource("2")
+id = &"position"
+label = "Position"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(0, 0, -3),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="rotation"]
+script = ExtResource("2")
+id = &"rotation"
+label = "Rotation"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(0, 0, 0),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="scale"]
+script = ExtResource("2")
+id = &"scale"
+label = "Scale"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(1, 1, 1),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="shape"]
+script = ExtResource("2")
+id = &"shape"
+label = "Shape"
+value_type = 2
+options = {
+"choices": ["Ellipsoid", "Cone", "Cylinder", "Box", "World"],
+"default": 3,
+"group": "Volume"
+}
+
+[sub_resource type="Resource" id="volume_size"]
+script = ExtResource("2")
+id = &"volume_size"
+label = "Size"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(4, 2, 4),
+"group": "Volume"
+}
+
+[sub_resource type="Resource" id="density"]
+script = ExtResource("2")
+id = &"density"
+label = "Density"
+value_type = 3
+animatable = true
+options = {
+"default": 1.0,
+"group": "Fog",
+"max": 16.0,
+"min": 0.0,
+"visible_when": {"property": "material", "values": [null]}
+}
+
+[sub_resource type="Resource" id="albedo"]
+script = ExtResource("2")
+id = &"albedo"
+label = "Color"
+value_type = 20
+animatable = true
+options = {
+"default": Color(1, 1, 1, 1),
+"group": "Fog",
+"visible_when": {"property": "material", "values": [null]}
+}
+
+[sub_resource type="Resource" id="emission"]
+script = ExtResource("2")
+id = &"emission"
+label = "Emission"
+value_type = 20
+animatable = true
+options = {
+"default": Color(0, 0, 0, 1),
+"group": "Fog",
+"visible_when": {"property": "material", "values": [null]}
+}
+
+[sub_resource type="Resource" id="emission_energy"]
+script = ExtResource("2")
+id = &"emission_energy"
+label = "Emission Energy"
+value_type = 3
+animatable = true
+options = {
+"default": 1.0,
+"group": "Fog",
+"max": 64.0,
+"min": 0.0,
+"visible_when": {"property": "material", "values": [null]}
+}
+
+[sub_resource type="Resource" id="edge_fade"]
+script = ExtResource("2")
+id = &"edge_fade"
+label = "Edge Fade"
+value_type = 3
+animatable = true
+options = {
+"default": 0.1,
+"group": "Fog",
+"max": 1.0,
+"min": 0.0,
+"visible_when": {"property": "material", "values": [null]}
+}
+
+[sub_resource type="Resource" id="fog_shader_material"]
+script = ExtResource("2")
+id = &"material"
+label = "Fog Shader"
+object_type = &"fog_shader_material"
+options = {
+"accepted_object_types": PackedStringArray("fog_shader_material"),
+"default": null,
+"extensions": PackedStringArray("tres", "res"),
+"file_resource_mode": "editable",
+"group": "Fog"
+}
+
+[resource]
+script = ExtResource("1")
+type_id = &"fog_volume"
+display_name = "Fog Volume"
+category = "Lighting"
+description = "A local volumetric fog region for atmosphere, clouds, and light shafts."
+icon = ExtResource("4")
+properties = Array[ExtResource("2")]([SubResource("position"), SubResource("rotation"), SubResource("scale"), SubResource("shape"), SubResource("volume_size"), SubResource("density"), SubResource("albedo"), SubResource("emission"), SubResource("emission_energy"), SubResource("edge_fade"), SubResource("fog_shader_material")])
+runtime_scene = ExtResource("3")

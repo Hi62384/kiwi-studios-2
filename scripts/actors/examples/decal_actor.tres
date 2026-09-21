@@ -1,0 +1,110 @@
+[gd_resource type="Resource" script_class="ActorDefinition" format=3 uid="uid://cdgdehaamlkri"]
+
+[ext_resource type="Script" uid="uid://cfphk6n07ph5o" path="res://scripts/actors/core/actor_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="2"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/basic_actor.tscn" id="3"]
+[ext_resource type="Texture2D" uid="uid://6rpn2ploxldm" path="res://resources/Images/ActorIcons/Decal3D.svg" id="4"]
+
+[sub_resource type="Resource" id="position"]
+script = ExtResource("2")
+id = &"position"
+label = "Position"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(0, 0, -3),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="rotation"]
+script = ExtResource("2")
+id = &"rotation"
+label = "Rotation"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(0, 0, 0),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="scale"]
+script = ExtResource("2")
+id = &"scale"
+label = "Scale"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(1, 1, 1),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="size"]
+script = ExtResource("2")
+id = &"decal_size"
+label = "Projection Size"
+value_type = 9
+animatable = true
+options = {
+"default": Vector3(2, 2, 2),
+"group": "Decal"
+}
+
+[sub_resource type="Resource" id="texture"]
+script = ExtResource("2")
+id = &"texture"
+label = "Image"
+object_type = &"image"
+options = {
+"accepted_object_types": ["image", "noise_image"],
+"default": null,
+"extensions": ["tres", "png", "jpg", "jpeg", "webp", "bmp", "svg", "tga", "hdr", "exr"],
+"file_resource_mode": "editable",
+"group": "Decal"
+}
+
+[sub_resource type="Resource" id="modulate"]
+script = ExtResource("2")
+id = &"modulate"
+label = "Color"
+value_type = 20
+animatable = true
+options = {
+"default": Color(1, 1, 1, 1),
+"group": "Appearance"
+}
+
+[sub_resource type="Resource" id="upper"]
+script = ExtResource("2")
+id = &"upper_fade"
+label = "Upper Fade"
+value_type = 3
+animatable = true
+options = {
+"default": 0.3,
+"group": "Appearance",
+"max": 1.0,
+"min": 0.0
+}
+
+[sub_resource type="Resource" id="lower"]
+script = ExtResource("2")
+id = &"lower_fade"
+label = "Lower Fade"
+value_type = 3
+animatable = true
+options = {
+"default": 0.3,
+"group": "Appearance",
+"max": 1.0,
+"min": 0.0
+}
+
+[resource]
+script = ExtResource("1")
+type_id = &"decal_3d"
+display_name = "3D Decal"
+category = "Media"
+description = "Projects an image onto nearby 3D surfaces."
+icon = ExtResource("4")
+properties = Array[ExtResource("2")]([SubResource("position"), SubResource("rotation"), SubResource("scale"), SubResource("size"), SubResource("texture"), SubResource("modulate"), SubResource("upper"), SubResource("lower")])
+runtime_scene = ExtResource("3")

@@ -7,6 +7,7 @@ const FOLDER_COLORED_TEXTURE = preload("uid://h5xgw3ns54ys")
 const SPEAKER_TEXTURE = preload("uid://dcqki3r6v5dxo")
 const ThumbnailRenderer = preload("uid://g3isy00e4xs5")
 const CUBE_TEXTURE = preload("uid://bw47linn7yref")
+const SHADER_TEXTURE = preload("res://resources/Images/ActorIcons/Shader.svg")
 
 
 
@@ -20,12 +21,15 @@ enum FileType {
 	GDSHADER,
 	ENVIRONMENT,
 	MATERIAL3D,
+	VIDEO,
+	SCENE,
 }
 
 
 const _FILE_TYPE_TO_EXTENSION: Dictionary = {
-		FileType.IMAGE : ['png','jpg'],
-		FileType.AUDIO : ['mp3','wav'],
+	FileType.VIDEO: ActorVideo.EXTENSIONS,
+	FileType.IMAGE : ['png','jpg','jpeg','webp','bmp','svg','tga','hdr','exr'],
+		FileType.AUDIO : ['mp3','wav','ogg','flac'],
 		FileType.MODEL : ['fbx','glb','gltf'],
 		FileType.GDSCRIPT: ['gd'],
 		FileType.GDSHADER: ['gdshader'],
@@ -119,13 +123,21 @@ static func _get_tres_type(path: String) -> String:
 
 
 static func get_type_of_file(file_path: String) -> FileType:
-	var extension: String = file_path.get_extension()
+	var extension: String = file_path.get_extension().to_lower()
 	if extension == "": return FileType.FOLDER
-	elif extension == "tres":
-		var resource_name = _TRES_NAME_TO_FILE_TYPE.get(_get_tres_type(file_path))
-		if resource_name == null:
-			return FileType.FOLDER
-		return _TRES_NAME_TO_FILE_TYPE[_get_tres_type(file_path)]
+	if extension in ["tres", "res"]:
+		var resource := ResourceLoader.load(file_path)
+		if resource is ActorSceneData: return FileType.SCENE
+		if resource is ActorObjectData:
+			if resource.type_id == &"environment": return FileType.ENVIRONMENT
+			if resource.type_id in [&"image", &"noise_image"]: return FileType.IMAGE
+		if resource is Environment: return FileType.ENVIRONMENT
+		if resource is Mesh: return FileType.MESH
+		if resource is PackedScene: return FileType.MODEL
+		if resource is AudioStream: return FileType.AUDIO
+		if resource is Texture2D: return FileType.IMAGE
+		if resource is StandardMaterial3D: return FileType.MATERIAL3D
+		return FileType.FOLDER
 	
 	
 	for key: FileType in _FILE_TYPE_TO_EXTENSION.keys():
@@ -366,12 +378,51 @@ static func dir_path_string_is_valid(path: String) -> bool:
 static func get_file_thumbnail(file: String) -> Texture2D:
 	if !(FileAccess.file_exists(file) or DirAccess.dir_exists_absolute(file)):
 		return null
+	if file.get_extension().to_lower() == "gdshader":
+		return SHADER_TEXTURE
 	
+	if file.get_extension().to_lower() in ["tres", "res"]:
+		var resource := ResourceLoader.load(file, "", ResourceLoader.CACHE_MODE_IGNORE)
+		if resource is ActorSceneData:
+			return load("res://resources/Images/ActorIcons/Scene.svg") as Texture2D
+		var editable := resource as ActorObjectData
+		if editable != null and editable.type_id == &"text_settings":
+			return load("res://resources/Images/ActorIcons/TextSettings.svg") as Texture2D
+		if editable != null and editable.type_id == &"environment":
+			return await ThumbnailRenderer.render_actor_environment(editable) if is_instance_valid(ThumbnailRenderer._instance) else FILE_COLORED_TEXTURE
+		if resource is Environment:
+			return await ThumbnailRenderer.render_environment(resource) if is_instance_valid(ThumbnailRenderer._instance) else FILE_COLORED_TEXTURE
+		if resource is Texture2D: return resource
+		if editable != null and editable.type_id in [&"image", &"noise_image"]:
+			return ActorImageGenerator.texture_for_object(editable)
+		if editable != null and editable.type_id == &"material" and ThumbnailRenderer._instance != null:
+			var preview_material := StandardMaterial3D.new()
+			var tint: Color = editable.get_value(&"tint", Color.WHITE)
+			tint.a *= editable.get_value(&"opacity", 1.0)
+			preview_material.albedo_color = tint
+			var albedo_reference := editable.get_value(&"albedo_map") as ActorObjectReference
+			if albedo_reference != null:
+				preview_material.albedo_texture = ActorImageGenerator.texture_for_object(albedo_reference.resolve(func(path: String):
+					return ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as ActorObjectData))
+			preview_material.roughness = editable.get_value(&"roughness", 1.0)
+			preview_material.metallic = editable.get_value(&"metallic", 0.0)
+			preview_material.metallic_specular = editable.get_value(&"specular", 0.5)
+			preview_material.emission_enabled = editable.get_value(&"emission_enabled", false)
+			preview_material.emission = editable.get_value(&"emission_color", Color.BLACK)
+			preview_material.emission_energy_multiplier = editable.get_value(&"emission_energy", 1.0)
+			return await ThumbnailRenderer.render_material(preview_material)
 	var file_type: FileType = get_type_of_file(file)
 	
 	if DirAccess.dir_exists_absolute(file): return FOLDER_COLORED_TEXTURE
 	elif file_type == FileType.IMAGE: return load_image(file)
 	elif file_type == FileType.AUDIO: return SPEAKER_TEXTURE
+	elif file_type == FileType.VIDEO:
+		var preview := ActorVideo.frame(file, 0.0)
+		var deadline := Time.get_ticks_msec() + 10000
+		while preview == null and Time.get_ticks_msec() < deadline and not ActorVideo.info(file).is_empty():
+			await (Engine.get_main_loop() as SceneTree).process_frame
+			preview = ActorVideo.frame(file, 0.0)
+		return preview if preview != null else preload("res://resources/Images/ActorIcons/Video.svg")
 	elif file_type == FileType.MODEL: return CUBE_TEXTURE
 	elif file_type == FileType.MESH: return CUBE_TEXTURE
 	elif file_type == FileType.ENVIRONMENT: return await ThumbnailRenderer.render_environment(ResourceLoader.load(file))
@@ -385,13 +436,8 @@ static func load_image(path: String) -> Texture2D:
 
 
 
-static func load_audio(path: String):
-	var file = FileAccess.open(path, FileAccess.READ)
-	var sound = AudioStreamMP3.new()
-	if path.get_extension() == "wav":
-		sound =  AudioStreamWAV.new()
-	sound.data = file.get_buffer(file.get_length())
-	return sound
+static func load_audio(path: String) -> AudioStream:
+	return ActorAudio.source(path)
 
 
 

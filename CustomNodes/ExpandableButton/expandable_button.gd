@@ -41,6 +41,7 @@ const POINTER_RIGHT = preload("uid://bdblvy7bf8xgn")
 		text = v
 		if !is_node_ready(): return
 		_label.text = v
+		_label.tooltip_text = v
 
 @export var label_settings: LabelSettings:
 	set(v):
@@ -68,6 +69,11 @@ signal toggled(on: bool)
 
 
 func _ready() -> void:
+	_main_icon.texture = icon
+	_label.text = text
+	_label.tooltip_text = text
+	_expandable_icon.texture = POINTER_DOWN if expanded else POINTER_RIGHT
+	_children_container.visible = expanded
 	_expandable_icon_button.pressed.connect(func():
 		expanded = !expanded
 		)

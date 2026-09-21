@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="ActorObjectData" format=3]
+
+[ext_resource type="Script" path="res://scripts/actors/core/actor_object_data.gd" id="1_dsgcc"]
+
+[resource]
+script = ExtResource("1_dsgcc")
+type_id = &"noise_image"
+values = {
+&"contrast": 1.0,
+&"fractal_type": 1,
+&"frequency": 0.015,
+&"gain": 0.5,
+&"high_color": Color(1, 1, 1, 1),
+&"invert": false,
+&"lacunarity": 2.0,
+&"low_color": Color(0, 0, 0, 1),
+&"noise_type": 1,
+&"octaves": 5,
+&"resolution": 2,
+&"seamless": true,
+&"seed": 0
+}

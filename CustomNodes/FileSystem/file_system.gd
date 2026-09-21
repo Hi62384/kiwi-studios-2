@@ -1,5 +1,8 @@
 extends Panel
 
+signal file_resource_opened(path: String)
+signal shader_file_opened(path: String)
+
 
 const EXPANDABLE_BUTTON = preload("uid://basy0qkxblg2m")
 const ExpandableButton = preload("uid://dk22ixmn3cmrb")
@@ -25,6 +28,7 @@ const FileSystemCallableActions = preload("uid://b5gm21p0e2sbv")
 var _expanded_folders: Array[String]
 var _ordered_expandable_buttons: Array[ExpandableButton]
 var _filtered_files_to_display: Array[String]
+var _display_generation := 0
 
 
 
@@ -76,6 +80,7 @@ func _should_filter_files() -> bool:
 
 
 func update_filesystem_display() -> void:
+	_display_generation += 1
 	files_selector.clear_selected()
 	NodeOperations.delete_children(container)
 	
@@ -92,11 +97,8 @@ func update_filesystem_display() -> void:
 	
 	container.add_child(expandable_button)
 	
-	_style_expandable_button(
-		expandable_button,
-		root_folder.path.get_file(),
-		await FileOperations.get_file_thumbnail(root_folder.path)
-	)
+	_style_expandable_button(expandable_button, root_folder.path.get_file(), FileOperations.FOLDER_COLORED_TEXTURE)
+	_load_button_thumbnail(root_folder.path, expandable_button, _display_generation)
 	
 	update_folder_display(root_folder, expandable_button)
 	
@@ -121,12 +123,10 @@ func update_folder_display(folder: LocalProjectFilesystem.Folder, expandable_but
 		
 		expandable_button.add_child_in_expand(child_expandable_button)
 		
-		_style_expandable_button(
-			child_expandable_button,
-			file.path.get_file(),
-			await FileOperations.get_file_thumbnail(file.path),
-			file is LocalProjectFilesystem.Folder
-		)
+		_style_expandable_button(child_expandable_button, file.path.get_file(),
+			FileOperations.FOLDER_COLORED_TEXTURE if file is LocalProjectFilesystem.Folder else FileOperations.FILE_COLORED_TEXTURE,
+			file is LocalProjectFilesystem.Folder)
+		_load_button_thumbnail(file.path, child_expandable_button, _display_generation)
 		
 		if file is LocalProjectFilesystem.Folder:
 			#if file_search_line_edit.text != ""
@@ -136,9 +136,20 @@ func update_folder_display(folder: LocalProjectFilesystem.Folder, expandable_but
 
 
 
+func _load_button_thumbnail(path: String, button: Variant, generation: int) -> void:
+	var thumbnail: Texture2D = await FileOperations.get_file_thumbnail(path)
+	_apply_button_thumbnail(button, thumbnail, generation)
+
+func _apply_button_thumbnail(button: Variant, thumbnail: Texture2D, generation: int) -> void:
+	if generation != _display_generation or not is_instance_valid(button) or button.is_queued_for_deletion(): return
+	if thumbnail != null: button.icon = thumbnail
+
 #setups folder expandable button
 func _setup_folder_expandable_button(folder: LocalProjectFilesystem.Folder, button: ExpandableButton) -> void:
 	button.set_meta("path", folder.path)
+	var main_button := button.get_main_button() as ProjectFileDragButton
+	main_button.accepts_drop = _can_drop_files_on_folder.bind(folder.path)
+	main_button.receives_drop = _drop_files_on_folder.bind(folder.path)
 	
 	#expand if should be expanded
 	if _expanded_folders.has(folder.path):
@@ -159,12 +170,20 @@ func _setup_folder_expandable_button(folder: LocalProjectFilesystem.Folder, butt
 #setups file expandable button
 func _setup_file_expandable_button(file: LocalProjectFilesystem.File, button: ExpandableButton) -> void:
 	button.set_meta("path", file.path)
-	
-	button.get_main_button().mouse_entered.connect(file_mover.set_hovered_expandable_button.bind(button))
-	button.get_main_button().mouse_exited.connect(file_mover.set_hovered_expandable_button.bind(null))
-	button.get_main_button().pressed.connect(file_pressed.bind(button))
-	button.get_main_button().gui_input.connect(func(event):
+	var main_button := button.get_main_button() as ProjectFileDragButton
+	main_button.drag_paths_provider = _dragged_file_paths.bind(button)
+
+	main_button.mouse_entered.connect(file_mover.set_hovered_expandable_button.bind(button))
+	main_button.mouse_exited.connect(file_mover.set_hovered_expandable_button.bind(null))
+	main_button.pressed.connect(file_pressed.bind(button))
+	main_button.gui_input.connect(func(event):
 		_connect_expandable_button_right_click(event, file_right_clicked, button)
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed and event.double_click:
+			if file.path.get_extension().to_lower() == "gdshader":
+				shader_file_opened.emit(file.path)
+			else:
+				file_resource_opened.emit(file.path)
+			get_viewport().set_input_as_handled()
 		)
 
 
@@ -188,10 +207,57 @@ func file_pressed(expandable_button: ExpandableButton) -> void:
 	
 	#hold file to move it
 	await get_tree().create_timer(0.2).timeout
+	if not is_instance_valid(expandable_button) or expandable_button.is_queued_for_deletion(): return
+	# Files use native GUI drag-and-drop so inspector resource fields can receive
+	# them. Folders retain the existing hold gesture.
+	if FileAccess.file_exists(str(expandable_button.get_meta("path"))):
+		return
 	if Input.is_action_pressed("left_click"): 
 		file_mover.start_moving_selected_files()
 	elif clicked_already_selected_file and expandable_button != null:
 		files_selector.handle_input_for_clicked_file(expandable_button)
+
+
+func _dragged_file_paths(button: ExpandableButton) -> PackedStringArray:
+	var paths := PackedStringArray()
+	var selected: Array[ExpandableButton] = files_selector.get_expandable_buttons_top_selected_files()
+	if not files_selector.expandable_button_is_selected(button):
+		paths.append(str(button.get_meta("path")))
+		return paths
+	for selected_button: ExpandableButton in selected:
+		var path := str(selected_button.get_meta("path"))
+		if FileAccess.file_exists(path):
+			paths.append(path)
+	if paths.is_empty():
+		paths.append(str(button.get_meta("path")))
+	return paths
+
+
+func _paths_from_drag(data: Variant) -> Array[String]:
+	if not data is Dictionary:
+		return []
+	var values: Variant = data.get("paths", [])
+	var paths: Array[String] = []
+	if values is PackedStringArray or values is Array:
+		for value: Variant in values:
+			paths.append(str(value).simplify_path())
+	return paths
+
+
+func _can_drop_files_on_folder(data: Variant, folder_path: String) -> bool:
+	var paths := _paths_from_drag(data)
+	if paths.is_empty():
+		return false
+	for path: String in paths:
+		if not FileAccess.file_exists(path) or path.get_base_dir().simplify_path() == folder_path.simplify_path():
+			return false
+	return true
+
+
+func _drop_files_on_folder(data: Variant, folder_path: String) -> void:
+	var paths: Array[String] = _paths_from_drag(data)
+	if not paths.is_empty():
+		file_system_callable_actions.move_files(folder_path, paths)
 	
 
 

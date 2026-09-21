@@ -1,0 +1,116 @@
+[gd_resource type="Resource" script_class="ActorObjectDefinition" format=3 uid="uid://70yblcc2yqh6"]
+
+[ext_resource type="Script" uid="uid://ct1qlalxsv4yb" path="res://scripts/actors/core/actor_object_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="2"]
+
+[sub_resource type="Resource" id="font"]
+script = ExtResource("2")
+id = &"font"
+label = "Font"
+value_type = 4
+options = {
+"default": "Arial",
+"group": "Font",
+"no_keyframes": true,
+"system_font": true
+}
+
+[sub_resource type="Resource" id="font_size"]
+script = ExtResource("2")
+id = &"font_size"
+label = "Font Size"
+value_type = 3
+options = {
+"default": 48.0,
+"group": "Font",
+"max": 512.0,
+"min": 1.0
+}
+
+[sub_resource type="Resource" id="bold"]
+script = ExtResource("2")
+id = &"bold"
+label = "Bold"
+value_type = 1
+options = {
+"default": false,
+"group": "Font"
+}
+
+[sub_resource type="Resource" id="italic"]
+script = ExtResource("2")
+id = &"italic"
+label = "Italic"
+value_type = 1
+options = {
+"default": false,
+"group": "Font"
+}
+
+[sub_resource type="Resource" id="color"]
+script = ExtResource("2")
+id = &"color"
+label = "Color"
+value_type = 20
+options = {
+"default": Color(1, 1, 1, 1),
+"group": "Appearance"
+}
+
+[sub_resource type="Resource" id="outline_size"]
+script = ExtResource("2")
+id = &"outline_size"
+label = "Outline Size"
+value_type = 2
+options = {
+"default": 0,
+"group": "Outline",
+"max": 32.0,
+"min": 0.0
+}
+
+[sub_resource type="Resource" id="outline_color"]
+script = ExtResource("2")
+id = &"outline_color"
+label = "Outline Color"
+value_type = 20
+options = {
+"default": Color(0, 0, 0, 1),
+"group": "Outline"
+}
+
+[sub_resource type="Resource" id="shadow"]
+script = ExtResource("2")
+id = &"shadow"
+label = "Shadow"
+value_type = 1
+options = {
+"default": false,
+"group": "Shadow"
+}
+
+[sub_resource type="Resource" id="shadow_color"]
+script = ExtResource("2")
+id = &"shadow_color"
+label = "Shadow Color"
+value_type = 20
+options = {
+"default": Color(0, 0, 0, 0.65),
+"group": "Shadow"
+}
+
+[sub_resource type="Resource" id="shadow_offset"]
+script = ExtResource("2")
+id = &"shadow_offset"
+label = "Shadow Offset"
+value_type = 5
+options = {
+"default": Vector2(2, 2),
+"group": "Shadow"
+}
+
+[resource]
+script = ExtResource("1")
+type_id = &"text_settings"
+display_name = "Text Settings"
+properties = Array[ExtResource("2")]([SubResource("font"), SubResource("font_size"), SubResource("bold"), SubResource("italic"), SubResource("color"), SubResource("outline_size"), SubResource("outline_color"), SubResource("shadow"), SubResource("shadow_color"), SubResource("shadow_offset")])

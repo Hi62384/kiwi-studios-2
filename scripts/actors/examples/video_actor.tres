@@ -1,0 +1,76 @@
+[gd_resource type="Resource" script_class="ActorDefinition" format=3 uid="uid://drkra4e7hxeim"]
+
+[ext_resource type="Script" uid="uid://cfphk6n07ph5o" path="res://scripts/actors/core/actor_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="2"]
+[ext_resource type="Texture2D" uid="uid://beioiex0qfdka" path="res://resources/Images/ActorIcons/Video.svg" id="3"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/video_actor.tscn" id="4"]
+
+[sub_resource type="Resource" id="video"]
+script = ExtResource("2")
+id = &"video"
+label = "Video"
+value_type = 4
+options = {
+"default": "",
+"extensions": PackedStringArray("mp4", "mov", "mkv", "webm", "avi", "m4v", "ogv", "mpeg", "mpg", "wmv", "ts"),
+"file_picker": true,
+"group": "Source",
+"no_keyframes": true,
+"prompt_on_create": true,
+"refresh_inspector": true
+}
+
+[sub_resource type="Resource" id="audio"]
+script = ExtResource("2")
+id = &"linked_audio_actor"
+label = "Linked Audio Actor"
+value_type = 4
+options = {
+"actor_reference": true,
+"actor_types": ["audio"],
+"create_video_audio": true,
+"default": "",
+"group": "Source",
+"no_keyframes": true
+}
+
+[sub_resource type="Resource" id="position"]
+script = ExtResource("2")
+id = &"position"
+label = "Position"
+value_type = 9
+options = {
+"default": Vector3(0, 0, 0),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="rotation"]
+script = ExtResource("2")
+id = &"rotation"
+label = "Rotation"
+value_type = 9
+options = {
+"default": Vector3(0, 0, 0),
+"group": "Transform",
+"suffix": " °"
+}
+
+[sub_resource type="Resource" id="scale"]
+script = ExtResource("2")
+id = &"scale"
+label = "Scale"
+value_type = 9
+options = {
+"default": Vector3(1, 1, 1),
+"group": "Transform"
+}
+
+[resource]
+script = ExtResource("1")
+type_id = &"video"
+display_name = "Video"
+category = "Video"
+description = "Seekable video with source-bound trims, frame strip and linked audio child."
+icon = ExtResource("3")
+properties = Array[ExtResource("2")]([SubResource("video"), SubResource("audio"), SubResource("position"), SubResource("rotation"), SubResource("scale")])
+runtime_scene = ExtResource("4")

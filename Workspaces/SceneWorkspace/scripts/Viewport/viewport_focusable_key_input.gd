@@ -28,6 +28,10 @@ func _process(delta: float) -> void:
 func _focused_input(event: InputEvent) -> void:
 	if !Input.is_action_pressed("right_click"):
 		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		# The compact shader CodeEdit can retain GUI focus while the viewport owns
+		# free-camera input. Release it so WASD/QE never become shader text.
+		get_viewport().gui_release_focus()
 	
 	if event is InputEventMouseMotion:
 		freecam.look_up(event.relative.y)

@@ -12,67 +12,74 @@
 -environment objectAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 -material 3d objectAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 -shader material 3d objectAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
--actors
--image actor
--node3d actor
--light actor
--mesh3d actor
--camera actor
--directional light actor
--environment actor
+-actorsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-image actorAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-node3d actorAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-light actorAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-mesh3d actorAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-camera actorAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-directional light actorAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-environment actorAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
--timeline logic and able to create actors
--creating actors and moving them on timeline
--changing actors length
--deleting created actors
--display and able to change actor properties on inspector
--display and able to change file properties on inspector
--renaming actors (on inspector)
--able to save and load objects in inspector
+-timeline logic and able to create actorsAAAAAAAAAAAAAAAAAAAAAAAAAA
+-creating actors and moving them on timelineAAAAAAAAAAAAAAAAAAAAAAA
+-changing actors lengthAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-deleting created actorsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-display and able to change actor properties on inspectorAAAAAAAAAA
+-display and able to change file properties on inspectorAAAAAAAAAAA
+-renaming actors (on inspector)AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-able to save and load objects in inspectorAAAAAAAAAAAAAAAAAAAAAAAA
 
--able to parent actors
--able to unparent actors
--scene tree clicking on actor only shows actor and its children on timeline
--nested actor parents
+-able to parent actorsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-able to unparent actorsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-scene tree clicking on actor only shows actor and its children on timelineAAAAAAAAAAAA
+-nested actor parentsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
--scene tree
--timeline sections in scene tree
--dragging from filesystems on timeline to create actors
+-scene treeAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-timeline sections in scene treeAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
--keyframes on actors
+-keyframes on actorsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
--magnet timeline tool
--snapping timeline tool
+-magnet timeline toolAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-snapping timeline toolAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
 -remote transform actor
 
 
--each actor saves the inspector state
--audio actor
--mic in timeline toolbar that records audio
--screen record option in timeline toolbar
--mp4 support
--video actor
+-each actor saves the inspector stateAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-audio actorAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-mic in timeline toolbar that records audioAAAAAAAAAAAAAAAAAAAAAAA
+-mp4 supportAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-video actorAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-screen record option in timeline toolbarAAAAAAAAAAAAAAAAAAAAAAAAA
 
--export video with proper audio
+-2d ui actorsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-2d ui toolsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
 -scene settings
--more simple actor types
--save scene
--instantiate scenes in other scenes
+-more simple actor typesAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-save sceneAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-able to create and delete workspacesAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-able to switch between workspacesAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-instantiate scenes in other scenesAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-export video with proper audioAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
--shader object that inherits material object
--shader coding section (able to replace scene tree section)
+-shader editor workspaceAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
--video effects shader
--camera effects shader
+-shader object that inherits material objectAAAAAAAAAAAAAAAAAAAAAAA
+-shader coding section (able to replace scene tree section)AAAAAAAA
+
+SHADERS-------------------------
+-video effects shaderAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-camera effects shaderAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 -environment effects shader
--shader material 3d
--fog shader
+-shader material 3dAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+-fog shaderAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
--able to create and delete workspaces
--able to switch between workspaces
+-image editor workspace
+
+KIWISCRIPT----------------------
 -scripting workspace
-
 -able to create gdscript scripts in scripting workspace
 -interface for kiwiscript and gdscript
 -scripting autocomplete and features
@@ -80,15 +87,21 @@
 -scripts attachable on any actor
 -script attachable in scene settings (is the script on instantiated scenes)
 
+-make script do fancy computer things
+-documentation for kiwiscript
+
+3D TOOLS-------------------------------------
 -click on actor in viewport to select it
 -3d tools to transform actors
 -3d tools unique to certain actors
 
+
+3D TOOL ACTORS-------------------------------
 -deformation 2d object
--ability to create viewport tools on an actor
 -deformable actor 2d
 
 -deformation 3d object
 -deformable actor 3d
 
+SUPER CLIPBOARD------------------------------
 -super clipboard

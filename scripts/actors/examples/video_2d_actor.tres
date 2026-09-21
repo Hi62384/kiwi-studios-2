@@ -1,0 +1,101 @@
+[gd_resource type="Resource" script_class="ActorDefinition" format=3 uid="uid://dmyscf0j5o0hv"]
+
+[ext_resource type="Script" uid="uid://cfphk6n07ph5o" path="res://scripts/actors/core/actor_definition.gd" id="1"]
+[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="2"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/ui_actor.tscn" id="3"]
+[ext_resource type="Texture2D" uid="uid://ba6eaekmpl3we" path="res://resources/Images/ActorIcons/Video2D.svg" id="4"]
+
+[sub_resource type="Resource" id="position"]
+script = ExtResource("2")
+id = &"position"
+label = "Position"
+value_type = 5
+options = {
+"default": Vector2(0, 0),
+"group": "Transform",
+"suffix": " px"
+}
+
+[sub_resource type="Resource" id="rotation"]
+script = ExtResource("2")
+id = &"rotation"
+label = "Rotation"
+value_type = 3
+options = {
+"default": 0.0,
+"group": "Transform",
+"suffix": " °"
+}
+
+[sub_resource type="Resource" id="scale"]
+script = ExtResource("2")
+id = &"scale"
+label = "Scale"
+value_type = 5
+options = {
+"default": Vector2(1, 1),
+"group": "Transform"
+}
+
+[sub_resource type="Resource" id="size"]
+script = ExtResource("2")
+id = &"size"
+label = "Size"
+value_type = 5
+options = {
+"default": Vector2(400, 240),
+"group": "Layout",
+"suffix": " px"
+}
+
+[sub_resource type="Resource" id="video"]
+script = ExtResource("2")
+id = &"video"
+label = "Video"
+value_type = 4
+options = {
+"default": "",
+"extensions": PackedStringArray("mp4", "mov", "mkv", "webm", "avi", "m4v", "ogv", "mpeg", "mpg", "wmv", "ts"),
+"file_picker": true,
+"group": "Source",
+"no_keyframes": true,
+"prompt_on_create": true,
+"refresh_inspector": true
+}
+
+[sub_resource type="Resource" id="linked_audio_actor"]
+script = ExtResource("2")
+id = &"linked_audio_actor"
+label = "Linked Audio Actor"
+value_type = 4
+options = {
+"actor_reference": true,
+"actor_types": ["audio"],
+"create_video_audio": true,
+"default": "",
+"group": "Source",
+"no_keyframes": true
+}
+
+[sub_resource type="Resource" id="canvas_material"]
+script = ExtResource("2")
+id = &"material"
+label = "Canvas Shader"
+object_type = &"canvas_shader_material"
+options = {
+"accepted_object_types": PackedStringArray("canvas_shader_material"),
+"default": null,
+"extensions": PackedStringArray("tres", "res"),
+"file_resource_mode": "editable",
+"group": "Appearance"
+}
+
+[resource]
+script = ExtResource("1")
+type_id = &"video_2d"
+display_name = "2D Video"
+category = "Video"
+description = "Screen-space video with editable pixel transforms."
+icon = ExtResource("4")
+properties = Array[ExtResource("2")]([SubResource("position"), SubResource("rotation"), SubResource("scale"), SubResource("size"), SubResource("video"), SubResource("linked_audio_actor"), SubResource("canvas_material")])
+runtime_scene = ExtResource("3")
