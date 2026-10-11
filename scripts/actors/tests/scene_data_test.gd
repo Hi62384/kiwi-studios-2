@@ -676,26 +676,28 @@ func run() -> void:
 	starting_image.fill(Color.RED)
 	check(starting_image.save_png(image_path) == OK, "Create image editor test file")
 	check(tabs.open_image(image_path) and tabs.image_workspace.visible
-		and tabs.image_workspace.image.get_width() == 8,
+		and tabs.image_workspace.document.canvas_size.x == 8,
 		"Opening a project image creates a dedicated image workspace tab")
 	var image_tab_count := tabs.documents.size()
 	tabs.open_image(image_path)
 	check(tabs.documents.size() == image_tab_count,
 		"Opening the same image again activates its existing tab")
-	tabs.image_workspace._change_image(func(): tabs.image_workspace.image.fill(Color.BLUE))
+	tabs.image_workspace._action(func():
+		var edited := Image.create(8,8,false,Image.FORMAT_RGBA8)
+		edited.fill(Color.BLUE)
+		tabs.image_workspace.document.layers[0].texture=ImageTexture.create_from_image(edited))
 	check(bool(tabs.documents[tabs.current_tab].dirty), "Image edits mark the image tab unsaved")
 	tabs.image_workspace.undo()
-	check(tabs.image_workspace.image.get_pixel(0, 0) == Color.RED, "Image editor undo restores pixels")
+	check(tabs.image_workspace.document.layers[0].texture.get_image().get_pixel(0, 0) == Color.RED, "Image editor undo restores pixels")
 	tabs.image_workspace.redo()
-	tabs.image_workspace.save()
-	check(Image.load_from_file(image_path).get_pixel(0, 0) == Color.BLUE
-		and not bool(tabs.documents[tabs.current_tab].dirty),
-		"Saving an image overwrites its existing file and clears the unsaved marker")
-	for extension in ["jpg", "webp"]:
-		var format_path: String = "user://image_workspace_" + ActorData.new_id() + "." + str(extension)
-		check(tabs.image_workspace._write_image(format_path) == OK and FileAccess.file_exists(format_path),
-			"Image editor can export ." + extension)
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(format_path))
+	check(tabs.image_workspace.document.layers[0].texture.get_image().get_pixel(0, 0) == Color.BLUE,
+		"Image editor redo restores the edited layer")
+	var image_document_path := "user://image_document_" + ActorData.new_id() + ".tres"
+	check(ResourceSaver.save(tabs.image_workspace.document,image_document_path)==OK,"Save native image composition")
+	tabs._filesystem_resource_opened(image_document_path)
+	check(tabs.image_workspace.visible and tabs.image_workspace.path==image_document_path,
+		"Double-clicking a native image document opens Image Studio")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(image_document_path))
 	var source_path := "user://shader_workspace_load_" + ActorData.new_id() + ".gdshader"
 	var source_file := FileAccess.open(source_path, FileAccess.WRITE)
 	source_file.store_string("shader_type canvas_item;\nvoid fragment() { COLOR = vec4(0.2, 0.4, 0.8, 1.0); }\n")

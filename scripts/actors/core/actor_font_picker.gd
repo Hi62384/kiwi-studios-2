@@ -9,6 +9,8 @@ var options: VBoxContainer
 var result_count: Label
 var current_family: String
 var families: PackedStringArray
+var preview_text: String=""
+var preview_actual:=false
 
 
 func setup(selected: String) -> void:
@@ -48,6 +50,11 @@ func setup(selected: String) -> void:
 	search.custom_minimum_size.y = 40
 	search.text_changed.connect(_rebuild)
 	column.add_child(search)
+	var preview_toggle:=CheckButton.new()
+	preview_toggle.text="Preview using text content"
+	preview_toggle.disabled=preview_text.is_empty()
+	column.add_child(preview_toggle)
+	preview_toggle.toggled.connect(func(enabled: bool): preview_actual=enabled; _rebuild(search.text))
 	var scroll := ScrollContainer.new()
 	scroll.custom_minimum_size = Vector2(430, 350)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -72,7 +79,9 @@ func _rebuild(query: String) -> void:
 		count += 1
 		var row := Button.new()
 		row.name = "FontOption"
-		row.text = ("✓  " if family == current_family else "    ") + family
+		row.text = ("✓  " if family == current_family else "    ") + (preview_text if preview_actual else family)
+		row.tooltip_text=family
+		row.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
 		row.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		row.custom_minimum_size.y = 42
 		row.add_theme_font_override("font", ActorTextSettings.font({&"font": family}))

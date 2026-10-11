@@ -65,6 +65,11 @@ func run() -> void:
 	check(is_equal_approx(editor.canvas.playhead, 0.3), "Recording moves playhead")
 	check(is_equal_approx(actor.animation_time, previous), "Recording does not evaluate actor animation")
 	check(not editor.audio_system.players[clip.id].playing, "Recording stops timeline audio")
+	editor.audio_recorder.record_timeline = true
+	editor._evaluate_runtimes()
+	check(editor.audio_system.players[clip.id].playing, "Timeline audio option plays audio actors while recording")
+	check(is_equal_approx(actor.animation_time, previous), "Timeline audio recording still leaves scene animation frozen")
+	editor.audio_recorder.record_timeline = false
 	editor.audio_recorder.recording = false
 	editor.playing = false
 	var viewport := SubViewport.new()

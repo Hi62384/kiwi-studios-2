@@ -64,7 +64,10 @@ func drag_pixels(pixels: float, ctrl: bool, shift: bool) -> void:
 	_remainder += pixels
 	var ticks := int(_remainder / 4.0)
 	_remainder -= ticks * 4.0
-	var increment := 0.01 if shift else (1.0 if ctrl else 0.1)
+	# Integer editors use a whole-number tick. Previously their 0.1 preview was
+	# truncated by the property setter, making slow drags appear unresponsive.
+	var integer_step:=step>=1.0 and is_equal_approx(step,round(step))
+	var increment := step if integer_step else (0.01 if shift else (1.0 if ctrl else 0.1))
 	set_value_no_signal(value + ticks * increment)
 	if ticks != 0:
 		preview_changed.emit(value)

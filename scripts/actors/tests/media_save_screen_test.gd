@@ -21,6 +21,7 @@ func run() -> void:
 	var popup: PopupPanel = editor.screen_button.get("popup")
 	check(popup.find_child("CaptureTarget", true, false) != null, "Screen capture options expose targets")
 	check(popup.find_child("RecordMicrophone", true, false) != null and popup.find_child("RecordSystemAudio", true, false) != null, "Screen recorder exposes independent audio source checkboxes")
+	check(popup.find_child("RecordTimelineAudio", true, false) != null, "Screen recorder can include timeline audio")
 	var property := editor.registry.get_definition(&"audio").find_property(&"audio")
 	var stream := AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS

@@ -4,6 +4,9 @@ extends PopupPanel
 
 signal finished(path: String)
 
+## Distinct from Cancel (empty string): the caller must clear its resource slot.
+const EMPTY_RESOURCE := "::empty-resource::"
+
 var project_root: String
 var allowed_extensions: PackedStringArray
 var allowed_raw_extensions: PackedStringArray
@@ -206,6 +209,11 @@ func _build(property: ActorProperty, title_text: String) -> void:
 	cancel.text = "Cancel"
 	cancel.pressed.connect(func(): _resolve(""))
 	selection_row.add_child(cancel)
+	var empty:=Button.new()
+	empty.text="Proceed empty"
+	empty.tooltip_text="Use no resource (null)"
+	empty.pressed.connect(func(): _resolve(EMPTY_RESOURCE))
+	selection_row.add_child(empty)
 	choose_button = Button.new()
 	choose_button.text = "Choose asset"
 	choose_button.disabled = true
@@ -415,6 +423,7 @@ func _path_allowed(path: String) -> bool:
 			or (allowed_native_types.has("PackedScene") and native_resource is PackedScene) \
 			or (allowed_native_types.has("Texture2D") and native_resource is Texture2D) \
 			or (allowed_native_types.has("ActorSceneData") and native_resource is ActorSceneData) \
+			or (allowed_native_types.has("KiwiImageDocument") and native_resource is KiwiImageDocument) \
 			or (native_resource is ActorObjectData and not allowed_resource_type.is_empty() and accepted_object_types.has(str(native_resource.type_id)))
 	if allowed_resource_type.is_empty():
 		return true

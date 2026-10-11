@@ -6,6 +6,9 @@ const FileSystemCallableActions = preload("uid://b5gm21p0e2sbv")
 @onready var file_system_callable_actions: FileSystemCallableActions = $"../FileSystemCallableActions"
 
 func _focused_input(_event: InputEvent) -> void:
+	if not is_visible_in_tree(): return
+	var owner:=get_viewport().gui_get_focus_owner()
+	if owner!=null and (owner is LineEdit or owner is TextEdit or not get_parent().is_ancestor_of(owner)): return
 	if Input.is_action_just_pressed("redo"):
 		file_system_callable_actions.redo()
 	elif Input.is_action_just_pressed("undo"):

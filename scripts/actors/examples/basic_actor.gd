@@ -852,8 +852,7 @@ func refresh_saved_shader(_source: Variant) -> void:
 
 func refresh_saved_image(source: Variant) -> void:
 	if source is String:
-		texture_cache.erase(str(source))
-		texture_cache.erase(ProjectSettings.globalize_path(str(source)) if str(source).begins_with("res://") else str(source))
+		texture_cache.clear()
 
 
 func _load_external_texture(path: String) -> Texture2D:

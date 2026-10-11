@@ -569,6 +569,8 @@ func _choose_mesh() -> void:
 	property.options = {"extensions": ["glb", "gltf", "fbx", "obj", "mesh", "tres", "res"],
 		"native_resource_types": ["Mesh", "PackedScene"], "file_picker": true}
 	var path := await ActorProjectFilePicker.pick(self, property, "Choose preview mesh")
+	if path==ActorProjectFilePicker.EMPTY_RESOURCE:
+		_mesh_mode="shape"; _mesh_path=""; _rebuild_mesh(); document_changed.emit(); return
 	if path.is_empty(): return
 	_mesh_mode = "file"
 	_mesh_path = path
@@ -582,7 +584,7 @@ func _choose_shader_file() -> void:
 	property.label = "Shader"
 	property.options = {"extensions": ["gdshader"], "file_picker": true}
 	var path := await ActorProjectFilePicker.pick(self, property, "Load shader from project")
-	if path.is_empty(): return
+	if path.is_empty() or path==ActorProjectFilePicker.EMPTY_RESOURCE: return
 	var tabs := get_tree().get_first_node_in_group("actor_scene_tabs") as ActorSceneTabs
 	if tabs != null: tabs.load_shader_into_current_tab(path)
 
@@ -593,6 +595,8 @@ func _choose_environment() -> void:
 	property.label = "Environment"
 	property.options = {"extensions": ["tres", "res"], "native_resource_types": ["Environment"], "file_picker": true}
 	var path := await ActorProjectFilePicker.pick(self, property, "Choose preview environment")
+	if path==ActorProjectFilePicker.EMPTY_RESOURCE:
+		_environment_path=""; _apply_environment(); document_changed.emit(); return
 	if path.is_empty(): return
 	_environment_path = path
 	_apply_environment()
@@ -606,6 +610,8 @@ func _choose_canvas_image() -> void:
 	property.options = {"extensions": ["png", "jpg", "jpeg", "webp", "bmp", "svg", "tga", "hdr", "exr", "tres", "res"],
 		"native_resource_types": ["Texture2D"], "file_picker": true}
 	var path := await ActorProjectFilePicker.pick(self, property, "Choose canvas preview image")
+	if path==ActorProjectFilePicker.EMPTY_RESOURCE:
+		_canvas_image_path=""; _update_canvas_texture(); document_changed.emit(); return
 	if path.is_empty():
 		return
 	_canvas_image_path = path
@@ -1224,6 +1230,7 @@ func _choose_parameter_texture(name: StringName) -> void:
 		"accepted_object_types": ["image", "noise_image"],
 		"native_resource_types": ["Texture2D"], "file_picker": true}
 	var path := await ActorProjectFilePicker.pick(self, property, "Choose preview texture")
+	if path==ActorProjectFilePicker.EMPTY_RESOURCE: _set_preview_parameter(name,null); return
 	if path.is_empty():
 		return
 	_set_parameter_image_path(name, path)

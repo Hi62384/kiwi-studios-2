@@ -5,6 +5,13 @@ var players: Dictionary = {}
 var envelopes: Dictionary = {}
 var jobs: Dictionary = {}
 var _scrub_remaining: Dictionary = {}
+var output_bus := "Master"
+
+func set_output_bus(value: String) -> void:
+	output_bus = value if AudioServer.get_bus_index(value) >= 0 else "Master"
+	for player: AudioStreamPlayer in players.values():
+		var bus := AudioServer.get_bus_index(player.bus)
+		if bus >= 0: AudioServer.set_bus_send(bus, output_bus)
 
 ## Short forward grains preview the source under the cursor, even when scrubbing backwards.
 ## Each grain expires independently, so paused transport never leaves audio running.
@@ -42,6 +49,7 @@ func synchronize(model: ActorTimeline, time: float, playing: bool) -> void:
 			AudioServer.add_bus()
 			AudioServer.set_bus_name(AudioServer.bus_count - 1, bus)
 			AudioServer.add_bus_effect(AudioServer.bus_count - 1, AudioEffectPitchShift.new())
+			AudioServer.set_bus_send(AudioServer.bus_count - 1, output_bus)
 			player.bus = bus
 			add_child(player)
 			players[clip.id] = player

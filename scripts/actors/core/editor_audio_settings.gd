@@ -7,6 +7,7 @@ static func read() -> Dictionary:
 	config.load(PATH)
 	return {"record_mic": bool(config.get_value("microphone", "record_mic", true)),
 		"record_system": bool(config.get_value("microphone", "record_system", false)),
+		"record_timeline": bool(config.get_value("microphone", "record_timeline", false)),
 		"device": str(config.get_value("microphone", "device", "Default")),
 		"gain_db": float(config.get_value("microphone", "gain_db", 0.0)),
 		"mono": bool(config.get_value("microphone", "mono", false))}

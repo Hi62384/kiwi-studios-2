@@ -135,7 +135,7 @@ func _load() -> void:
 	property.options = {"extensions": PackedStringArray(["tres"]),
 		"native_resource_types": PackedStringArray(["ActorSceneData"])}
 	var path := await ActorProjectFilePicker.pick(self, property, "Load editable scene")
-	if path.is_empty():
+	if path.is_empty() or path==ActorProjectFilePicker.EMPTY_RESOURCE:
 		return
 	var scene := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as ActorSceneData
 	if scene == null:
@@ -155,7 +155,7 @@ func _instantiate_scene() -> void:
 	property.options = {"extensions": PackedStringArray(["tres"]),
 		"native_resource_types": PackedStringArray(["ActorSceneData"])}
 	var path := await ActorProjectFilePicker.pick(self, property, "Instantiate a scene")
-	if path.is_empty():
+	if path.is_empty() or path==ActorProjectFilePicker.EMPTY_RESOURCE:
 		return
 	var source := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as ActorSceneData
 	if source != null:

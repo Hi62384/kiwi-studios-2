@@ -85,13 +85,13 @@ func new_shader() -> void:
 
 
 func new_image() -> void:
-	var blank := Image.create(512, 512, false, Image.FORMAT_RGBA8)
-	blank.fill(Color.TRANSPARENT)
+	var blank:=KiwiImageDocument.new()
+	blank.layers.append(KiwiImageLayer.create("basic",blank.canvas_size))
 	open_image(blank)
 
 
 func open_image(source: Variant) -> bool:
-	if image_workspace == null or not (source is String or source is Image or source is Texture2D): return false
+	if image_workspace == null or not (source is String or source is Image or source is Texture2D or source is KiwiImageDocument): return false
 	var identity := _image_identity(source)
 	for index in documents.size():
 		if str(documents[index].get("type", "")) == "image" and str(documents[index].get("identity", "")) == identity:
@@ -237,10 +237,13 @@ func open_scene(path: String) -> bool:
 	return true
 
 
-func close_scene(index: int) -> void:
+func close_scene(index: int, discard_changes: bool = false) -> void:
 	if index < 0 or index >= documents.size():
 		return
 	_capture_current()
+	if not discard_changes and str(documents[index].get("type", "")) == "image" and bool(documents[index].get("dirty", false)):
+		_confirm_image_close(index)
+		return
 	var previous_active := _active_index
 	_switching = true
 	documents.remove_at(index)
@@ -257,6 +260,27 @@ func close_scene(index: int) -> void:
 		current_tab = _active_index
 		_switching = false
 		_refresh_titles()
+
+
+func _confirm_image_close(index: int) -> void:
+	var popup := PopupPanel.new()
+	popup.add_theme_stylebox_override("panel", _tab_style(Color("14212e"),Color("4a8275")))
+	add_child(popup)
+	var column := VBoxContainer.new(); column.custom_minimum_size=Vector2(350,96); column.add_theme_constant_override("separation",8); popup.add_child(column)
+	var title := Label.new(); title.text="Save your image changes?"; title.add_theme_font_size_override("font_size",19); column.add_child(title)
+	var detail := Label.new(); detail.text=str(documents[index].name)+" has unsaved edits."; detail.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS; column.add_child(detail)
+	var row := HBoxContainer.new(); column.add_child(row)
+	var cancel := Button.new(); cancel.text="Keep editing"; row.add_child(cancel); cancel.pressed.connect(popup.hide)
+	var discard := Button.new(); discard.text="Discard"; row.add_child(discard)
+	discard.pressed.connect(func(): popup.hide(); close_scene(index,true))
+	var save_button := Button.new(); save_button.text="Save"; save_button.add_theme_stylebox_override("normal",_tab_style(Color("23594e"),Color("68d2b6"))); row.add_child(save_button)
+	save_button.pressed.connect(func():
+		popup.hide()
+		_capture_current(); _open_index(index)
+		await image_workspace.save()
+		if not image_workspace._dirty: close_scene(index,true))
+	popup.popup_hide.connect(popup.queue_free)
+	popup.popup_centered(Vector2i(390,132))
 
 
 func save_current(path: String = "") -> Error:
@@ -417,6 +441,8 @@ func _filesystem_resource_opened(path: String) -> void:
 	var resource := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
 	if resource is ActorSceneData:
 		open_scene(path)
+	elif resource is KiwiImageDocument:
+		open_image(path)
 
 
 func _show_new_tab_menu() -> void:
@@ -463,7 +489,10 @@ func _shader_identity(source: Variant) -> String:
 
 
 func _image_identity(value: Variant) -> String:
-	if value is String: return str(value).replace("\\", "/").simplify_path()
+	if value is String:
+		var normalized := str(value).replace("\\", "/").simplify_path()
+		if FileAccess.file_exists(normalized + ".image.tres"): normalized += ".image.tres"
+		return ProjectSettings.globalize_path(normalized).replace("\\", "/").simplify_path()
 	if value is Object: return "embedded:" + str(value.get_instance_id())
 	return ""
 
@@ -490,15 +519,17 @@ func _image_saved(source: Variant) -> void:
 	_refresh_titles()
 	# Actor image objects resolve file paths when evaluated. Re-evaluate and
 	# refresh the inspector so both viewport textures and thumbnails update.
-	get_tree().call_group("actor_shader_runtimes", "refresh_saved_image", source)
+	var refreshed_source: Variant = image_workspace.document.output_path if not image_workspace.document.output_path.is_empty() else source
+	get_tree().call_group("actor_shader_runtimes", "refresh_saved_image", refreshed_source)
 	if timeline != null:
 		timeline._evaluate_runtimes()
 		if timeline.inspector != null:
 			timeline.inspector.refresh()
-			if source is String:
+			if refreshed_source is String:
 				for child in timeline.inspector.fields.get_children():
-					if child is ActorMediaPreview and str(child.path).replace("\\", "/") == str(source).replace("\\", "/"):
-						child.image.texture = ImageTexture.create_from_image(Image.load_from_file(str(source)))
+					if child is ActorMediaPreview and ProjectSettings.globalize_path(str(child.path)).replace("\\", "/") == ProjectSettings.globalize_path(str(refreshed_source)).replace("\\", "/"):
+						var bitmap := Image.load_from_file(str(refreshed_source))
+						if bitmap != null: child.image.texture = ImageTexture.create_from_image(bitmap)
 
 
 func _active_shader_changed() -> void:

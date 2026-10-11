@@ -18,6 +18,7 @@ func _is_mouse_inside_self() -> bool:
 
 
 func _input(_event: InputEvent) -> void:
+	if not is_visible_in_tree(): return
 	if _event is InputEventMouseButton and _event.button_index == MOUSE_BUTTON_RIGHT \
 			and _event.pressed and _is_mouse_inside_self():
 		FocusableKeyInput.current_focused_instance = self

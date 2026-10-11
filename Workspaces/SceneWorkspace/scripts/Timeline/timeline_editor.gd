@@ -484,13 +484,34 @@ func _pause_recording_scene(paused: bool) -> void:
 		_recording_viewport.process_mode = _saved_scene_process
 		_recording_viewport = null
 
+func _active_recording_audio() -> ActorAudioRecorder:
+	if screen_recorder.recording and is_instance_valid(screen_recorder.audio_recorder):
+		return screen_recorder.audio_recorder
+	if audio_recorder.recording:
+		return audio_recorder
+	return null
+
+func _recording_timeline_audio() -> bool:
+	var recorder := _active_recording_audio()
+	return recorder != null and recorder.record_timeline
+
+func _route_timeline_audio() -> void:
+	if audio_system == null: return
+	var recorder := _active_recording_audio()
+	var destination := "Master"
+	if recorder != null and recorder.record_timeline and not recorder.timeline_bus_name.is_empty():
+		destination = recorder.timeline_bus_name
+	audio_system.set_output_bus(destination)
+
 func toggle_recording() -> void:
 	if screen_recorder.recording: return
 	if _record_busy: return
 	_record_busy = true
 	if audio_recorder.recording:
 		playing = false
+		_evaluate_runtimes()
 		var stream: AudioStreamWAV = await audio_recorder.stop()
+		_route_timeline_audio()
 		_pause_recording_scene(false)
 		_record_busy = false
 		canvas.recording_preview.clear()
@@ -504,7 +525,7 @@ func toggle_recording() -> void:
 		if stream != null:
 			_create_recording(stream)
 		else:
-			_audio_notice("No audio was captured. Check your microphone and the system's microphone permissions.")
+			_audio_notice("No audio was captured. Check the selected recording sources and their permissions.")
 		_refresh()
 	else:
 		playing = false
@@ -523,6 +544,7 @@ func toggle_recording() -> void:
 		canvas.recording_preview = {"start": _record_start, "duration": 0.0, "layer": _record_layer}
 		playing = true
 		play_button.text = "Ⅱ"
+		_route_timeline_audio()
 		_evaluate_runtimes()
 		mic_button.icon = _toolbar_icon("stop")
 		mic_button.self_modulate = Color.WHITE
@@ -591,6 +613,8 @@ func _start_screen_recording(options: Dictionary, target: Dictionary) -> void:
 	canvas.recording_peaks = PackedFloat32Array()
 	playing = true
 	play_button.text = "Ⅱ"
+	_route_timeline_audio()
+	_evaluate_runtimes()
 	screen_button.icon = _toolbar_icon("stop")
 	screen_button.tooltip_text = "Stop screen recording"
 	mic_button.disabled = true
@@ -603,6 +627,7 @@ func _stop_screen_recording() -> void:
 	playing = false
 	_evaluate_runtimes()
 	var path: String = await screen_recorder.stop()
+	_route_timeline_audio()
 	_pause_recording_scene(false)
 	_record_busy = false
 	canvas.recording_preview.clear()
@@ -770,6 +795,7 @@ func create_actor(type_index: int) -> void:
 					"file_picker": true
 				}
 			var chosen := await ActorProjectFilePicker.pick(self, picker_property, "Choose %s for %s" % [property.label, definition.display_name])
+			if chosen==ActorProjectFilePicker.EMPTY_RESOURCE: initial_values[property.id]=null; continue
 			if chosen.is_empty():
 				canvas.grab_focus()
 				return
@@ -1260,8 +1286,14 @@ func _runtime_for_clip(clip_id: String) -> ActorRuntime:
 
 func _evaluate_runtimes() -> void:
 	if audio_recorder.recording or screen_recorder.recording:
-		for player in audio_system.players.values(): player.stop()
+		_route_timeline_audio()
+		if _recording_timeline_audio():
+			model.playhead_time = canvas.playhead
+			audio_system.synchronize(model, canvas.playhead, playing)
+		else:
+			for player in audio_system.players.values(): player.stop()
 		return
+	if audio_system != null and audio_system.output_bus != "Master": audio_system.set_output_bus("Master")
 	model.playhead_time = canvas.playhead
 	var indices: Array[int] = []
 	for index in model.actors.size():

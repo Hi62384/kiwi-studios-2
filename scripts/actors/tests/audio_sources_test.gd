@@ -20,7 +20,7 @@ func wave(rate: int, seconds: int, value: int) -> AudioStreamWAV:
 
 func run() -> void:
 	var preferences := EditorAudioSettings.read()
-	check(preferences.has("record_mic") and preferences.has("record_system"), "Recording sources have independent saved preferences")
+	check(preferences.has("record_mic") and preferences.has("record_system") and preferences.has("record_timeline"), "Recording sources have independent saved preferences")
 	var mic := wave(22050, 1, 4096)
 	var system := wave(48000, 2, 8192)
 	check(ActorAudioRecorder.mix_streams(mic, null) == mic, "Mic-only recording retains its source")
@@ -54,7 +54,8 @@ func run() -> void:
 	var sources: Array[CheckBox] = []
 	for node in popup.get_child(0).get_children():
 		if node is CheckBox: sources.append(node)
-	check(sources.size() == 2 and sources[0].button_group == null and sources[1].button_group == null, "Both checkboxes can be enabled together")
+	check(sources.size() == 3 and sources.all(func(source: CheckBox): return source.button_group == null), "Microphone, system and timeline sources can be enabled together")
+	check(popup.find_child("RecordTimelineAudio", true, false) != null, "Recording options expose timeline audio")
 	var gain := popup.find_child("InputGain", true, false) as DragNumber
 	check(gain != null, "Input gain supports dragging")
 	var original := gain.value

@@ -36,10 +36,11 @@ func open_settings() -> void:
 	heading.add_theme_font_size_override("font_size", 11)
 	heading.modulate = Color("8fb5b1")
 	column.add_child(heading)
-	for source in ["record_mic", "record_system"]:
+	for source in ["record_mic", "record_system", "record_timeline"]:
 		var enabled := CheckBox.new()
-		enabled.name = "RecordMicrophone" if source == "record_mic" else "RecordSystemAudio"
-		enabled.text = "Record microphone audio" if source == "record_mic" else "Record system audio"
+		enabled.name = {"record_mic": "RecordMicrophone", "record_system": "RecordSystemAudio", "record_timeline": "RecordTimelineAudio"}[source]
+		enabled.text = {"record_mic": "Record microphone audio", "record_system": "Record system audio", "record_timeline": "Record timeline audio"}[source]
+		enabled.tooltip_text = "Play and capture audio actors while the recording playhead advances." if source == "record_timeline" else ""
 		enabled.button_pressed = preferences[source]
 		column.add_child(enabled)
 		enabled.toggled.connect(func(value: bool):

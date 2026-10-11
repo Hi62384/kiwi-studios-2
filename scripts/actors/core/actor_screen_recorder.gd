@@ -67,7 +67,7 @@ func start(options: Dictionary, target: Dictionary) -> String:
 	directory = ProjectSettings.globalize_path("user://screen_recordings/" + ActorData.new_id())
 	DirAccess.make_dir_recursive_absolute(directory)
 	var audio_started := Time.get_ticks_msec()
-	if options.record_mic or options.record_system:
+	if options.record_mic or options.record_system or options.get("record_timeline", false):
 		audio_recorder = ActorAudioRecorder.new()
 		audio_recorder.preferences_override = options.duplicate()
 		add_child(audio_recorder)

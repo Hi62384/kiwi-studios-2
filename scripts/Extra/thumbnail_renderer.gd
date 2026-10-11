@@ -117,3 +117,16 @@ static func render_actor_environment(object: ActorObjectData) -> Texture2D:
 	runtime.call("_configure_environment", environment, object)
 	runtime.free()
 	return await render_environment(environment)
+
+
+static func render_text_settings(object: ActorObjectData) -> Texture2D:
+	await _begin_render()
+	var viewport:=SubViewport.new(); viewport.size=Vector2i(256,144); viewport.transparent_bg=false
+	viewport.render_target_update_mode=SubViewport.UPDATE_ONCE; _instance.add_child(viewport)
+	var background:=ColorRect.new(); background.color=Color("182532"); background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); viewport.add_child(background)
+	var label:=Label.new(); label.text="Aa  Text"; label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
+	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); ActorTextSettings.apply_label(label,object.values); viewport.add_child(label)
+	if DisplayServer.get_name()=="headless": await _instance.get_tree().process_frame
+	else: await RenderingServer.frame_post_draw
+	var image:=viewport.get_texture().get_image(); viewport.queue_free(); _render_busy=false
+	return ImageTexture.create_from_image(image) if image!=null and not image.is_empty() else null

@@ -383,11 +383,23 @@ static func get_file_thumbnail(file: String) -> Texture2D:
 	
 	if file.get_extension().to_lower() in ["tres", "res"]:
 		var resource := ResourceLoader.load(file, "", ResourceLoader.CACHE_MODE_IGNORE)
+		if resource is KiwiImageDocument:
+			if resource.preview==null: return load("res://resources/Images/ActorIcons/Image2D.svg") as Texture2D
+			var thumbnail:=Image.create(192,144,false,Image.FORMAT_RGBA8); thumbnail.fill(Color(0,0,0,0))
+			thumbnail.fill_rect(Rect2i(16,4,170,126),Color("385b62"))
+			thumbnail.fill_rect(Rect2i(8,10,170,126),Color("508f89"))
+			thumbnail.fill_rect(Rect2i(0,18,170,126),Color("152735"))
+			var picture: Image=resource.preview.get_image().duplicate()
+			var factor:=minf(158.0/picture.get_width(),100.0/picture.get_height())
+			picture.resize(maxi(1,roundi(picture.get_width()*factor)),maxi(1,roundi(picture.get_height()*factor)),Image.INTERPOLATE_LANCZOS)
+			thumbnail.blend_rect(picture,Rect2i(Vector2i.ZERO,picture.get_size()),Vector2i(6+(158-picture.get_width())/2,24+(100-picture.get_height())/2))
+			for line in 3: thumbnail.fill_rect(Rect2i(10+line*5,128+line*3,18,2),Color("75e2c4"))
+			return ImageTexture.create_from_image(thumbnail)
 		if resource is ActorSceneData:
 			return load("res://resources/Images/ActorIcons/Scene.svg") as Texture2D
 		var editable := resource as ActorObjectData
 		if editable != null and editable.type_id == &"text_settings":
-			return load("res://resources/Images/ActorIcons/TextSettings.svg") as Texture2D
+			return await ThumbnailRenderer.render_text_settings(editable) if is_instance_valid(ThumbnailRenderer._instance) else load("res://resources/Images/ActorIcons/TextSettings.svg") as Texture2D
 		if editable != null and editable.type_id == &"environment":
 			return await ThumbnailRenderer.render_actor_environment(editable) if is_instance_valid(ThumbnailRenderer._instance) else FILE_COLORED_TEXTURE
 		if resource is Environment:

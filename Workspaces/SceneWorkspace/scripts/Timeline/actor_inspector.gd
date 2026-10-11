@@ -30,7 +30,7 @@ func setup(document: ActorTimeline, types: ActorRegistry, state: ActorInspectorS
 	ui_state = state if state != null else ActorInspectorState.new()
 	custom_minimum_size.x = 220
 	fields.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	fields.add_theme_constant_override("separation", 10)
+	fields.add_theme_constant_override("separation", 6)
 	add_child(fields)
 	model.changed.connect(refresh)
 	model.selection_requested.connect(func():
@@ -383,7 +383,7 @@ func refresh() -> void:
 	fields.add_child(identity)
 	var icon := TextureRect.new()
 	icon.texture = definition.icon
-	icon.custom_minimum_size = Vector2(42, 42)
+	icon.custom_minimum_size = Vector2(36, 36)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	identity.add_child(icon)
@@ -440,7 +440,7 @@ func _prepare_buttons() -> void:
 			continue
 		button.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		button.mouse_filter = Control.MOUSE_FILTER_STOP
-		button.custom_minimum_size.y = maxf(button.custom_minimum_size.y, 28.0)
+		button.custom_minimum_size.y = maxf(button.custom_minimum_size.y, 24.0)
 
 
 func _font_editor(parent: Control, value: String, commit: Callable) -> Button:
@@ -468,6 +468,7 @@ func _font_editor(parent: Control, value: String, commit: Callable) -> Button:
 	button.pressed.connect(func():
 		var popup := ActorFontPicker.new()
 		button.add_child(popup)
+		if _actor!=null: popup.preview_text=str(_actor.get_value(&"text",""))
 		popup.setup(button.text)
 		popup.font_chosen.connect(func(family: String):
 			button.text = family
@@ -497,7 +498,7 @@ func _category(text: String, actor: ActorData) -> VBoxContainer:
 func _stateful_category(text: String, state_id: String, parent: VBoxContainer,
 		state_key: String = "") -> VBoxContainer:
 	var section := VBoxContainer.new()
-	section.add_theme_constant_override("separation", 8)
+	section.add_theme_constant_override("separation", 4)
 	parent.add_child(section)
 	var header := Button.new()
 	var category_key := text if state_key.is_empty() else state_key + ":" + text
@@ -510,7 +511,7 @@ func _stateful_category(text: String, state_id: String, parent: VBoxContainer,
 	section.add_child(header)
 	var content := VBoxContainer.new()
 	content.name = "Content"
-	content.add_theme_constant_override("separation", 7)
+	content.add_theme_constant_override("separation", 4)
 	content.visible = header.button_pressed
 	section.add_child(content)
 	var update_header := func(expanded: bool):
@@ -954,6 +955,8 @@ func _choose_object_resource(actor: ActorData, actor_definition: ActorDefinition
 		property: ActorProperty, object_definition: ActorObjectDefinition) -> void:
 	var path := await ActorProjectFilePicker.pick(self, _object_picker_property(property),
 		"Choose " + object_definition.display_name)
+	if path==ActorProjectFilePicker.EMPTY_RESOURCE:
+		_edit_property(actor,actor_definition,property.id,null); _rebuild_selected(); return
 	if path.is_empty():
 		return
 	_assign_object_resource_path(actor, actor_definition, property, path)
@@ -1203,6 +1206,7 @@ func _file_resource_menu_action(id: int, property: ActorProperty, get_value: Cal
 				set_value.call(texture)
 		1:
 			var chosen := await ActorProjectFilePicker.pick(self, property, "Choose " + property.label)
+			if chosen==ActorProjectFilePicker.EMPTY_RESOURCE: set_value.call(null); return
 			if not chosen.is_empty():
 				set_value.call(chosen)
 				if _is_shader_property(property):
@@ -1589,10 +1593,10 @@ func _resource_box() -> StyleBoxFlat:
 	style.border_color = Color("38566a")
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(7)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 10
-	style.content_margin_bottom = 12
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 6
+	style.content_margin_bottom = 7
 	return style
 
 
@@ -1747,6 +1751,8 @@ func _nested_object_menu_action(id: int, actor: ActorData, owner: ActorObjectDat
 		1:
 			var path := await ActorProjectFilePicker.pick(self, _object_picker_property(property),
 				"Choose " + object_definition.display_name)
+			if path==ActorProjectFilePicker.EMPTY_RESOURCE:
+				model.edit_object_property(actor,owner,owner_definition,property.id,null); _rebuild_selected(); return
 			if not path.is_empty():
 				_assign_nested_object_resource_path(path, actor, owner, owner_definition, property)
 		2:
