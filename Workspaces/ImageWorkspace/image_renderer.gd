@@ -22,9 +22,24 @@ uniform vec2 clip_size = vec2(1280.0,720.0);
 uniform float clip_opacity = 1.0;
 uniform sampler2D curve_lut;
 uniform vec2 yaw = vec2(0.0);
+uniform int mirror_side = 0;
+uniform float mirror_position = 0.5;
+uniform sampler2D effect_original;
+uniform sampler2D effect_selection;
+uniform bool effects_selection_only = false;
+uniform bool has_effect_selection = false;
 void fragment() {
  vec2 sample_uv = UV;
  bool outside = false;
+ if (mode == 23) {
+  vec2 p = (UV / TEXTURE_PIXEL_SIZE - vec2(48.0)) / content_size;
+  if (mirror_side == 0) p.x = mirror_position - abs(p.x - mirror_position);
+  else if (mirror_side == 1) p.x = mirror_position + abs(p.x - mirror_position);
+  else if (mirror_side == 2) p.y = mirror_position - abs(p.y - mirror_position);
+  else p.y = mirror_position + abs(p.y - mirror_position);
+  outside = any(lessThan(p,vec2(0.0))) || any(greaterThan(p,vec2(1.0)));
+  sample_uv = (p * content_size + vec2(48.0)) * TEXTURE_PIXEL_SIZE;
+ }
  if (mode == 12 && length(yaw) > 0.00001) {
   float cy=cos(yaw.y), sy=sin(yaw.y), cx=cos(yaw.x), sx=sin(yaw.x);
   vec2 depth=vec2(-sy,cy*sx)/2.0;
@@ -103,7 +118,13 @@ void fragment() {
   vec2 uv = (clip_origin + clip_axis_x*p.x + clip_axis_y*p.y + vec2(48.0))/clip_size;
   c.a *= (uv.x>=0.0 && uv.y>=0.0 && uv.x<=1.0 && uv.y<=1.0) ? texture(clip_texture,uv).a * clip_opacity : 0.0;
  }
- COLOR = vec4(c.rgb*c.a,c.a);
+ vec4 result = vec4(c.rgb*c.a,c.a);
+ if (mode == 24 && effects_selection_only) {
+  vec2 p = (UV / TEXTURE_PIXEL_SIZE - vec2(48.0)) / content_size;
+  float selected = has_effect_selection && all(greaterThanEqual(p,vec2(0.0))) && all(lessThanEqual(p,vec2(1.0))) ? texture(effect_selection,p).a : 0.0;
+  result = mix(texture(effect_original,UV),result,selected);
+ }
+ COLOR = result;
 }
 """
 
@@ -262,7 +283,7 @@ func sync(value: KiwiImageDocument) -> void:
 	_export_display.size = Vector2(viewport.size)
 	var topology := ""
 	for layer in document.layers:
-		topology += layer.id + layer.parent_id + layer.kind
+		topology += layer.id + layer.parent_id + layer.kind + str(layer.properties.get("effects_selection_only",false))
 		for effect in layer.effects: topology += str(effect.get("id", "")) + str(effect.get("type", "")) + str(effect.get("shader", ""))
 	if topology != _topology:
 		_topology = topology
@@ -275,6 +296,15 @@ func sync(value: KiwiImageDocument) -> void:
 		if views.has(layer.id): _update_layer(layer, views[layer.id])
 
 
+func _effect_stages(layer: KiwiImageLayer) -> Array:
+	var result: Array=[{"type":"mask","enabled":true}]
+	for effect in layer.effects:
+		result.append(effect)
+		if bool(layer.properties.get("effects_selection_only",false)): result.append({"type":"effects_selection","enabled":true})
+	result.append({"type":"values"}); result.append({"type":"perspective"})
+	return result
+
+
 func _build_layer(layer: KiwiImageLayer, parent: Node) -> void:
 	var target_size := Vector2i((_content_dimensions(layer)*render_scale).ceil()) + Vector2i.ONE * PAD * 2
 	var base := _surface(target_size)
@@ -284,9 +314,10 @@ func _build_layer(layer: KiwiImageLayer, parent: Node) -> void:
 	base.add_child(drawing)
 	var stages: Array[Dictionary] = []
 	var previous := base
-	var mask := {"type":"mask"}
-	var effects: Array = [mask] + layer.effects + [{"type":"values"},{"type":"perspective"}]
+	var effects: Array = _effect_stages(layer)
+	var original: Texture2D
 	for effect: Dictionary in effects:
+		if effect.get("type","") not in ["mask","values","perspective","effects_selection"]: original=previous.get_texture()
 		var input_surface: SubViewport
 		var input_display: TextureRect
 		if effect.get("type", "") == "shader":
@@ -309,7 +340,7 @@ func _build_layer(layer: KiwiImageLayer, parent: Node) -> void:
 		else: material.shader = _shader
 		display.material = material
 		surface.add_child(display)
-		stages.append({"viewport":surface,"display":display,"material":material,"input_viewport":input_surface,"input_display":input_display})
+		stages.append({"viewport":surface,"display":display,"material":material,"input_viewport":input_surface,"input_display":input_display,"original":original})
 		previous = surface
 	var root := Node2D.new()
 	parent.add_child(root)
@@ -363,9 +394,9 @@ func _update_layer(layer: KiwiImageLayer, view: Dictionary) -> void:
 	if int(view.signature) != signature or layer.kind=="text":
 		view.signature = signature
 		view.drawing.queue_redraw()
-	var effects: Array = [{"type":"mask","enabled":true}] + layer.effects + [{"type":"values"},{"type":"perspective"}]
+	var effects: Array = _effect_stages(layer)
 	var modes := {"mask":0,"brightness":1,"contrast":2,"saturation":3,"blur":4,"outline":5,"shadow":6,"grayscale":7,"invert":8,"glow":9,"wave":10,"curves":11,"perspective":12,
-		"sharpen":13,"pixelate":14,"grain":15,"chromatic":16,"halftone":17,"posterize":18,"vignette":19,"gradient_map":20,"color_replace":21,"twirl":22}
+		"sharpen":13,"pixelate":14,"grain":15,"chromatic":16,"halftone":17,"posterize":18,"vignette":19,"gradient_map":20,"color_replace":21,"twirl":22,"mirror":23,"effects_selection":24}
 	for index in view.stages.size():
 		var stage: Dictionary = view.stages[index]
 		var effect: Dictionary = effects[index]
@@ -396,6 +427,12 @@ func _update_layer(layer: KiwiImageLayer, view: Dictionary) -> void:
 			for key in effect.get("uniforms",{}): material.set_shader_parameter(key,effect.uniforms[key])
 		else:
 			material.set_shader_parameter("mode",int(modes.get(effect.get("type",""),0)) if enabled else 0)
+			material.set_shader_parameter("mirror_side",int(effect.get("mirror_side",0)))
+			material.set_shader_parameter("mirror_position",float(effect.get("mirror_position",0.5)))
+			material.set_shader_parameter("effects_selection_only",bool(layer.properties.get("effects_selection_only",false)))
+			material.set_shader_parameter("has_effect_selection",layer.properties.get("effects_selection")!=null)
+			material.set_shader_parameter("effect_selection",layer.properties.get("effects_selection"))
+			if effect.get("type","")=="effects_selection": material.set_shader_parameter("effect_original",stage.original)
 			material.set_shader_parameter("masked",index == 0 and layer.mask != null)
 			material.set_shader_parameter("layer_mask",layer.mask)
 			material.set_shader_parameter("content_size",layer.dimensions*(raster_scale if stable else Vector2.ONE*render_scale))
@@ -470,7 +507,7 @@ func flattened() -> Image:
 		var passes:=2
 		var current: KiwiImageLayer=layer
 		while current!=null:
-			passes+=4+current.effects.size()
+			passes+=4+current.effects.size()*(2 if bool(current.properties.get("effects_selection_only",false)) else 1)
 			for effect in current.effects:
 				if effect.get("type","")=="shader": passes+=1
 			current=document.layer_for_id(current.parent_id)

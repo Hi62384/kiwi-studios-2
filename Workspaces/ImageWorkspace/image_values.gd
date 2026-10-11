@@ -101,6 +101,15 @@ static func expression(kind: String, amount: float) -> String:
 		"red": return "c*vec3("+a+",1.0,1.0)"
 		"green": return "c*vec3(1.0,"+a+",1.0)"
 		"blue": return "c*vec3(1.0,1.0,"+a+")"
+		"vibrance": return "mix(vec3(dot(c,vec3(.2126,.7152,.0722))),c,1.0+"+a+"*(1.0-clamp(max(c.r,max(c.g,c.b))-min(c.r,min(c.g,c.b)),0.0,1.0)))"
+		"grayscale": return "mix(c,vec3(dot(c,vec3(.2126,.7152,.0722))),"+a+")"
+		"sepia": return "mix(c,vec3(dot(c,vec3(.393,.769,.189)),dot(c,vec3(.349,.686,.168)),dot(c,vec3(.272,.534,.131))),"+a+")"
+		"posterize": return "floor(c*"+str(maxf(2,amount))+"+.5)/"+str(maxf(2,amount))
+		"solarize": return "mix(c,vec3(1.0)-c,step(vec3("+a+"),c))"
+		"shadows": return "c+vec3("+a+")*pow(1.0-clamp(dot(c,vec3(.2126,.7152,.0722)),0.0,1.0),2.0)"
+		"highlights": return "c+vec3("+a+")*pow(clamp(dot(c,vec3(.2126,.7152,.0722)),0.0,1.0),2.0)"
+		"black_point": return "(c-vec3("+a+"))/"+str(maxf(.001,1-amount))
+		"white_point": return "c/"+str(maxf(.001,amount))
 	return "c"
 
 static func shader_code(layer: KiwiImageLayer) -> String:
@@ -175,6 +184,17 @@ static func _legacy_evaluate(value: Vector3, ops: Array) -> Vector3:
 			"red": c.x*=a
 			"green": c.y*=a
 			"blue": c.z*=a
+			"vibrance":
+				var chroma:=clampf(maxf(c.x,maxf(c.y,c.z))-minf(c.x,minf(c.y,c.z)),0,1)
+				c=(Vector3.ONE*c.dot(Vector3(.2126,.7152,.0722))).lerp(c,1+a*(1-chroma))
+			"grayscale": c=c.lerp(Vector3.ONE*c.dot(Vector3(.2126,.7152,.0722)),a)
+			"sepia": c=c.lerp(Vector3(c.dot(Vector3(.393,.769,.189)),c.dot(Vector3(.349,.686,.168)),c.dot(Vector3(.272,.534,.131))),a)
+			"posterize": c=(c*maxf(2,a)+Vector3.ONE*.5).floor()/maxf(2,a)
+			"solarize": c=Vector3(1-c.x if c.x>=a else c.x,1-c.y if c.y>=a else c.y,1-c.z if c.z>=a else c.z)
+			"shadows": c+=Vector3.ONE*a*pow(1-clampf(c.dot(Vector3(.2126,.7152,.0722)),0,1),2)
+			"highlights": c+=Vector3.ONE*a*pow(clampf(c.dot(Vector3(.2126,.7152,.0722)),0,1),2)
+			"black_point": c=(c-Vector3.ONE*a)/maxf(.001,1-a)
+			"white_point": c/=maxf(.001,a)
 	return c
 
 static func inverse_color(color: Color, layer: KiwiImageLayer) -> Color:

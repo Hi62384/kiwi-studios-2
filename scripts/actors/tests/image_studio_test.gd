@@ -87,9 +87,9 @@ func run() -> void:
 	check(studio.document.layers.size()==1 and studio.document.layers[0].kind=="basic","A new Image Studio tab starts with a Basic layer")
 	var original_brush_size:=studio.canvas.brush_size
 	studio.canvas.tool="brush"
-	var wheel:=InputEventMouseButton.new(); wheel.button_index=MOUSE_BUTTON_WHEEL_UP; wheel.pressed=true; wheel.ctrl_pressed=true; wheel.position=Vector2(20,20)
+	var wheel:=InputEventMouseButton.new(); wheel.button_index=MOUSE_BUTTON_WHEEL_UP; wheel.pressed=true; wheel.shift_pressed=true; wheel.position=Vector2(20,20)
 	studio.canvas._input_canvas(wheel)
-	check(studio.canvas.brush_size>original_brush_size and is_equal_approx(studio.canvas.zoom,.7),"Ctrl+wheel changes brush size without zooming the canvas")
+	check(studio.canvas.brush_size>original_brush_size and is_equal_approx(studio.canvas.zoom,.7),"Shift+wheel changes brush size without zooming the canvas")
 	studio._apply_paint_preset("brush",studio._paint_presets.brush[0]); studio.canvas.brush_size=41; studio._save_paint_preset("brush",false)
 	check(is_equal_approx(float(studio._paint_presets.brush[0].size),41),"Save updates the selected brush preset")
 	var preset_count: int=studio._paint_presets.brush.size()
@@ -408,6 +408,11 @@ func check_productivity_systems(studio: KiwiImageWorkspace) -> void:
 func check_workflow_panels(studio: KiwiImageWorkspace) -> void:
 	for action in [studio._transform_panel,studio._selection_panel,studio._effects_panel,studio._asset_shelf,studio._variants_panel,studio._automation_panel,studio._export_presets_panel]:
 		action.call(); await process_frame
+		if action.get_method()=="_effects_panel":
+			var editor:=studio.get_node_or_null("EffectStackEditor")
+			check(editor is Window and not studio._effects_dock.visible,"Effects use a dedicated live-preview stack editor instead of the inspector")
+			if editor!=null: editor.close_editor()
+			await process_frame; continue
 		var found:=false
 		for child in studio.get_children():
 			if child is PopupPanel and is_instance_valid(child): found=true; child.hide()
@@ -570,6 +575,10 @@ func check_revision_interactions(studio: KiwiImageWorkspace) -> void:
 	var points:=PackedVector2Array([Vector2(100,100),Vector2(180,100),Vector2(180,180),Vector2(100,180)])
 	studio.canvas._points=points.duplicate(); studio.canvas.polygon_committed.emit(points.duplicate())
 	check(shape.properties.points.size()==4,"Polygon vertices are persisted without Enter")
+	studio.canvas._points=PackedVector2Array([Vector2.ZERO,Vector2(30,50),Vector2(70,100),Vector2(120,80),Vector2(400,50)])
+	check(studio.canvas._polygon_insert(Vector2(210,-40))==5,"Above a polygon, insertion chooses its long top edge instead of short bottom edges")
+	check(studio.canvas._polygon_insert(Vector2(95,120))==3,"Near the bottom, insertion chooses the nearest short bottom edge")
+	studio.canvas._points=points.duplicate()
 	studio._set_tool("move")
 	check(shape.properties.points.size()==4,"Leaving polygon editing preserves points")
 	var rounded:=KiwiImageLayer.rounded_polygon(points,12)
@@ -686,17 +695,16 @@ func check_toolbar_input(studio: KiwiImageWorkspace) -> void:
 	studio.open_source(null); studio._set_tool("values")
 	for frame in 3: await process_frame
 	check(studio._context_panel.get_parent()==studio,"Spanning toolbar is outside sidebar hit-testing ancestors")
-	var target: HSlider=null
-	for column in studio.context.get_children():
-		for child in column.get_children():
-			if child is HSlider and child.get_global_rect().get_center().x>studio._side_split.global_position.x: target=child
-	check(target!=null,"A value slider extends above the right-hand inspector")
+	var target: Button=null
+	for child in studio.context.get_children():
+		if child is Button and child.text=="Adjustments": target=child
+	check(target!=null,"Color adjustments expose a compact top-toolbar launcher")
 	if target!=null:
 		var at:=target.get_global_rect().position+Vector2(target.size.x*.8,target.size.y*.5)
 		var motion:=InputEventMouseMotion.new(); motion.position=at; root.push_input(motion,true)
 		await process_frame
 		var hovered:=root.gui_get_hovered_control()
-		check(hovered==target or target.is_ancestor_of(hovered),"Right-side toolbar receives mouse input above the inspector")
+		check(hovered==target or target.is_ancestor_of(hovered),"Adjustment toolbar receives mouse input without the inspector intercepting it")
 	studio._set_tool("move")
 
 

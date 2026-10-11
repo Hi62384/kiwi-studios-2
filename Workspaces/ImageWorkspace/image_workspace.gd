@@ -49,6 +49,7 @@ var canvas := Canvas.new()
 var layer_tree := LayersTree.new()
 var inspector := VBoxContainer.new()
 var context := HFlowContainer.new()
+var _context_host: Container
 var _flatten_cache: Image
 var _edit_version:=0
 var _pixel_prepare_generation:=0
@@ -103,6 +104,14 @@ var _macros: Dictionary={}
 var _variants: Dictionary={}
 var _transform_clipboard: Dictionary={}
 var _recent_assets: Array[String]=[]
+var _effects_open:=false
+var _effects_filter:=""
+var _effects_signature:=""
+var _effects_dock:=VBoxContainer.new()
+var _effects_search:=LineEdit.new()
+var _effects_scroll:=ScrollContainer.new()
+var _effects_content:=VBoxContainer.new()
+var _effects_button: Button
 var _custom_shortcuts: Dictionary={}
 const PAINT_PRESETS_PATH := "user://image_studio_paint_presets.tres"
 
@@ -131,6 +140,10 @@ func _ready() -> void:
 	canvas.brush_size_changed.connect(func(value: float):
 		if is_instance_valid(brush_size): brush_size.set_value_no_signal(value)
 		if canvas.tool=="pixel_select": _refresh_context())
+	canvas.correction_scale_changed.connect(func(value: float):
+		var field: Variant=_context_fields.get("correction_scale")
+		if is_instance_valid(field): field.set_value_no_signal(value)
+		_persist_paint_presets())
 	canvas.threshold_changed.connect(func(_value: float): _refresh_context())
 	if document == null: open_source(null)
 	set_process(true)
@@ -171,6 +184,7 @@ func _box(fill: Color,border: Color,radius: int=8,padding: int=8) -> StyleBoxFla
 func _icon(name: String) -> Texture2D:
 	if _icons.has(name): return _icons[name]
 	var paths := {
+		"effects":"<path d='m4 20 13-13 3 3L7 23zM15 2v4M13 4h4M5 5v4M3 7h4M20 15v4M18 17h4'/>",
 		"brightness":"<circle cx='12' cy='12' r='4'/><path d='M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10l2 2M5 19l2-2M17 7l2-2'/>",
 		"contrast":"<circle cx='12' cy='12' r='9'/><path d='M12 3a9 9 0 0 1 0 18z' fill='currentColor'/>",
 		"saturation":"<path d='M12 2C9 7 5 10 5 15a7 7 0 0 0 14 0c0-5-4-8-7-13zM8 15c0 3 2 4 4 4'/>",
@@ -269,10 +283,6 @@ func _build_ui() -> void:
 		["Save project",save_project],["Save project as…",save_project_as],["Export…",export_image],["Open image / document…",_choose_image]])
 	_menu(header,"Image",[["Resize / upscale image…",_image_size_dialog],["Scale image 2×",func(): _scale_image(Vector2i(document.canvas_size)*2,Image.INTERPOLATE_LANCZOS)],
 		["Scale image ½",func(): _scale_image(Vector2i(Vector2(document.canvas_size)*.5),Image.INTERPOLATE_LANCZOS)]])
-	_menu(header,"Workflow",[["Command palette   Ctrl+K",_command_palette],["Repeat last command   Ctrl+Shift+R",_repeat_last_command],
-		["Transform & align…",_transform_panel],["Smart selection & masks…",_selection_panel],["Effects & styles…",_effects_panel],
-		["Assets & reusable items…",_asset_shelf],["Variants & snapshots…",_variants_panel],["Macros & batch…",_automation_panel],
-		["Quick export presets…",_export_presets_panel]])
 	title_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL; title_label.clip_text=true; header.add_child(title_label)
 	_button(header,"",undo,"Undo · Ctrl+Z","undo")
 	_button(header,"",redo,"Redo · Ctrl+Shift+Z / Ctrl+Y","redo")
@@ -293,11 +303,10 @@ func _build_ui() -> void:
 	add_child(_context_panel); add_child(preset_panel)
 	var stage:=HBoxContainer.new(); stage.size_flags_vertical=Control.SIZE_EXPAND_FILL; stage_column.add_child(stage)
 	var rail:=VBoxContainer.new(); rail.custom_minimum_size.x=42; rail.add_theme_constant_override("separation",3); stage.add_child(rail)
-	for entry in [["move","Move · V"],["values","Color adjustments"],["brush","Brush · B"],["eraser","Eraser · E"],["fill","Fill · G"],["pixel_select","Pixel selection · M"],["crop","Crop · C"],["lasso_crop","Lasso_crop · L"]]:
-		var id: String=entry[0]
-		var button:=_button(rail,"",func(): _set_tool(id),entry[1],"lasso" if id=="lasso_crop" else ("mask" if id=="pixel_select" else id))
-		button.custom_minimum_size=Vector2(38,35); button.toggle_mode=true
-		tool_buttons[id]=button
+	_tool_section(rail,"SELECT",[["move","Move · V"],["pixel_select","Pixel selection · M"]])
+	_tool_section(rail,"PAINT",[["brush","Draw · B"],["eraser","Erase · E"],["fill","Bucket · G"]])
+	_tool_section(rail,"ADJUST",[["values","Color adjustments"],["effects","Effects & Styles"]])
+	_effects_button=tool_buttons.effects
 	color_picker.color=Color("62d9bc")
 	color_picker.color_changed.connect(func(value: Color): canvas.color=value)
 	canvas.size_flags_horizontal=Control.SIZE_EXPAND_FILL; canvas.size_flags_vertical=Control.SIZE_EXPAND_FILL
@@ -310,6 +319,7 @@ func _build_ui() -> void:
 	properties_panel.size_flags_vertical=Control.SIZE_EXPAND_FILL; inspector_column.add_child(properties_panel)
 	_inspector_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO
 	_inspector_scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL; properties_panel.add_child(_inspector_scroll)
+	properties_panel.add_child(_effects_dock); _effects_dock.hide(); _build_effects_dock()
 	inspector.size_flags_horizontal=Control.SIZE_EXPAND_FILL; inspector.add_theme_constant_override("separation",5); _inspector_scroll.add_child(inspector)
 	var layers_panel:=PanelContainer.new(); layers_panel.custom_minimum_size.y=160
 	layers_panel.add_theme_stylebox_override("panel",_box(Color("17212d"),Color("2c3c4c"),8,9)); _side_split.add_child(layers_panel)
@@ -421,8 +431,18 @@ func open_source(value: Variant,state: Dictionary={}) -> void:
 	if canvas.selected.is_empty() and not document.layers.is_empty(): canvas.selected.append(document.layers[-1].id)
 	canvas.zoom=float(ui.get("zoom",.7)); canvas.pan=ui.get("pan",Vector2.ZERO)
 	canvas.clear_selection(); canvas.tool=str(ui.get("tool","move"))
+	canvas.pixel_mode=str(ui.get("pixel_mode","brush")); canvas.pixel_box_select=bool(ui.get("pixel_box_select",false))
+	if canvas.tool in ["crop","lasso_crop"]: canvas.pixel_mode=canvas.tool; canvas.tool="pixel_select"
+	if bool(ui.get("effects_open",false)): canvas.tool="effects"
+	_effects_open=false; _effects_filter=str(ui.get("effects_filter","")); _effects_search.text=_effects_filter
+	_effects_signature=""; _effects_button.set_pressed_no_signal(canvas.tool=="effects")
 	canvas.paint_selection_only=bool(ui.get("paint_selection_only",false))
+	canvas.stroke_correct=bool(ui.get("stroke_correct",canvas.stroke_correct))
+	canvas.correction_strength=float(ui.get("correction_strength",canvas.correction_strength))
+	canvas.correction_scale=clampf(float(ui.get("correction_scale",canvas.correction_scale)),.1,16)
 	canvas.pixel_match_all=bool(ui.get("pixel_match_all",false))
+	canvas.edge_magnet=bool(ui.get("edge_magnet",false)); canvas.edge_threshold=float(ui.get("edge_threshold",.4))
+	canvas.object_threshold=float(ui.get("object_threshold",.5)); canvas.smart_selection.invalidate()
 	canvas.sync_pixel_selection()
 	_main_split.split_offset=int(ui.get("main_split",1000)); _side_split.split_offset=int(ui.get("side_split",280))
 	renderer._topology="_unbuilt_"; renderer.sync(document); canvas.preview=renderer.texture()
@@ -430,6 +450,7 @@ func open_source(value: Variant,state: Dictionary={}) -> void:
 	_update_title()
 	if ui.is_empty(): canvas.call_deferred("fit")
 	status.text=_tool_hint()
+	if canvas.tool=="pixel_select": _prepare_pixel_selection()
 
 
 func capture_state() -> Dictionary:
@@ -440,7 +461,11 @@ func capture_state() -> Dictionary:
 
 func _ui_state() -> Dictionary:
 	return {"selected":canvas.selected.duplicate(),"zoom":canvas.zoom,"pan":canvas.pan,"tool":canvas.tool,
+		"pixel_mode":canvas.pixel_mode,"pixel_box_select":canvas.pixel_box_select,"effects_open":_effects_open,"effects_filter":_effects_filter,
+		"stroke_correct":canvas.stroke_correct,"correction_strength":canvas.correction_strength,
+		"correction_scale":canvas.correction_scale,
 		"paint_selection_only":canvas.paint_selection_only,"pixel_match_all":canvas.pixel_match_all,
+		"edge_magnet":canvas.edge_magnet,"edge_threshold":canvas.edge_threshold,"object_threshold":canvas.object_threshold,
 		"main_split":_main_split.split_offset,"side_split":_side_split.split_offset,
 		"macros":_macros.duplicate(true),"variants":_variants.duplicate(),"recent_assets":_recent_assets.duplicate(),"custom_shortcuts":_custom_shortcuts.duplicate()}
 
@@ -488,6 +513,7 @@ func _commit() -> void:
 	# Keep the original mask and its reference layer. Baking here used to clip
 	# off-canvas pixels and could only approximate perspective yaw.
 	_sizing_preview=false
+	_store_active_mask()
 	_undo.append(_before); _before=null
 	if _undo.size()>40: _undo.pop_front()
 	_redo.clear(); _dirty=true
@@ -536,7 +562,10 @@ func _cancel() -> void:
 
 
 func _finish_pending() -> void:
-	if canvas._drag=="pixel_select": canvas._finish(canvas._last)
+	if canvas._drag in ["object_preview","edge_pending"]:
+		if canvas._drag=="object_preview" and canvas._smart_ready: canvas.commit_object_selection()
+		else: canvas.cancel_gesture()
+	if canvas._drag in ["pixel_select","pixel_box","pixel_lasso"]: canvas._finish(canvas._last)
 	canvas.confirm_stroke()
 	if _before != null: _commit()
 
@@ -653,24 +682,34 @@ func _create_at(kind: String,bounds: Rect2,points: PackedVector2Array) -> void:
 
 
 func _set_tool(id: String) -> void:
+	if canvas._drag=="object_preview" and canvas._smart_ready: canvas.commit_object_selection()
 	canvas.grab_focus()
-	canvas.cancel_gesture(); canvas.tool=id
+	canvas.cancel_gesture()
+	if id in ["crop","lasso_crop"]: canvas.tool="pixel_select"; canvas.pixel_mode=id
+	else:
+		canvas.tool=id
+		if id=="pixel_select" and canvas.pixel_mode in ["crop","lasso_crop"]: canvas.pixel_mode="brush"
 	canvas.sync_pixel_selection()
-	if id=="pixel_select": _prepare_pixel_selection()
+	if canvas.tool=="pixel_select" and canvas.pixel_mode not in ["crop","lasso_crop"]: _prepare_pixel_selection()
 	if id in ["brush","eraser","fill"]:
 		if canvas.selected.is_empty(): add_layer("basic")
 		elif _main_layer()!=null and _main_layer().kind not in ["image","paint","basic"]: rasterize_selected()
 	_refresh_context()
-	for key in tool_buttons: tool_buttons[key].set_pressed_no_signal(key==id)
+	for key in tool_buttons: tool_buttons[key].set_pressed_no_signal(key==canvas.tool)
 	status.text=_tool_hint(); canvas.queue_redraw()
 
 
 func _tool_hint() -> String:
+	if canvas.tool=="pixel_select" and canvas.pixel_mode in ["crop","lasso_crop"]:
+		return "Drag a crop region · Release applies · Right-click / Esc cancels"
+	if canvas.tool=="pixel_select" and canvas.pixel_box_select and canvas.pixel_mode in ["brush","erase"]:
+		return "Drag: box select · Shift-drag: lasso select · Ctrl: subtract · Esc: cancel"
 	var hints:={"move":"Drag to move · Ctrl toggles snap · Shift constrains · Alt-drag duplicates · Space pans · Wheel zooms",
-		"brush":"Ctrl+wheel: size · Hold Shift: line / Q: curve / O: circle · 0–9: presets · Enter: apply · Esc: cancel",
-		"eraser":"Erase on selected layer · [ / ] brush size · Esc cancels",
+		"brush":"Ctrl: erase · Shift+wheel: size · "+("Alt+wheel: scale · " if canvas.stroke_correct else "")+"Shift/Q/O: line/curve/circle · 0–9: presets · Esc: cancel",
+		"eraser":"Erase on selected layer · Shift+wheel: size · [ / ] brush size · Esc cancels",
 		"path":"Click adds points · Enter closes polygon · Esc cancels",
-		"pixel_select":"Paint / erase a selection · Fill selects connected colors · Ctrl+Z undoes · Copy / Delete / Extract",
+		"pixel_select":"Ctrl: subtract pixels · Shift+wheel: size / fill threshold · Ctrl+Z undoes · Copy / Delete / Extract",
+		"fill":"Click: fill · Ctrl+click: erase region · Shift+wheel: threshold · Ctrl+Z undoes",
 		"lasso_crop":"Draw around the crop · Release applies · Right-click / Esc cancels",
 		"shape":"Drag to create a shape · Edit fill, stroke, and corners in Properties",
 		"text":"Click to add text · Double-click existing text to edit",
@@ -682,40 +721,88 @@ func _clear(parent: Node) -> void:
 	for child in parent.get_children(): parent.remove_child(child); child.queue_free()
 
 
+func _tool_section(rail: Node,caption: String,entries: Array) -> void:
+	var panel:=PanelContainer.new(); panel.name=caption.capitalize()+"Tools"
+	panel.add_theme_stylebox_override("panel",_box(Color("15232d"),Color("2b414d"),6,3)); rail.add_child(panel)
+	var column:=VBoxContainer.new(); column.add_theme_constant_override("separation",3); panel.add_child(column)
+	var label:=Label.new(); label.text=caption; label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size",8); label.add_theme_color_override("font_color",Color("85a4b1")); column.add_child(label)
+	for entry in entries:
+		var id: String=entry[0]
+		var button:=_button(column,"",func(): _set_tool(id),entry[1],"mask" if id=="pixel_select" else id)
+		button.custom_minimum_size=Vector2(34,33); button.toggle_mode=true; tool_buttons[id]=button
+
 func _refresh_context() -> void:
 	_clear(context)
+	_context_host=context
+	if canvas.tool=="brush":
+		# Brush controls are one row; narrow windows scroll instead of wrapping
+		# controls onto a second row and taking space away from the canvas.
+		var scroll:=ScrollContainer.new(); scroll.name="BrushToolbarScroll"
+		scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+		scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO
+		scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+		context.add_child(scroll)
+		var row:=HBoxContainer.new(); row.name="BrushToolbarRow"
+		row.size_flags_horizontal=Control.SIZE_EXPAND_FILL; row.add_theme_constant_override("separation",5)
+		scroll.add_child(row); _context_host=row
 	_clear(preset_context); preset_panel.visible=false
 	_context_fields.clear()
-	var tool_icon:=TextureRect.new(); tool_icon.texture=_icon("lasso" if canvas.tool=="lasso_crop" else ("mask" if canvas.tool=="pixel_select" else canvas.tool)); tool_icon.custom_minimum_size=Vector2(22,22); tool_icon.expand_mode=TextureRect.EXPAND_IGNORE_SIZE; tool_icon.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED; tool_icon.size_flags_vertical=Control.SIZE_SHRINK_CENTER; context.add_child(tool_icon)
+	var tool_icon:=TextureRect.new(); tool_icon.texture=_icon("lasso" if canvas.tool=="lasso_crop" else ("mask" if canvas.tool=="pixel_select" else canvas.tool)); tool_icon.custom_minimum_size=Vector2(22,22); tool_icon.expand_mode=TextureRect.EXPAND_IGNORE_SIZE; tool_icon.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED; tool_icon.size_flags_vertical=Control.SIZE_SHRINK_CENTER; _context_host.add_child(tool_icon)
 	var label:=Label.new(); label.text=canvas.tool.replace("_"," ").capitalize()
-	label.custom_minimum_size.x=62; label.size_flags_vertical=Control.SIZE_SHRINK_CENTER; label.add_theme_color_override("font_color",Color("7fe3cd")); context.add_child(label)
-	if canvas.tool=="values":
-		_button(context,"≡ Order edit",func(): _open_values(true),"Ordered color operations with a live preview")
+	label.custom_minimum_size.x=62; label.size_flags_vertical=Control.SIZE_SHRINK_CENTER; label.add_theme_color_override("font_color",Color("7fe3cd")); _context_host.add_child(label)
+	if canvas.tool=="brush": label.custom_minimum_size.x=48
+	if canvas.tool in ["values","effects"]:
+		_button(context,"Adjustments" if canvas.tool=="values" else "Effects",func(): _open_stack_editor(canvas.tool=="values"),"Choose, order, and preview adjustments" if canvas.tool=="values" else "Choose, order, and preview effects",canvas.tool)
 		if not canvas.selected.is_empty():
 			var layer:=document.layer_for_id(canvas.selected[-1])
-			_build_value_sliders(layer)
-			_check(context,"Selected pixels only",bool(layer.properties.get("values_selection_only",false)),func(value: bool):
-				layer.properties.values_selection_only=value
-				layer.properties.values_selection=document.pixel_selection
-				layer.properties.values_selection_frame=document.world_transform(layer)
-				layer.properties.values_selection_dimensions=layer.dimensions)
+			if layer!=null:
+				if canvas.tool=="effects": _effect_selection_control(context,layer)
+				else:
+					_check(context,"Affect selected pixels only",bool(layer.properties.get("values_selection_only",false)),func(value: bool):
+						layer.properties.values_selection_only=value
+						layer.properties.values_selection=document.pixel_selection
+						layer.properties.values_selection_frame=document.world_transform(layer)
+						layer.properties.values_selection_dimensions=layer.dimensions)
 		return
 	if canvas.tool=="pixel_select":
 		var modes:=_toolbar_group("SELECT PIXELS","mask")
-		for entry in [["brush","brush","Paint selection"],["erase","eraser","Erase selection"],["fill","fill","Select connected colors"]]:
+		for entry in [["brush","brush","Paint selection"],["erase","eraser","Erase selection"],["fill","fill","Select connected colors"],["object","mask","Object Selector"]]:
 			var mode: String=entry[0]
-			var button:=_button(modes,"",func(): canvas.pixel_mode=mode; _refresh_context(),entry[2],entry[1]); button.toggle_mode=true; button.button_pressed=canvas.pixel_mode==mode
+			var button:=_button(modes,"",func():
+				if canvas._drag=="object_preview" and canvas._smart_ready: canvas.commit_object_selection()
+				canvas.cancel_gesture(); canvas.pixel_mode=mode; _refresh_context()
+				if mode not in ["crop","lasso_crop"]: _prepare_pixel_selection(),entry[2],entry[1])
+			button.toggle_mode=true; button.button_pressed=canvas.pixel_mode==mode
 		var value:=DragNumber.new(); value.custom_minimum_size.x=96
-		if canvas.pixel_mode=="fill":
+		if canvas.pixel_mode in ["brush","fill"]:
+			var magnet:=CheckButton.new(); magnet.text="Edge Magnet"; magnet.name="EdgeMagnet"; magnet.button_pressed=canvas.edge_magnet
+			modes.add_child(magnet)
+			magnet.toggled.connect(func(enabled: bool): canvas.cancel_gesture(); canvas.edge_magnet=enabled; canvas.pixel_box_select=false if enabled else canvas.pixel_box_select; canvas.prepare_smart_selection(); _refresh_context())
+			if canvas.edge_magnet:
+				_pixel_threshold_control("Edge Threshold",canvas.edge_threshold,func(next: float): canvas.edge_threshold=next; canvas.queue_redraw())
+		if canvas.pixel_mode=="object":
+			value.queue_free(); _pixel_threshold_control("Object Threshold",canvas.object_threshold,canvas.set_object_threshold)
+			var proposal:=_toolbar_group("OBJECT SELECTION","mask")
+			_button(proposal,"Apply",canvas.commit_object_selection,"Commit the proposed selection · Enter","check")
+			_button(proposal,"Cancel",canvas.cancel_gesture,"Discard the proposed selection · Esc","close")
+		elif canvas.pixel_mode=="fill" and not canvas.edge_magnet:
 			var all_colors:=CheckButton.new(); all_colors.text="All matching colors"; all_colors.button_pressed=canvas.pixel_match_all; modes.add_child(all_colors)
 			all_colors.toggled.connect(func(enabled: bool): canvas.pixel_match_all=enabled)
 			value.min_value=0; value.max_value=1; value.step=.01; value.value=canvas.fill_threshold
 			value.value_changed.connect(func(next: float): canvas.fill_threshold=clampf(next,0,1)); value.preview_changed.connect(func(next: float): canvas.fill_threshold=clampf(next,0,1))
 			_toolbar_group("THRESHOLD","hardness").add_child(value)
-		else:
+		elif canvas.pixel_mode in ["brush","erase"] or (canvas.pixel_mode=="fill" and canvas.edge_magnet):
+			var box:=CheckButton.new(); box.text="Box select"; box.name="PixelBoxSelect"; box.button_pressed=canvas.pixel_box_select; modes.add_child(box)
+			box.visible=canvas.pixel_mode in ["brush","erase"] and not canvas.edge_magnet
+			box.tooltip_text="Box-select pixels · Shift-drag: lasso · Ctrl: subtract"
+			box.toggled.connect(func(enabled: bool): canvas.cancel_gesture(); canvas.pixel_box_select=enabled; _refresh_context())
 			value.min_value=1; value.max_value=500; value.value=canvas.brush_size; value.suffix="px"
 			value.value_changed.connect(func(next: float): canvas.brush_size=clampf(next,1,500)); value.preview_changed.connect(func(next: float): canvas.brush_size=clampf(next,1,500))
-			_toolbar_group("SIZE","brush").add_child(value)
+			if not canvas.pixel_box_select or canvas.edge_magnet: _toolbar_group("SIZE","brush").add_child(value)
+			else: value.queue_free()
+		else:
+			value.queue_free(); _crop_controls()
 		var actions:=_toolbar_group("SELECTED PIXELS","layers")
 		_button(actions,"Copy",func(): _apply_pixel_selection("copy"),"Copy selected pixels into a new layer","duplicate")
 		_button(actions,"Delete",func(): _apply_pixel_selection("delete"),"Delete selected pixels","trash")
@@ -724,23 +811,56 @@ func _refresh_context() -> void:
 		_button(selection_tools,"Clear",func(): _action(func(): document.pixel_selection=null); canvas.sync_pixel_selection(),"Clear the pixel selection")
 		_button(selection_tools,"Opaque",func(): _select_pixel_region(false),"Select every pixel with non-zero alpha")
 		_button(selection_tools,"Invert",func(): _select_pixel_region(true),"Invert pixel selection · Ctrl+I")
+		_selection_mask_controls()
 	elif canvas.tool in ["brush","eraser"]:
 		_paint_selection_toggle()
-		brush_size=DragNumber.new(); brush_size.min_value=1; brush_size.max_value=500; brush_size.value=canvas.brush_size; brush_size.suffix="px"; brush_size.custom_minimum_size.x=96
+		brush_size=DragNumber.new(); brush_size.min_value=1; brush_size.max_value=500; brush_size.value=canvas.brush_size; brush_size.suffix="px"; brush_size.custom_minimum_size.x=80
 		_toolbar_group("BRUSH SIZE","brush").add_child(brush_size)
 		brush_size.value_changed.connect(func(value: float): canvas.brush_size=value)
 		brush_size.preview_changed.connect(func(value: float): canvas.brush_size=value; canvas.queue_redraw())
 		var opacity_group:=_toolbar_group("OPACITY","opacity")
 		var opacity:=HSlider.new(); opacity.min_value=.01; opacity.max_value=1; opacity.step=.01; opacity.value=canvas.brush_opacity; opacity.size_flags_vertical=Control.SIZE_SHRINK_CENTER
-		opacity.custom_minimum_size=Vector2(130,32); opacity.tooltip_text="Brush opacity"; opacity_group.add_child(opacity)
+		opacity.custom_minimum_size=Vector2(80,32); opacity.tooltip_text="Brush opacity"; opacity_group.add_child(opacity)
 		opacity.value_changed.connect(func(value: float): canvas.brush_opacity=value)
 		var hardness_group:=_toolbar_group("HARDNESS","hardness")
-		var hardness:=HSlider.new(); hardness.min_value=0; hardness.max_value=1; hardness.step=.01; hardness.value=canvas.hardness; hardness.custom_minimum_size=Vector2(130,32); hardness.size_flags_vertical=Control.SIZE_SHRINK_CENTER; hardness_group.add_child(hardness)
+		var hardness:=HSlider.new(); hardness.min_value=0; hardness.max_value=1; hardness.step=.01; hardness.value=canvas.hardness; hardness.custom_minimum_size=Vector2(80,32); hardness.size_flags_vertical=Control.SIZE_SHRINK_CENTER; hardness_group.add_child(hardness)
 		hardness.value_changed.connect(func(value: float): canvas.hardness=value)
 		if canvas.tool=="brush":
 			var paint_group:=_toolbar_group("PAINT","layers")
 			_context_color("Color",paint_group)
 			_toolbar_toggle(paint_group,"plus",canvas.paint_new_layer,"Draw each stroke on a new layer",func(value: bool): canvas.paint_new_layer=value)
+			var correction_group:=_toolbar_group("STROKE","effects")
+			# Prioritize correction beside the tool title, before groups that can wrap.
+			_context_host.move_child(correction_group.get_parent().get_parent(),2)
+			var correction:=CheckButton.new(); correction.text="Stroke Correct"; correction.button_pressed=canvas.stroke_correct; correction_group.add_child(correction)
+			correction.name="StrokeCorrect"
+			var strength:=HSlider.new(); strength.min_value=0; strength.max_value=100; strength.step=1
+			strength.name="CorrectionStrength"
+			strength.value=canvas.correction_strength*100; strength.custom_minimum_size=Vector2(85,28)
+			strength.tooltip_text="Correction Strength: %d%%" % strength.value
+			strength.size_flags_vertical=Control.SIZE_SHRINK_CENTER; correction_group.add_child(strength)
+			var strength_label:=Label.new(); strength_label.text="%d%%" % strength.value; strength_label.custom_minimum_size.x=34; correction_group.add_child(strength_label)
+			strength.visible=canvas.stroke_correct; strength_label.visible=canvas.stroke_correct
+			correction.toggled.connect(func(enabled: bool):
+				canvas.stroke_correct=enabled; strength.visible=enabled; strength_label.visible=enabled; status.text=_tool_hint(); _persist_paint_presets())
+			strength.drag_started.connect(func(): strength.set_meta("dragging",true))
+			strength.value_changed.connect(func(value: float):
+				canvas.correction_strength=value/100.0; strength_label.text="%d%%" % value
+				strength.tooltip_text="Correction Strength: %d%%" % value
+				if not bool(strength.get_meta("dragging",false)): _persist_paint_presets())
+			strength.drag_ended.connect(func(_changed: bool):
+				strength.set_meta("dragging",false); _persist_paint_presets())
+			var scale_label:=Label.new(); scale_label.text="Scale"; correction_group.add_child(scale_label)
+			var scale:=DragNumber.new(); scale.name="CorrectionScale"; scale.min_value=.1; scale.max_value=16; scale.step=.01
+			scale.value=canvas.correction_scale; scale.suffix="×"; scale.custom_minimum_size=Vector2(72,28)
+			scale.tooltip_text="Smooth broader shapes at larger scales · Gap closing stays within 16 image pixels · Alt+wheel"
+			correction_group.add_child(scale); _context_fields.correction_scale=scale
+			scale.visible=canvas.stroke_correct; scale_label.visible=canvas.stroke_correct
+			correction.toggled.connect(func(enabled: bool): scale.visible=enabled; scale_label.visible=enabled)
+			scale.value_changed.connect(func(value: float): canvas.correction_scale=value; _persist_paint_presets())
+			scale.preview_changed.connect(func(value: float): canvas.correction_scale=value)
+			scale.drag_committed.connect(func(value: float): canvas.correction_scale=value; _persist_paint_presets())
+			scale.drag_cancelled.connect(func(): canvas.correction_scale=scale.value)
 		_paint_preset_controls(canvas.tool)
 	elif canvas.tool=="fill":
 		_paint_selection_toggle()
@@ -804,21 +924,100 @@ func _refresh_context() -> void:
 		elif not canvas.selected.is_empty():
 			_button(context,"Duplicate",duplicate_layers,"Ctrl+D")
 			_button(context,"Mask",selection_to_mask,"Use selection as layer mask","mask")
-	var spacer:=Control.new(); spacer.size_flags_horizontal=Control.SIZE_EXPAND_FILL; context.add_child(spacer)
+	var spacer:=Control.new(); spacer.size_flags_horizontal=Control.SIZE_EXPAND_FILL; _context_host.add_child(spacer)
 	if _main_layer()==null or canvas.tool not in ["move","rect_select","lasso"]:
-		var size_info:=Label.new(); size_info.text="%d × %d" % [document.canvas_size.x,document.canvas_size.y]; size_info.add_theme_color_override("font_color",Color("8199ad")); context.add_child(size_info)
+		var size_info:=Label.new(); size_info.text="%d × %d" % [document.canvas_size.x,document.canvas_size.y]; size_info.add_theme_color_override("font_color",Color("8199ad")); _context_host.add_child(size_info)
 
 
 func _context_color(caption: String,parent: Node=null) -> void:
 	var host:=parent if parent!=null else context
-	var picker:=ColorPickerButton.new(); picker.color=color_picker.color; picker.custom_minimum_size=Vector2(72,32); picker.tooltip_text=caption; host.add_child(picker)
+	var picker:=ColorPickerButton.new(); picker.color=color_picker.color; picker.custom_minimum_size=Vector2(56 if canvas.tool=="brush" else 72,32); picker.tooltip_text=caption; host.add_child(picker)
 	picker.color_changed.connect(func(value: Color): color_picker.color=value; canvas.color=value)
 
+func _crop_controls() -> void:
+	var scope:=CheckButton.new(); scope.text="Crop entire image"; scope.button_pressed=_crop_canvas; context.add_child(scope)
+	scope.toggled.connect(func(value: bool): _crop_canvas=value; _refresh_context())
+	if not _crop_canvas:
+		var mode:=OptionButton.new(); mode.add_item("Extract + remove original"); mode.add_item("Copy to new layer"); mode.add_item("Remove only")
+		mode.select(_crop_action); context.add_child(mode)
+		mode.item_selected.connect(func(value: int): _crop_action=value)
 
-func _load_paint_presets() -> void:
-	if FileAccess.file_exists(PAINT_PRESETS_PATH):
-		var saved:=ResourceLoader.load(PAINT_PRESETS_PATH,"",ResourceLoader.CACHE_MODE_IGNORE)
+func _pixel_threshold_control(caption: String,value: float,changed: Callable) -> void:
+	var group:=_toolbar_group(caption,"hardness")
+	var label:=Label.new(); label.text=caption; group.add_child(label)
+	var slider:=HSlider.new(); slider.min_value=0; slider.max_value=100; slider.step=1; slider.value=value*100
+	slider.custom_minimum_size=Vector2(110,28); slider.size_flags_vertical=Control.SIZE_SHRINK_CENTER; group.add_child(slider)
+	var amount:=Label.new(); amount.custom_minimum_size.x=40; amount.text="%d%%" % slider.value; group.add_child(amount)
+	slider.value_changed.connect(func(next: float): amount.text="%d%%" % next; changed.call(next/100.0))
+
+func _selection_mask_controls() -> void:
+	var group:=_toolbar_group("SAVED MASKS","mask")
+	var picker:=OptionButton.new(); picker.name="SelectionMaskPicker"; picker.custom_minimum_size.x=125
+	picker.add_item("Working selection"); var ids: Array[String]=[""]
+	for id: String in document.selection_masks:
+		ids.append(id); picker.add_item(str(document.selection_masks[id].label))
+		if id==document.active_selection_mask: picker.select(ids.size()-1)
+	group.add_child(picker); picker.item_selected.connect(func(index: int): _activate_selection_mask(ids[index]))
+	_button(group,"Save mask",func(): _save_selection_mask(false),"Update the selected mask","save")
+	_button(group,"Save new",func(): _save_selection_mask(false,true),"Save the current selection as a new mask","plus")
+	_button(group,"＋",func(): _save_selection_mask(true),"Create a new empty mask","plus")
+	var remove:=_button(group,"",_remove_selection_mask,"Delete the active saved mask","trash")
+	remove.disabled=document.active_selection_mask.is_empty()
+
+func _store_active_mask() -> void:
+	var id:=document.active_selection_mask
+	if id.is_empty() or not document.selection_masks.has(id): return
+	var saved: Dictionary=document.selection_masks[id]
+	saved.texture=document.pixel_selection; saved.owner=document.pixel_selection_owner
+	saved.reference=document.pixel_selection_reference.copy_layer() if document.pixel_selection_reference!=null else null
+	saved.world=document.pixel_selection_reference_world
+
+func _save_selection_mask(empty: bool,new_mask: bool=false) -> void:
+	_finish_pending()
+	if not empty and not new_mask and document.selection_masks.has(document.active_selection_mask):
+		_store_active_mask()
+		status.text="Updated "+str(document.selection_masks[document.active_selection_mask].label)
+		return
+	if not empty and document.pixel_selection==null: status.text="Select some pixels first."; return
+	_action(func():
+		var id:=ActorData.new_id(); var number:=document.selection_masks.size()+1
+		var labels: Array=[]
+		for saved in document.selection_masks.values(): labels.append(saved.label)
+		while "Mask %d" % number in labels: number+=1
+		var label:="Mask %d" % number
+		document.selection_masks[id]={"label":label}; document.active_selection_mask=id
+		if empty:
+			document.pixel_selection=null; document.pixel_selection_owner=canvas.selected[-1] if not canvas.selected.is_empty() else ""
+			document.pixel_selection_reference=null; document.pixel_selection_reference_world=Transform2D.IDENTITY)
+	canvas.sync_pixel_selection(); _refresh_context()
+
+func _activate_selection_mask(id: String) -> void:
+	_finish_pending()
+	_action(func():
+		document.active_selection_mask=id
+		if id.is_empty():
+			document.pixel_selection=null; document.pixel_selection_reference=null
+		else:
+			var saved: Dictionary=document.selection_masks[id]
+			document.pixel_selection=saved.get("texture"); document.pixel_selection_owner=str(saved.get("owner",""))
+			document.pixel_selection_reference=saved.get("reference"); document.pixel_selection_reference_world=saved.get("world",Transform2D.IDENTITY)
+			if document.layer_for_id(document.pixel_selection_owner)!=null: canvas.selected.assign([document.pixel_selection_owner]))
+	canvas.sync_pixel_selection(); _selection_changed()
+
+func _remove_selection_mask() -> void:
+	var id:=document.active_selection_mask
+	if id.is_empty(): return
+	_action(func(): document.selection_masks.erase(id); document.active_selection_mask="")
+	_refresh_context()
+
+
+func _load_paint_presets(path: String=PAINT_PRESETS_PATH) -> void:
+	if FileAccess.file_exists(path):
+		var saved:=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE)
 		if saved!=null:
+			canvas.stroke_correct=bool(saved.get_meta("stroke_correct",false))
+			canvas.correction_strength=clampf(float(saved.get_meta("correction_strength",.5)),0,1)
+			canvas.correction_scale=clampf(float(saved.get_meta("correction_scale",1.0)),.1,16)
 			var stored: Variant=saved.get_meta("presets",{})
 			if stored is Dictionary:
 				for key in ["brush","eraser","fill"]:
@@ -885,6 +1084,11 @@ func _apply_paint_preset(kind: String,preset: Dictionary) -> void:
 	canvas.brush_size=float(preset.get("size",canvas.brush_size)); canvas.brush_opacity=float(preset.get("opacity",canvas.brush_opacity))
 	canvas.hardness=float(preset.get("hardness",canvas.hardness)); canvas.fill_threshold=float(preset.get("threshold",canvas.fill_threshold))
 	canvas.color=preset.get("color",canvas.color); color_picker.color=canvas.color
+	if kind=="brush":
+		canvas.stroke_correct=bool(preset.get("stroke_correct",canvas.stroke_correct))
+		canvas.correction_strength=clampf(float(preset.get("correction_strength",canvas.correction_strength)),0,1)
+		canvas.correction_scale=clampf(float(preset.get("correction_scale",canvas.correction_scale)),.1,16)
+		_persist_paint_presets()
 	_active_preset[kind]=str(preset.get("id","")); _refresh_context(); canvas.queue_redraw()
 
 
@@ -902,6 +1106,8 @@ func _save_paint_preset(kind: String,as_new: bool) -> void:
 
 func _current_paint_preset(label: String) -> Dictionary:
 	var result:=_preset(label,canvas.brush_size,canvas.brush_opacity,canvas.hardness,canvas.color,canvas.fill_threshold)
+	if canvas.tool=="brush": result.stroke_correct=canvas.stroke_correct; result.correction_strength=canvas.correction_strength
+	if canvas.tool=="brush": result.correction_scale=canvas.correction_scale
 	result.mode=canvas.brush_mode; return result
 
 
@@ -912,8 +1118,11 @@ func _delete_paint_preset(kind: String,id: String) -> void:
 	_persist_paint_presets(); _refresh_context()
 
 
-func _persist_paint_presets() -> void:
-	var library:=Resource.new(); library.set_meta("presets",_paint_presets); ResourceSaver.save(library,PAINT_PRESETS_PATH)
+func _persist_paint_presets(path: String=PAINT_PRESETS_PATH) -> void:
+	var library:=Resource.new(); library.set_meta("presets",_paint_presets)
+	library.set_meta("stroke_correct",canvas.stroke_correct); library.set_meta("correction_strength",canvas.correction_strength)
+	library.set_meta("correction_scale",canvas.correction_scale)
+	ResourceSaver.save(library,path)
 
 
 func _move_preset(kind: String,source_id: String,target_id: String) -> void:
@@ -929,11 +1138,12 @@ func _move_preset(kind: String,source_id: String,target_id: String) -> void:
 func _paint_selection_toggle() -> void:
 	var toggle:=CheckButton.new(); toggle.text="Selection only"; toggle.button_pressed=canvas.paint_selection_only
 	toggle.tooltip_text="Only paint selected pixels; show a subtle selection overlay."
-	context.add_child(toggle)
+	toggle.add_theme_font_size_override("font_size",12); _context_host.add_child(toggle)
 	toggle.toggled.connect(func(enabled: bool): canvas.paint_selection_only=enabled; canvas.queue_redraw())
 
 
 func _select_pixel_region(invert: bool) -> void:
+	_finish_pending()
 	await _prepare_pixel_selection()
 	if canvas.pixel_source==null or canvas.selected.is_empty(): return
 	var bytes:=PackedByteArray(); bytes.resize(document.canvas_size.x*document.canvas_size.y*4)
@@ -956,7 +1166,7 @@ func _select_pixel_region(invert: bool) -> void:
 
 
 func _toolbar_group(caption: String,icon_name: String) -> HBoxContainer:
-	var panel:=PanelContainer.new(); panel.tooltip_text=caption.capitalize(); panel.add_theme_stylebox_override("panel",_box(Color("131e2a"),Color("304555"),6,3)); context.add_child(panel)
+	var panel:=PanelContainer.new(); panel.tooltip_text=caption.capitalize(); panel.add_theme_stylebox_override("panel",_box(Color("131e2a"),Color("304555"),6,3)); _context_host.add_child(panel)
 	var compact:=Theme.new()
 	for kind in ["Button","OptionButton","ColorPickerButton"]:
 		compact.set_font_size("font_size",kind,12)
@@ -965,6 +1175,9 @@ func _toolbar_group(caption: String,icon_name: String) -> HBoxContainer:
 		compact.set_stylebox("pressed",kind,_box(Color("21584f"),Color("6ae2c3"),5,4))
 	compact.set_stylebox("normal","LineEdit",_box(Color("131e2a"),Color("344356"),4,3))
 	compact.set_font_size("font_size","LineEdit",12); panel.theme=compact
+	if canvas.tool=="brush":
+		compact.set_font_size("font_size","CheckButton",12)
+		compact.set_font_size("font_size","Label",12)
 	var row:=HBoxContainer.new(); row.add_theme_constant_override("separation",5); panel.add_child(row)
 	var icon:=TextureRect.new(); icon.texture=_icon(icon_name); icon.tooltip_text=caption.capitalize(); icon.custom_minimum_size=Vector2(15,15); icon.expand_mode=TextureRect.EXPAND_IGNORE_SIZE; icon.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED; icon.size_flags_vertical=Control.SIZE_SHRINK_CENTER; icon.modulate=Color("76cdbb"); row.add_child(icon)
 	var controls:=HBoxContainer.new(); controls.set_meta("compact_toolbar",true); controls.add_theme_constant_override("separation",4); row.add_child(controls)
@@ -1092,6 +1305,8 @@ func _section(label: String) -> VBoxContainer:
 
 
 func _refresh_inspector() -> void:
+	_effects_dock.visible=_effects_open; _inspector_scroll.visible=not _effects_open
+	if _effects_open: _refresh_effects_dock(); return
 	var old_scroll:=_inspector_scroll.scroll_vertical
 	_clear(inspector); _text_input=null
 	var layer:=_main_layer()
@@ -1448,50 +1663,8 @@ func _build_value_sliders(layer: KiwiImageLayer) -> void:
 		reset.pressed.connect(func(): slider.value=default; _commit())
 
 
-func _open_values(ordered: bool) -> void:
-	if canvas.selected.is_empty(): return
-	var layer:=document.layer_for_id(canvas.selected[-1])
-	if layer==null: return
-	var math_script=preload("res://Workspaces/ImageWorkspace/image_values.gd")
-	var old_ops: Array=layer.properties.get("value_operations",[])
-	if ordered and old_ops.any(func(op: Dictionary): return not op.has("a") and op.type in math_script.TYPES):
-		_action(func():
-			for i in old_ops.size():
-				var op: Dictionary=old_ops[i]
-				if op.has("a") or op.type not in math_script.TYPES: continue
-				var replacement: Dictionary=math_script.new_operation(str(op.type))
-				var amount:=float(op.get("amount",1))
-				replacement.b.value=1.0/maxf(1,amount) if op.type=="snap" else (maxf(.001,amount) if op.type in ["divide","power"] else amount)
-				replacement.preserve_hue=false; replacement.enabled=op.get("enabled",true); old_ops[i]=replacement)
-	var dialog:=Window.new(); dialog.title="Order edit · "+layer.label if ordered else "Color adjustments · "+layer.label
-	var available:=Vector2i(get_viewport_rect().size)-Vector2i(48,100)
-	dialog.size=Vector2i(920,600).min(available); dialog.min_size=Vector2i(480,300).min(available); dialog.transient=true; dialog.exclusive=true
-	add_child(dialog)
-	var panel:=PanelContainer.new(); panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); panel.add_theme_stylebox_override("panel",_box(Color("111b26"),Color("345364"),10,16)); dialog.add_child(panel)
-	var split:=HSplitContainer.new(); panel.add_child(split)
-	var preview:=preload("res://Workspaces/ImageWorkspace/image_operation_preview.gd").new(); preview.custom_minimum_size=Vector2(160,160); preview.size_flags_horizontal=Control.SIZE_EXPAND_FILL; split.add_child(preview)
-	var right:=VBoxContainer.new(); right.custom_minimum_size.x=280; split.add_child(right)
-	var title:=Label.new(); title.text="OPERATIONS · top to bottom" if ordered else "FINAL COLOR ADJUSTMENTS"; title.add_theme_color_override("font_color",Color("7fe3cd")); right.add_child(title)
-	var scroll:=ScrollContainer.new(); scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL; right.add_child(scroll)
-	var list:=VBoxContainer.new(); list.size_flags_horizontal=Control.SIZE_EXPAND_FILL; list.add_theme_constant_override("separation",10); scroll.add_child(list)
-	var rebuild:=func(): _populate_values(list,layer,ordered)
-	if ordered:
-		var choices: Array=[]
-		for type in preload("res://Workspaces/ImageWorkspace/image_values.gd").TYPES:
-			var kind: String=type
-			choices.append([kind.capitalize(),func():
-				_action(func():
-					if not layer.properties.has("value_operations"): layer.properties.value_operations=[]
-					layer.properties.value_operations.append(preload("res://Workspaces/ImageWorkspace/image_values.gd").new_operation(kind)))
-				rebuild.call()])
-		_menu(right,"＋ Add operation",choices)
-	_button(right,"Done",func(): _finish_pending(); dialog.queue_free())
-	dialog.close_requested.connect(func(): _finish_pending(); dialog.queue_free())
-	var timer:=Timer.new(); timer.wait_time=.08; dialog.add_child(timer)
-	timer.timeout.connect(func():
-		if document.layer_for_id(layer.id)!=layer: dialog.queue_free(); return
-		if renderer.views.has(layer.id): preview.texture=renderer.views[layer.id].output.texture)
-	timer.start(); rebuild.call(); dialog.popup_centered()
+func _open_values(_ordered: bool) -> void:
+	_open_stack_editor(true)
 
 
 func _populate_values(list: VBoxContainer, layer: KiwiImageLayer, ordered: bool) -> void:
@@ -1573,8 +1746,9 @@ func _operand_controls(host: Control, caption: String, op: Dictionary, key: Stri
 
 func _build_effects(layer: KiwiImageLayer) -> void:
 	var effects:=_section("Effects")
+	_effect_selection_control(effects,layer)
 	var choices: Array=[]
-	for kind in ["brightness","contrast","saturation","curves","blur","sharpen","outline","shadow","glow","wave","twirl","chromatic","grain","pixelate","halftone","posterize","vignette","gradient_map","color_replace","grayscale","invert"]:
+	for kind in ["mirror","brightness","contrast","saturation","curves","blur","sharpen","outline","shadow","glow","wave","twirl","chromatic","grain","pixelate","halftone","posterize","vignette","gradient_map","color_replace","grayscale","invert"]:
 		var effect_kind: String=kind
 		choices.append([effect_kind.capitalize(),func(): add_effect(effect_kind)])
 	choices.append(["Canvas shader…",_choose_shader_effect])
@@ -1597,6 +1771,7 @@ func _build_effects(layer: KiwiImageLayer) -> void:
 		var effect_index:=index
 		_button(header,"↑",func(): _move_effect(effect_index,-1),"Move effect earlier")
 		_button(header,"↓",func(): _move_effect(effect_index,1),"Move effect later")
+		_button(header,"Apply",func(): _apply_effect(layer,effect_index),"Bake effects through this point into layer pixels")
 		_button(header,"×",func(): _action(func(): layer.effects.remove_at(effect_index)),"Remove effect")
 		var ranges:={"brightness":Vector2(-1,1),"contrast":Vector2(0,3),"saturation":Vector2(0,3),"blur":Vector2(0,24),"sharpen":Vector2(0,2),"outline":Vector2(0,24),"shadow":Vector2(0,24),"glow":Vector2(0,32),"wave":Vector2(0,40),"twirl":Vector2(-12,12),"chromatic":Vector2(0,32),"grain":Vector2(0,1),"pixelate":Vector2(1,128),"halftone":Vector2(2,64),"posterize":Vector2(2,32),"vignette":Vector2(0,2),"color_replace":Vector2(.001,1)}
 		if ranges.has(effect.type):
@@ -1610,6 +1785,7 @@ func _build_effects(layer: KiwiImageLayer) -> void:
 			_number(fields,"Offset X",effect.offset.x,func(value: float): effect.offset.x=value,-48,48)
 			_number(fields,"Offset Y",effect.offset.y,func(value: float): effect.offset.y=value,-48,48)
 		if effect.type=="shader" and effect.get("shader") is Shader: _shader_fields(fields,effect)
+		if effect.type=="mirror": _mirror_fields(fields,effect)
 		if effect.type=="curves":
 			var graph:=ActorValueCurve.new(); graph.curve=effect.curve; graph.editable=true; graph.custom_minimum_size.y=145; fields.add_child(graph)
 			graph.edit_started.connect(_begin)
@@ -1625,17 +1801,90 @@ func add_effect(kind: String) -> void:
 		for id in canvas.selected:
 			var layer:=document.layer_for_id(id)
 			if layer==null or layer.locked: continue
-			layer.effects.append({"id":ActorData.new_id(),"type":kind,"enabled":true,
-				"amount":0.0 if kind=="brightness" else (8.0 if kind in ["blur","outline","shadow","glow","wave","chromatic","halftone"] else (6.0 if kind in ["pixelate","posterize"] else 1.0)),
-				"color":Color.WHITE if kind in ["outline","glow"] else Color(0,0,0,.65),"offset":Vector2(8,8),
-				"color2":Color.WHITE,
-				"curve":ActorValueCurve.preset("Linear") if kind=="curves" else null}))
+			layer.effects.append(_new_effect(kind)))
+
+func _new_effect(kind: String) -> Dictionary:
+	return {"id":ActorData.new_id(),"type":kind,"enabled":true,
+		"amount":0.0 if kind=="brightness" else (8.0 if kind in ["blur","outline","shadow","glow","wave","chromatic","halftone"] else (6.0 if kind in ["pixelate","posterize"] else 1.0)),
+		"color":Color.WHITE if kind in ["outline","glow"] else Color(0,0,0,.65),"offset":Vector2(8,8),
+		"color2":Color.WHITE,"mirror_side":0,"mirror_position":0.5,
+		"curve":ActorValueCurve.preset("Linear") if kind=="curves" else null}
 
 
 func _move_effect(index: int,direction: int) -> void:
 	var layer:=_main_layer()
 	var target:=clampi(index+direction,0,layer.effects.size()-1)
 	_action(func(): var effect: Dictionary=layer.effects[index]; layer.effects.remove_at(index); layer.effects.insert(target,effect))
+
+
+func _mirror_fields(fields: Node,effect: Dictionary) -> void:
+	var side:=OptionButton.new()
+	for label in ["Mirror from left","Mirror from right","Mirror from top","Mirror from bottom"]: side.add_item(label)
+	side.select(int(effect.get("mirror_side",0))); fields.add_child(side)
+	side.item_selected.connect(func(value: int): _action(func(): effect.mirror_side=value))
+	_slider(fields,"Mirror line",float(effect.get("mirror_position",0.5)),0.0,1.0,func(value: float): effect.mirror_position=value)
+
+
+func _effect_selection_control(parent: Node,layer: KiwiImageLayer) -> void:
+	var toggle:=CheckBox.new(); toggle.text="Affect selected pixels only"
+	toggle.button_pressed=bool(layer.properties.get("effects_selection_only",false))
+	toggle.tooltip_text="Limit this layer's effects to the current pixel selection. Toggle again to capture a new selection."
+	parent.add_child(toggle)
+	toggle.toggled.connect(func(enabled: bool):
+		var mask: Texture2D
+		if enabled and canvas.selection!=null:
+			var size:=Vector2i(layer.dimensions.ceil()).max(Vector2i.ONE)
+			var bitmap:=Image.create(size.x,size.y,false,Image.FORMAT_RGBA8); bitmap.fill(Color.TRANSPARENT)
+			var world:=document.world_transform(layer)
+			var mapping:=canvas.selection_inverse*world
+			var translated:=not canvas.selection_inverse_warp.is_valid() and mapping.x.is_equal_approx(Vector2.RIGHT) and mapping.y.is_equal_approx(Vector2.DOWN) and mapping.origin.is_equal_approx(mapping.origin.round()) and is_zero_approx(float(layer.properties.get("yaw_up_down",0))) and is_zero_approx(float(layer.properties.get("yaw_left_right",0)))
+			if translated:
+				var origin:=Vector2i(mapping.origin.round())
+				var region:=Rect2i(origin,size).intersection(Rect2i(Vector2i.ZERO,canvas.selection.get_size()))
+				if region.has_area(): bitmap.blit_rect(canvas.selection,region,region.position-origin)
+			else:
+				for y in size.y:
+					for x in size.x:
+						var point:=world*layer.project_point(Vector2(x,y)+Vector2.ONE*.5)
+						var sample: Vector2=canvas.selection_inverse_warp.call(point) if canvas.selection_inverse_warp.is_valid() else canvas.selection_inverse*point
+						var pixel:=Vector2i(sample.floor())
+						if pixel.x>=0 and pixel.y>=0 and pixel.x<canvas.selection.get_width() and pixel.y<canvas.selection.get_height(): bitmap.set_pixel(x,y,canvas.selection.get_pixelv(pixel))
+			mask=ImageTexture.create_from_image(bitmap)
+		_action(func():
+			layer.properties.effects_selection_only=enabled
+			if enabled: layer.properties.effects_selection=mask))
+
+
+func _apply_effect(layer: KiwiImageLayer,index: int) -> void:
+	if layer==null or not document.can_edit(layer) or index<0 or index>=layer.effects.size(): return
+	if layer.kind=="group":
+		status.text="Merge the group before applying its effects."; return
+	var original:=document
+	var version:=_edit_version
+	var temporary:=Document.new()
+	temporary.canvas_size=Vector2i(layer.dimensions.ceil()).max(Vector2i.ONE)
+	var source:=layer.copy_layer()
+	source.parent_id=""; source.position=Vector2.ZERO; source.rotation=0.0
+	source.set_linear_basis(Transform2D.IDENTITY)
+	source.visible=true; source.isolated=false; source.opacity=1.0; source.blend=0; source.clip_to_below=false
+	source.properties.erase("yaw_up_down"); source.properties.erase("yaw_left_right")
+	for key in source.properties.keys():
+		if str(key).begins_with("value_") or str(key).begins_with("values_"): source.properties.erase(key)
+	source.effects.assign(source.effects.slice(0,index+1))
+	temporary.layers.append(source)
+	var baker:=Renderer.new(); add_child(baker); baker.sync(temporary)
+	var pixels: Image=await baker.flattened()
+	baker.queue_free()
+	if original!=document or document.layer_for_id(layer.id)!=layer or version!=_edit_version or pixels==null: return
+	# Baking the prefix preserves the order of the remaining effects. Transform,
+	# opacity and final color adjustments stay editable on the original layer.
+	pixels.convert(Image.FORMAT_RGBA8)
+	var texture:=ImageTexture.create_from_image(pixels)
+	_action(func():
+		layer.kind="basic"; layer.texture=texture; layer.paint_base=texture; layer.mask=null
+		layer.effects.assign(layer.effects.slice(index+1))
+		layer.properties.erase("linked_style"))
+	status.text="Applied effects to layer pixels · Ctrl+Z to undo"
 
 
 func _choose_shader_effect() -> void:
@@ -2168,6 +2417,7 @@ func _prepare_pixel_selection() -> void:
 	_pixel_prepare_generation+=1
 	var generation:=_pixel_prepare_generation
 	canvas.pixel_source=null
+	canvas.smart_selection.invalidate()
 	var layer:=_main_layer()
 	if layer==null or not document.can_edit(layer): status.text="Select an unlocked layer to select its pixels."; return
 	var original:=document
@@ -2184,10 +2434,12 @@ func _prepare_pixel_selection() -> void:
 	pixels.convert(Image.FORMAT_RGBA8); canvas.pixel_source=pixels
 	var area:=world*Rect2(Vector2.ZERO,layer.content_dimensions())
 	canvas.pixel_domain=Rect2i(Vector2i(area.position.floor()),Vector2i(area.size.ceil())).intersection(Rect2i(Vector2i.ZERO,document.canvas_size))
+	if canvas.edge_magnet or canvas.pixel_mode=="object": canvas.prepare_smart_selection()
 	status.text="Paint selects · Erase subtracts · Fill selects connected colors · Ctrl+Z undoes · Copy / Delete / Extract"
 
 
 func _apply_pixel_selection(action: String) -> void:
+	_finish_pending()
 	var layer:=_main_layer()
 	if layer==null or not document.can_edit(layer) or canvas.selection==null or canvas.pixel_source==null: return
 	if not canvas.selection.get_used_rect().has_area(): return
@@ -2751,35 +3003,82 @@ func _create_adjustment_group() -> void:
 
 
 func _effects_panel() -> void:
+	_set_tool("effects"); _open_stack_editor(false)
+
+func _toggle_effects_panel() -> void:
+	_set_tool("effects")
+
+func _open_stack_editor(adjustments: bool) -> void:
+	if _main_layer()==null: status.text="Select a layer first."; return
+	_finish_pending()
+	var editor:=preload("res://Workspaces/ImageWorkspace/image_stack_editor.gd").new()
+	editor.workspace=self; editor.layer_id=_main_layer().id; editor.adjustments=adjustments
+	add_child(editor); editor.popup_centered()
+
+func _build_effects_dock() -> void:
+	_effects_dock.name="EffectsDock"; _effects_dock.add_theme_constant_override("separation",6)
+	var header:=HBoxContainer.new(); _effects_dock.add_child(header)
+	var title:=Label.new(); title.text="EFFECTS & STYLES"; title.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	title.add_theme_font_size_override("font_size",12); title.add_theme_color_override("font_color",Color("77e4c7")); header.add_child(title)
+	_button(header,"×",_toggle_effects_panel,"Return to layer properties")
+	_effects_search.name="EffectsSearch"; _effects_search.placeholder_text="Search effects…"; _effects_search.clear_button_enabled=true
+	_effects_dock.add_child(_effects_search)
+	_effects_search.text_changed.connect(func(value: String): _effects_filter=value; _refresh_effects_dock())
+	_effects_scroll.name="EffectsScroll"; _effects_scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL
+	_effects_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
+	_effects_scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_SHOW_ALWAYS; _effects_dock.add_child(_effects_scroll)
+	_effects_content.size_flags_horizontal=Control.SIZE_EXPAND_FILL; _effects_content.add_theme_constant_override("separation",8)
+	_effects_scroll.add_child(_effects_content)
+
+func _refresh_effects_dock() -> void:
+	if not _effects_open: return
 	var layer:=_main_layer()
-	if layer==null: status.text="Select a layer first."; return
-	var ui:=_workflow_window("Effects & reusable styles",Vector2(790,560)); var body: VBoxContainer=ui.body
-	var add:=_panel_card(body,"Add non-destructive effect","Effects remain editable, reorderable, toggleable, and are included in reusable styles.")
-	var choices:=HFlowContainer.new(); add.add_child(choices)
-	for entry in [["Blur","blur"],["Sharpen","sharpen"],["Shadow","shadow"],["Glow","glow"],["Outline","outline"],["Curves","curves"],["Gradient map","gradient_map"],["Replace color","color_replace"],["Grain","grain"],["Pixelate","pixelate"],["Halftone","halftone"],["Posterize","posterize"],["Chromatic","chromatic"],["Vignette","vignette"],["Wave","wave"],["Twirl","twirl"],["Grayscale","grayscale"],["Invert","invert"]]:
-		var kind: String=entry[1]; _button(choices,entry[0],func(): add_effect(kind); (ui.popup as PopupPanel).queue_free(); _effects_panel())
-	var stack:=_panel_card(body,"Effect stack")
-	var scroll:=ScrollContainer.new(); scroll.custom_minimum_size.y=235; stack.add_child(scroll)
-	var list:=VBoxContainer.new(); list.size_flags_horizontal=Control.SIZE_EXPAND_FILL; scroll.add_child(list)
-	if layer.effects.is_empty():
-		var empty:=Label.new(); empty.text="No effects yet — the source remains untouched."; empty.add_theme_color_override("font_color",Color("7f99aa")); list.add_child(empty)
+	var signature:=str(document.get_instance_id())+_effects_filter+(layer.id if layer!=null else "")
+	if layer!=null:
+		for effect in layer.effects:
+			signature+=str(effect.get("id",""))+str(effect.type)
+			if effect.get("curve") is Curve: signature+=str(effect.curve.get_instance_id())
+	if signature==_effects_signature: return
+	_effects_signature=signature
+	var old_scroll:=_effects_scroll.scroll_vertical
+	_clear(_effects_content)
+	if layer==null:
+		var empty:=Label.new(); empty.text="Select a layer to edit its effects."; empty.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+		_effects_content.add_child(empty); return
+	var label:=Label.new(); label.text=layer.label; label.clip_text=true; label.add_theme_color_override("font_color",Color("9db3c6")); _effects_content.add_child(label)
+	_effect_selection_control(_effects_content,layer)
+	var choices: Array=[]
+	for kind in ["mirror","brightness","contrast","saturation","curves","blur","sharpen","shadow","glow","outline","gradient_map","color_replace","grain","pixelate","halftone","posterize","chromatic","vignette","wave","twirl","grayscale","invert"]:
+		var effect_kind: String=kind; var title: String=effect_kind.replace("_"," ").capitalize()
+		if title.to_lower().contains(_effects_filter.to_lower()): choices.append([title,func(): add_effect(effect_kind)])
+	if "canvas shader".contains(_effects_filter.to_lower()): choices.append(["Canvas shader…",_choose_shader_effect])
+	var add:=_menu(_effects_content,"＋ Add effect",choices); add.disabled=choices.is_empty()
+	var visible_effects:=0
 	for index in layer.effects.size():
 		var effect: Dictionary=layer.effects[index]; var effect_index:=index
-		var row:=HBoxContainer.new(); list.add_child(row)
-		var toggle:=CheckButton.new(); toggle.text="%d  %s" % [index+1,str(effect.type).replace("_"," ").capitalize()]; toggle.button_pressed=effect.get("enabled",true); toggle.size_flags_horizontal=Control.SIZE_EXPAND_FILL; row.add_child(toggle)
-		toggle.toggled.connect(func(value: bool): _action(func(): effect.enabled=value))
-		_button(row,"Edit",func(): _effect_editor(effect))
-		_button(row,"↑",func(): _move_effect(effect_index,-1); (ui.popup as PopupPanel).queue_free(); _effects_panel())
-		_button(row,"↓",func(): _move_effect(effect_index,1); (ui.popup as PopupPanel).queue_free(); _effects_panel())
-		_button(row,"×",func(): _action(func(): layer.effects.remove_at(effect_index)); (ui.popup as PopupPanel).queue_free(); _effects_panel())
-	var reusable:=_panel_card(body,"Styles","Copy the full appearance or save it for every image document.")
-	var style_actions:=HFlowContainer.new(); reusable.add_child(style_actions)
-	_button(style_actions,"Copy style",copy_style); _button(style_actions,"Paste style",paste_style); _button(style_actions,"Save current style…",_save_style)
+		var title:=str(effect.type).replace("_"," ").capitalize()
+		if not title.to_lower().contains(_effects_filter.to_lower()): continue
+		visible_effects+=1
+		var panel:=PanelContainer.new(); panel.add_theme_stylebox_override("panel",_box(Color("111c28"),Color("304a5c"),6,7)); _effects_content.add_child(panel)
+		var fields:=VBoxContainer.new(); fields.add_theme_constant_override("separation",5); panel.add_child(fields)
+		var header:=HBoxContainer.new(); fields.add_child(header)
+		var enabled:=CheckButton.new(); enabled.text=title; enabled.button_pressed=effect.get("enabled",true); enabled.size_flags_horizontal=Control.SIZE_EXPAND_FILL; header.add_child(enabled)
+		enabled.toggled.connect(func(value: bool): _action(func(): effect.enabled=value))
+		_button(header,"×",func(): _action(func(): layer.effects.remove_at(effect_index)),"Remove effect")
+		_effect_fields(fields,effect)
+		var actions:=HBoxContainer.new(); fields.add_child(actions)
+		_button(actions,"Apply",func(): await _apply_effect(layer,effect_index),"Bake effects through this point into layer pixels")
+		_button(actions,"↑",func(): _move_effect(effect_index,-1),"Move effect earlier")
+		_button(actions,"↓",func(): _move_effect(effect_index,1),"Move effect later")
+	if visible_effects==0:
+		var empty:=Label.new(); empty.text="No matching effects." if not _effects_filter.is_empty() else "Add an effect to get started."
+		empty.add_theme_color_override("font_color",Color("8fa8bb")); _effects_content.add_child(empty)
+	var styles: Array=[["Copy style",copy_style],["Paste style",paste_style],["Save current style…",_save_style]]
 	for name: String in _presets:
-		var preset_name:=name
-		_button(style_actions,name,func(): _apply_style_preset(preset_name,false),"Apply once")
-		_button(style_actions,"⛓",func(): _apply_style_preset(preset_name,true),"Link selected layers to “%s”; future preset edits update every linked layer" % preset_name)
-	(ui.popup as PopupPanel).popup_centered()
+		var style_name:=name; styles.append([style_name,func(): _apply_style_preset(style_name,false)])
+		styles.append(["Link: "+style_name,func(): _apply_style_preset(style_name,true)])
+	_menu(_effects_content,"Style presets",styles)
+	_effects_scroll.set_deferred("scroll_vertical",old_scroll)
 
 
 func _apply_style_preset(name: String,linked: bool) -> void:
@@ -2804,9 +3103,7 @@ func _sync_linked_styles() -> void:
 		layer.effects.assign(style.get("effects",[]).duplicate(true)); layer.opacity=float(style.get("opacity",layer.opacity)); layer.blend=int(style.get("blend",layer.blend))
 
 
-func _effect_editor(effect: Dictionary) -> void:
-	var dialog:=ConfirmationDialog.new(); dialog.title=str(effect.type).replace("_"," ").capitalize()+" effect"; add_child(dialog)
-	var fields:=VBoxContainer.new(); fields.custom_minimum_size=Vector2(390,180); fields.add_theme_constant_override("separation",6); dialog.add_child(fields)
+func _effect_fields(fields: Node,effect: Dictionary) -> void:
 	var ranges:={"brightness":Vector2(-1,1),"contrast":Vector2(0,3),"saturation":Vector2(0,3),"blur":Vector2(0,24),"sharpen":Vector2(0,2),"outline":Vector2(0,24),"shadow":Vector2(0,24),"glow":Vector2(0,32),"wave":Vector2(0,40),"twirl":Vector2(-12,12),"chromatic":Vector2(0,32),"grain":Vector2(0,1),"pixelate":Vector2(1,128),"halftone":Vector2(2,64),"posterize":Vector2(2,32),"vignette":Vector2(0,2),"color_replace":Vector2(.001,1)}
 	if ranges.has(effect.type):
 		var limits: Vector2=ranges[effect.type]; _slider(fields,"Amount",float(effect.get("amount",1)),limits.x,limits.y,func(value: float): effect.amount=value)
@@ -2815,10 +3112,11 @@ func _effect_editor(effect: Dictionary) -> void:
 	if effect.type=="shadow":
 		_number(fields,"Offset X",effect.offset.x,func(value: float): effect.offset.x=value,-128,128)
 		_number(fields,"Offset Y",effect.offset.y,func(value: float): effect.offset.y=value,-128,128)
+	if effect.type=="mirror": _mirror_fields(fields,effect)
+	if effect.type=="shader" and effect.get("shader") is Shader: _shader_fields(fields,effect)
 	if effect.type=="curves":
 		var graph:=ActorValueCurve.new(); graph.curve=effect.curve; graph.editable=true; graph.custom_minimum_size.y=180; fields.add_child(graph)
 		graph.edit_started.connect(_begin); graph.preview_changed.connect(func(curve: Curve): effect.curve=curve; _preview()); graph.edit_committed.connect(_commit); graph.edit_cancelled.connect(_cancel)
-	dialog.confirmed.connect(func(): _refresh_pending=true; dialog.queue_free()); dialog.canceled.connect(dialog.queue_free); dialog.popup_centered()
 
 
 func _asset_shelf() -> void:
@@ -3083,7 +3381,7 @@ func _register_commands() -> void:
 		{"name":"Fit canvas","category":"View","shortcut":"F","run":canvas.fit},{"name":"Load canvas shader effect","category":"Effect","run":_choose_shader_effect}]
 	for mode in ["left","center_x","right","top","center_y","bottom"]:
 		var align_mode: String=mode; _commands.append({"name":"Align "+mode.replace("_"," "),"category":"Transform","run":func(): align_selected(align_mode)})
-	for kind in ["brightness","contrast","saturation","curves","blur","sharpen","shadow","outline","glow","wave","twirl","chromatic","grain","pixelate","halftone","posterize","vignette","gradient_map","color_replace","grayscale","invert"]:
+	for kind in ["mirror","brightness","contrast","saturation","curves","blur","sharpen","shadow","outline","glow","wave","twirl","chromatic","grain","pixelate","halftone","posterize","vignette","gradient_map","color_replace","grayscale","invert"]:
 		var id: String=kind
 		_commands.append({"name":"Add "+id.replace("_"," ")+" effect","category":"Effect","run":func(): add_effect(id)})
 	for key in tool_buttons:
@@ -3192,6 +3490,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				else: delete_selected()
 			KEY_ESCAPE: canvas.cancel_gesture()
 			KEY_ENTER:
+				if canvas._drag=="object_preview": canvas.commit_object_selection(); get_viewport().set_input_as_handled(); return
 				if canvas.tool=="path": canvas.finish_path()
 				else: canvas.confirm_stroke()
 			KEY_F: canvas.fit()

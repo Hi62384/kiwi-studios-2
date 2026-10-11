@@ -14,6 +14,7 @@ signal files_dropped(paths: PackedStringArray, at: Vector2)
 signal color_sampled(color: Color)
 signal hint_changed(message: String)
 signal brush_size_changed(value: float)
+signal correction_scale_changed(value: float)
 signal threshold_changed(value: float)
 signal polygon_committed(points: PackedVector2Array)
 
@@ -58,6 +59,16 @@ var hardness := 0.8
 var brush_opacity := 1.0
 var fill_threshold := 0.08
 var brush_mode := "freehand"
+var stroke_correct := false
+var correction_strength := 0.5
+var correction_scale := 1.0
+var _erase_modifier:=false
+var _corrector: KiwiStrokeCorrector
+var _corrected_tail_bounds:=Rect2i()
+var _ink_origin:=Vector2i.ZERO
+var _corrected_stamp_distance:=0.0
+var _corrected_started:=false
+var _corrected_all_bounds:=Rect2i()
 var paint_new_layer := false
 var selection: Image
 var selection_transform:=Transform2D.IDENTITY
@@ -69,7 +80,23 @@ var selection_texture: ImageTexture
 var pixel_selection_bounds := Rect2()
 var path_layer_id: String=""
 var pixel_mode: String="brush"
+var pixel_box_select:=false
+var _pixel_area_base: Image
+var _pixel_area_previous:=Rect2i()
 var pixel_match_all:=false
+var edge_magnet:=false
+var edge_threshold:=.4
+var object_threshold:=.5
+var smart_selection:=KiwiPixelSelectionEngine.new()
+var _edge_follower:=KiwiPixelEdgeMagnet.new()
+var _edge_preview:=Vector2.INF
+var _smart_base: Image
+var _smart_seed:=Vector2.ZERO
+var _smart_request:=-1
+var _smart_subtract:=false
+var _smart_ready:=false
+var _smart_has_proposal:=false
+var _smart_apply_when_ready:=false
 var paint_selection_only:=false
 var _polygon_before:=PackedVector2Array()
 var _polygon_index: int=-1
@@ -110,6 +137,8 @@ var _stroke_dirty:=Rect2i()
 
 
 func _ready() -> void:
+	add_child(smart_selection); smart_selection.proposed.connect(_smart_proposed)
+	smart_selection.analyzed.connect(func(): _edge_follower.field=smart_selection.edges; hint_changed.emit("Edge analysis ready"))
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_ALL
 	clip_contents = true
@@ -127,15 +156,26 @@ func _ready() -> void:
 	var mask_material:=ShaderMaterial.new(); mask_material.shader=mask_shader
 	_selection_overlay.material=mask_material
 	add_child(_selection_overlay)
+	_selection_overlay.hide()
+	resized.connect(_sync_selection_overlay)
 
 
 func _process(_delta: float) -> void:
-	_selection_overlay.visible=(tool=="pixel_select" or (paint_selection_only and tool in ["brush","eraser","fill"])) and selection_texture!=null and document!=null
-	if _selection_overlay.visible:
+	if _drag=="paint" and _corrector!=null: _flush_corrected_stroke()
+	_sync_selection_overlay()
+	if tool!="pixel_select" or not edge_magnet: _edge_preview=Vector2.INF
+
+func _sync_selection_overlay() -> void:
+	var visible: bool=(tool=="pixel_select" or (paint_selection_only and tool in ["brush","eraser","fill"])) and selection_texture!=null and document!=null
+	if visible:
 		(_selection_overlay.material as ShaderMaterial).set_shader_parameter("strength",.65 if tool=="pixel_select" else .16)
 		_selection_overlay.texture=selection_texture
 		_selection_overlay.size=Vector2(selection_texture.get_size())
-		RenderingServer.canvas_item_set_transform(_selection_overlay.get_canvas_item(),Transform2D(0,origin()).scaled_local(Vector2.ONE*zoom)*Transform2D(0,selection_preview_origin))
+		# Use the Control's own transform. A raw RenderingServer override was
+		# overwritten by deferred Control layout updates, flashing an offset mask.
+		_selection_overlay.position=origin()+selection_preview_origin*zoom
+		_selection_overlay.scale=Vector2.ONE*zoom
+	_selection_overlay.visible=visible
 
 
 func origin() -> Vector2:
@@ -204,7 +244,7 @@ func _draw() -> void:
 		var rotate_handle:=_rotation_handle(screen)
 		draw_line(_handles(screen)[1],rotate_handle,Color("68e3c7"),1.5)
 		draw_circle(rotate_handle,4.5,Color("8ff4df"))
-	if _drag in ["rect_select","crop","shape","box"]:
+	if _drag in ["rect_select","crop","shape","box","pixel_box"]:
 		var drag_rect := Rect2(origin()+_start*zoom,(_last-_start)*zoom).abs()
 		draw_rect(drag_rect,Color(.03,.085,.07,.1))
 		draw_rect(drag_rect,Color("8ff4df"),false,1.5)
@@ -233,7 +273,7 @@ func _draw() -> void:
 	elif _points.size() > 1:
 		var points := PackedVector2Array()
 		for point in _points: points.append(origin()+point*zoom)
-		if tool=="lasso_crop" and points.size()>2:
+		if _drag in ["lasso_crop","pixel_lasso"] and points.size()>2:
 			var triangles:=Geometry2D.triangulate_polygon(points)
 			for index in range(0,triangles.size(),3):
 				draw_colored_polygon(PackedVector2Array([points[triangles[index]],points[triangles[index+1]],points[triangles[index+2]]]),Color(.04,.14,.12,.22))
@@ -264,8 +304,12 @@ func _draw() -> void:
 			for point in points:
 				var screen:=origin()+(document.world_transform(layer)*(point*layer.dimensions/source_size.max(Vector2.ONE)))*zoom
 				draw_circle(screen,4,Color("8ff4df"))
-	if (tool in ["brush","eraser"] or (tool=="pixel_select" and pixel_mode!="fill")) and Rect2(Vector2.ZERO,size).has_point(_mouse):
+	if (tool in ["brush","eraser"] or (tool=="pixel_select" and pixel_mode in ["brush","erase"] and not pixel_box_select)) and Rect2(Vector2.ZERO,size).has_point(_mouse):
 		draw_arc(_mouse,brush_size*zoom*.5,0,TAU,48,Color.WHITE,1.0,true)
+	if _edge_preview!=Vector2.INF and tool=="pixel_select" and edge_magnet:
+		var at:=origin()+_edge_preview*zoom
+		draw_arc(at,maxf(3,brush_size*zoom*.5),0,TAU,48,Color("8ff4df"),1.5,true)
+		draw_circle(at,2,Color("8ff4df"))
 
 
 func _projected_handles(rect: Rect2) -> Array[Vector2]:
@@ -350,13 +394,16 @@ func _input_canvas(event: InputEvent) -> void:
 		_mouse = event.position
 		var point := to_document(event.position)
 		if event.button_index==MOUSE_BUTTON_RIGHT and event.pressed:
-			if tool in ["crop","lasso_crop"] or _drag in ["shape_stroke","stroke_edit"]:
+			if tool in ["crop","lasso_crop"] or (tool=="pixel_select" and pixel_mode in ["crop","lasso_crop"]) or _drag in ["shape_stroke","stroke_edit","pixel_box","pixel_lasso"]:
 				cancel_gesture(); accept_event(); return
 		if event.button_index in [MOUSE_BUTTON_WHEEL_UP,MOUSE_BUTTON_WHEEL_DOWN] and event.pressed:
-			if event.ctrl_pressed and (tool=="fill" or (tool=="pixel_select" and pixel_mode=="fill")):
+			if event.alt_pressed and stroke_correct:
+				correction_scale=clampf(correction_scale*(1.1 if event.button_index==MOUSE_BUTTON_WHEEL_UP else 1.0/1.1),.1,16.0)
+				correction_scale_changed.emit(correction_scale); accept_event(); return
+			if event.shift_pressed and (tool=="fill" or (tool=="pixel_select" and pixel_mode=="fill" and not edge_magnet)):
 				fill_threshold=clampf(fill_threshold+(.01 if event.button_index==MOUSE_BUTTON_WHEEL_UP else -.01),0,1)
 				threshold_changed.emit(fill_threshold); accept_event(); return
-			if event.ctrl_pressed and tool in ["brush","eraser","pixel_select"]:
+			if event.shift_pressed and (tool in ["brush","eraser"] or (tool=="pixel_select" and ((pixel_mode in ["brush","erase"] and not pixel_box_select) or (pixel_mode=="fill" and edge_magnet)))):
 				brush_size=clampf(brush_size+(2.0 if event.button_index==MOUSE_BUTTON_WHEEL_UP else -2.0),1.0,500.0)
 				brush_size_changed.emit(brush_size); queue_redraw(); accept_event(); return
 			set_zoom(zoom*(1.15 if event.button_index==MOUSE_BUTTON_WHEEL_UP else 1/1.15),event.position)
@@ -380,6 +427,7 @@ func _input_canvas(event: InputEvent) -> void:
 		if event.pressed:
 			_start = point; _last = point; _moved = false; _pending_single=""
 			_selection_operation = -1 if event.ctrl_pressed else (1 if event.shift_pressed else 0)
+			if tool in ["brush","fill","pixel_select"]: _set_erase_modifier(event.ctrl_pressed)
 			if tool == "move":
 				var clicked:=hit(point)
 				if event.double_click and clicked!=null and clicked.kind=="text":
@@ -415,7 +463,11 @@ func _input_canvas(event: InputEvent) -> void:
 			elif tool in ["brush","eraser","fill"]:
 				_active_mode="circle" if Input.is_physical_key_pressed(KEY_O) else ("curve" if Input.is_physical_key_pressed(KEY_Q) else ("line" if event.shift_pressed else "freehand"))
 				_begin_paint(point)
-			elif tool=="pixel_select": _begin_pixel_selection(point)
+			elif tool=="pixel_select":
+				if pixel_mode in ["crop","lasso_crop"]:
+					_drag=pixel_mode
+					if pixel_mode=="lasso_crop": _points=PackedVector2Array([point])
+				else: _begin_pixel_selection(point,event.shift_pressed)
 			elif tool == "picker":
 				if preview != null:
 					var bitmap := preview.get_image()
@@ -444,13 +496,25 @@ func _input_canvas(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion:
 		_mouse = event.position
 		var point := to_document(event.position)
+		if _drag.is_empty() and tool=="pixel_select" and edge_magnet and pixel_mode in ["brush","fill"] and not pixel_box_select and smart_selection.edges!=null:
+			var ridge:=smart_selection.edges.nearest(point,edge_threshold)
+			_edge_preview=smart_selection.edges.refine(ridge) if ridge>=0 else Vector2.INF
 		if _drag == "pan": pan += event.position-_last; _last=event.position
 		elif _drag == "move" or _drag.begins_with("resize") or _drag == "rotate":
 			_transform(point,event.shift_pressed,event.ctrl_pressed)
 		elif _drag == "paint":
-			_paint_line(_last,point); _last=point; gesture_changed.emit()
+			_set_erase_modifier(event.ctrl_pressed if tool=="brush" else false)
+			if _corrector!=null: _corrector.add(point,Time.get_ticks_usec()/1000000.0)
+			else: _paint_line(_last,point); gesture_changed.emit()
+			_last=point
 		elif _drag=="pixel_select":
+			_set_erase_modifier(event.ctrl_pressed)
 			_pixel_brush_line(_last,point); _last=point; _update_selection_preview()
+		elif _drag=="pixel_box":
+			_set_erase_modifier(event.ctrl_pressed); _last=point; _update_pixel_box(point)
+		elif _drag=="pixel_lasso":
+			_set_erase_modifier(event.ctrl_pressed); _last=point
+			if _points[-1].distance_to(point)>2.0/zoom: _points.append(point)
 		elif _drag=="shape_stroke":
 			_shape_end=_constrain_shape_point(point,event.shift_pressed); var chord:=_shape_end-_start
 			_shape_control=_start.lerp(_shape_end,1.0/3)+Vector2(-chord.y,chord.x)*.5
@@ -659,7 +723,11 @@ func _resize_single(point: Vector2, index: int, constrained: bool, use_snap: boo
 
 
 func _finish(point: Vector2) -> void:
+	if _drag in ["object_preview","edge_pending"]: return
 	snap_guides_x.clear(); snap_guides_y.clear()
+	if _drag=="paint" and _corrector!=null:
+		_corrector.add(point,Time.get_ticks_usec()/1000000.0)
+		_flush_corrected_stroke()
 	if _drag=="shape_stroke":
 		_shape_end=_constrain_shape_point(point,Input.is_key_pressed(KEY_SHIFT))
 		if _active_mode=="line": confirm_stroke()
@@ -670,13 +738,17 @@ func _finish(point: Vector2) -> void:
 	var action := _drag
 	var created_paint_layer:=_paint_created_layer
 	_drag = ""
-	if action=="pixel_select":
+	if action in ["pixel_select","pixel_box","pixel_lasso"]:
+		if action=="pixel_box": _update_pixel_box(point)
+		elif action=="pixel_lasso":
+			_points.append(point); _apply_pixel_lasso()
 		document.pixel_selection=ImageTexture.create_from_image(selection)
 		document.pixel_selection_owner=selected[-1]
 		var owner:=document.layer_for_id(selected[-1])
 		document.pixel_selection_reference=owner.copy_layer() if owner!=null else null
 		document.pixel_selection_reference_world=document.world_transform(owner) if owner!=null else Transform2D.IDENTITY
-		gesture_finished.emit(); _update_selection_preview(); return
+		gesture_finished.emit(); _update_selection_preview(); _erase_modifier=false
+		_points.clear(); _pixel_area_base=null; _pixel_area_previous=Rect2i(); return
 	if action=="paint" and _paint_layer!=null and _paint_image!=null:
 		if bool(_paint_layer.properties.get("generated_stroke",false)):
 			var used:=_paint_image.get_used_rect()
@@ -712,6 +784,8 @@ func _finish(point: Vector2) -> void:
 		if rect.size.x>2 and rect.size.y>2: create_requested.emit(action,rect,PackedVector2Array())
 	if tool != "path": _points.clear()
 	_paint_image = null; _paint_data.clear(); _paint_layer = null; _stroke_base=null; _stroke_points.clear()
+	_corrector=null; _corrected_tail_bounds=Rect2i(); _ink_origin=Vector2i.ZERO
+	_erase_modifier=false
 	_pending_single=""
 	_paint_created_layer=false
 	hint_changed.emit("")
@@ -719,11 +793,16 @@ func _finish(point: Vector2) -> void:
 
 
 func cancel_gesture() -> void:
+	smart_selection.cancel_request(); _smart_request=-1; _smart_ready=false; _smart_apply_when_ready=false
+	_edge_follower.previous=-1; _edge_preview=Vector2.INF
 	snap_guides_x.clear(); snap_guides_y.clear()
 	_polygon_index=-1
 	if not _drag.is_empty() and _drag not in ["pan","box","shape","crop","lasso_crop"]: gesture_cancelled.emit()
 	_drag=""; _points.clear(); _paint_image=null; _paint_data.clear(); _paint_layer=null; _stroke_base=null; _stroke_points.clear()
+	_corrector=null; _corrected_tail_bounds=Rect2i(); _ink_origin=Vector2i.ZERO
+	_erase_modifier=false
 	sync_pixel_selection()
+	_pixel_area_base=null; _pixel_area_previous=Rect2i()
 	if _paint_created_layer: selected.clear(); _paint_created_layer=false; selection_changed.emit()
 	queue_redraw()
 
@@ -742,7 +821,7 @@ func finish_path() -> void:
 func _begin_paint(point: Vector2) -> void:
 	if paint_selection_only and selection==null:
 		hint_changed.emit("Select pixels first, or turn off Selection only."); return
-	if paint_new_layer and tool=="brush":
+	if paint_new_layer and tool=="brush" and not _erase_modifier:
 		gesture_started.emit()
 		_paint_layer=KiwiImageLayer.create("basic",document.canvas_size); _paint_layer.label="Brush stroke"
 		_paint_layer.properties.generated_stroke=true
@@ -752,7 +831,7 @@ func _begin_paint(point: Vector2) -> void:
 	if _paint_layer == null or not document.can_edit(_paint_layer): return
 	if _paint_layer.kind not in ["image","paint","basic"]:
 		hint_changed.emit("Preparing this layer for pixel editing…"); return
-	if not (paint_new_layer and tool=="brush"): gesture_started.emit()
+	if not _paint_created_layer: gesture_started.emit()
 	_paint_image=_paint_layer.texture.get_image() if _paint_layer.texture != null else null
 	if _paint_image == null: gesture_cancelled.emit(); return
 	if _paint_layer.paint_base==null: _paint_layer.paint_base=_paint_layer.texture
@@ -763,10 +842,17 @@ func _begin_paint(point: Vector2) -> void:
 	_stroke_base=_paint_image.duplicate(); _stroke_points=PackedVector2Array([point])
 	_stroke_ink=Image.create(_paint_image.get_width(),_paint_image.get_height(),false,Image.FORMAT_RGBA8)
 	_stroke_ink.fill(Color(0,0,0,0)); _stroke_dirty=Rect2i()
+	_corrector=null; _corrected_tail_bounds=Rect2i(); _ink_origin=Vector2i.ZERO
+	_corrected_stamp_distance=0.0; _corrected_started=false
+	_corrected_all_bounds=Rect2i()
 	_drag="paint"
 	if tool == "fill": _flood(point); _finish(point)
 	elif _active_mode!="freehand" and tool=="brush":
 		_start=point; _shape_end=point; _shape_control=point; _shape_control_end=point; _circle_profiles=Vector4(2,2,2,2); _drag="shape_stroke"
+	elif tool=="brush" and stroke_correct and correction_strength>0.0 and not _erase_modifier:
+		_corrector=KiwiStrokeCorrector.new()
+		_corrector.begin(point,correction_strength,brush_size,Time.get_ticks_usec()/1000000.0,correction_scale)
+		_flush_corrected_stroke()
 	else: _paint_line(point,point)
 	gesture_changed.emit()
 
@@ -838,7 +924,9 @@ func confirm_stroke() -> void:
 	if _drag not in ["shape_stroke","stroke_edit"]: return
 	var path:=_shape_path()
 	for index in range(1,path.size()): _paint_line(path[index-1],path[index],false)
-	_upload_native_paint(); _drag="paint"; _finish(_shape_end)
+	if _erase_modifier: _upload_paint()
+	else: _upload_native_paint()
+	_drag="paint"; _finish(_shape_end)
 
 
 func selected_pixel(point: Vector2) -> bool:
@@ -852,9 +940,96 @@ func _paint_pixel_allowed(point: Vector2) -> bool:
 	return not paint_selection_only or (selection!=null and selected_pixel(point))
 
 
+func _set_erase_modifier(enabled: bool) -> void:
+	if _erase_modifier==enabled: return
+	if _drag=="paint" and _paint_image!=null:
+		if _corrector!=null: _flush_corrected_stroke()
+		_corrector=null
+		# Each modifier phase starts from the live pixels. A later drawing
+		# preview must not restore pixels erased earlier in the same gesture.
+		_paint_data=_paint_image.get_data(); _stroke_base=_paint_image.duplicate()
+		_stroke_ink.fill(Color.TRANSPARENT); _stroke_dirty=Rect2i()
+		_corrected_tail_bounds=Rect2i(); _corrected_all_bounds=Rect2i()
+		_corrected_started=false; _corrected_stamp_distance=0.0
+		if not enabled and tool=="brush" and _active_mode=="freehand" and stroke_correct and correction_strength>0:
+			_corrector=KiwiStrokeCorrector.new()
+			_corrector.begin(_last,correction_strength,brush_size,Time.get_ticks_usec()/1000000.0,correction_scale)
+	_erase_modifier=enabled
+
+
+func _corrected_path_bounds(path: PackedVector2Array) -> Rect2i:
+	if path.is_empty(): return Rect2i()
+	var inverse:=document.world_transform(_paint_layer).affine_inverse()
+	var ratio:=Vector2(_paint_image.get_size())/_paint_layer.dimensions
+	var bounds:=Rect2((inverse*path[0])*ratio,Vector2.ZERO)
+	for point in path: bounds=bounds.expand((inverse*point)*ratio)
+	var radius:=Vector2.ONE*brush_size*ratio*.5+Vector2.ONE*3
+	return Rect2i(Vector2i((bounds.position-radius).floor()),Vector2i((bounds.size+radius*2).ceil())).intersection(Rect2i(Vector2i.ZERO,_paint_image.get_size()))
+
+
+func _paint_corrected_path(path: PackedVector2Array,commit: bool=false) -> void:
+	if path.is_empty(): return
+	# Raster sampling depends on brush width, not the number of fitted knots.
+	# This avoids hundreds of identical large-brush stamps along a short tail.
+	# Keep a continuous stamp phase across sealed patches, so event frequency
+	# and preview revisions do not alter the softness or thickness of a stroke.
+	var interval:=maxf(1.0,brush_size*.15)
+	var distance:=_corrected_stamp_distance
+	var stamped:=Vector2(INF,INF)
+	if not _corrected_started:
+		_paint_line(path[0],path[0],false); stamped=path[0]
+		if commit: _corrected_started=true
+	for index in range(1,path.size()):
+		var length:=path[index-1].distance_to(path[index])
+		var travel:=interval-distance
+		while travel<=length and length>.00001:
+			stamped=path[index-1].lerp(path[index],travel/length)
+			_paint_line(stamped,stamped,false); travel+=interval
+		distance=fmod(distance+length,interval)
+	if commit: _corrected_stamp_distance=distance
+	elif not stamped.is_equal_approx(path[-1]): _paint_line(path[-1],path[-1],false)
+
+
+func _flush_corrected_stroke() -> void:
+	if _corrector==null or _paint_layer==null or _paint_image==null: return
+	var patch:=_corrector.update()
+	if patch.is_empty(): return
+	if patch.has("replace"):
+		var shape: PackedVector2Array=patch.replace
+		var area:=_corrected_path_bounds(shape)
+		if _corrected_all_bounds.has_area(): area=area.merge(_corrected_all_bounds)
+		if not area.has_area(): return
+		_stroke_ink.fill_rect(area,Color.TRANSPARENT)
+		_corrected_started=false; _corrected_stamp_distance=0.0
+		_paint_corrected_path(shape)
+		_stroke_dirty=area; _upload_native_paint()
+		_corrected_all_bounds=area
+		gesture_changed.emit(); return
+	var fixed: PackedVector2Array=patch.fixed
+	var tail: PackedVector2Array=patch.tail
+	_paint_corrected_path(fixed,true)
+	var tail_bounds:=_corrected_path_bounds(tail)
+	var region:=tail_bounds
+	for area in [_corrected_tail_bounds,_stroke_dirty]:
+		if area.has_area(): region=region.merge(area) if region.has_area() else area
+	if region.has_area():
+		# Stable ink contains only sealed segments. The mutable tail is rebuilt
+		# on a small tile, then composited once against the original stroke base.
+		# Old tail pixels disappear cleanly, including at self intersections.
+		var stable:=_stroke_ink
+		_stroke_ink=stable.get_region(region); _ink_origin=region.position
+		_paint_corrected_path(tail)
+		_stroke_dirty=region
+		_upload_native_paint()
+		_stroke_ink=stable; _ink_origin=Vector2i.ZERO
+	_corrected_tail_bounds=tail_bounds
+	if region.has_area(): _corrected_all_bounds=region if not _corrected_all_bounds.has_area() else _corrected_all_bounds.merge(region)
+	gesture_changed.emit()
+
+
 func _paint_line(from: Vector2,to: Vector2,upload: bool=true) -> void:
 	if _paint_image == null or _paint_layer == null: return
-	if tool!="eraser":
+	if tool!="eraser" and not _erase_modifier:
 		_prepare_source_color()
 		var stamp_color:=color if bool(_paint_layer.properties.get("values_selection_only",false)) else _value_inverse_color
 		var inverse:=document.world_transform(_paint_layer).affine_inverse()
@@ -875,7 +1050,7 @@ func _paint_line(from: Vector2,to: Vector2,upload: bool=true) -> void:
 		for index in (1 if from.is_equal_approx(to) else steps+1):
 			var center:=(inverse*from.lerp(to,float(index)/steps))*ratio
 			var target:=Vector2i(center)-stamp_size/2
-			_stroke_ink.blend_rect(_stamp,Rect2i(Vector2i.ZERO,stamp_size),target)
+			_stroke_ink.blend_rect(_stamp,Rect2i(Vector2i.ZERO,stamp_size),target-_ink_origin)
 			var area:=Rect2i(target,stamp_size).intersection(Rect2i(Vector2i.ZERO,_paint_image.get_size()))
 			if area.has_area(): _stroke_dirty=area if not _stroke_dirty.has_area() else _stroke_dirty.merge(area)
 		if upload: _upload_native_paint()
@@ -894,7 +1069,7 @@ func _paint_line(from: Vector2,to: Vector2,upload: bool=true) -> void:
 				var alpha := brush_opacity*clampf((1-distance)/maxf(.001,1-hardness),0,1)
 				var offset: int=(y*_paint_image.get_width()+x)*4
 				var old_alpha:=float(_paint_data[offset+3])/255.0
-				if tool == "eraser": _paint_data[offset+3]=clampi(roundi(float(_paint_data[offset+3])*(1.0-alpha)),0,255)
+				if tool == "eraser" or _erase_modifier: _paint_data[offset+3]=clampi(roundi(float(_paint_data[offset+3])*(1.0-alpha)),0,255)
 				else:
 					var source_alpha:=alpha*color.a; var result_alpha:=source_alpha+old_alpha*(1.0-source_alpha)
 					for channel in 3:
@@ -914,7 +1089,7 @@ func _upload_paint() -> void:
 func _upload_native_paint() -> void:
 	_prepare_source_color()
 	if _stroke_ink!=null and _stroke_dirty.has_area():
-		var ink:=_stroke_ink.get_region(_stroke_dirty)
+		var ink:=_stroke_ink.get_region(Rect2i(_stroke_dirty.position-_ink_origin,_stroke_dirty.size))
 		var masked_values:=bool(_paint_layer.properties.get("values_selection_only",false)) and not preload("res://Workspaces/ImageWorkspace/image_values.gd").operations(_paint_layer).is_empty()
 		var opacity:=clampf(brush_opacity*(color.a if masked_values else _value_inverse_color.a),0,1)
 		if opacity<1 and not paint_selection_only and not masked_values:
@@ -976,10 +1151,11 @@ func _flood(point: Vector2) -> void:
 	# native Image implementation handle it in one call instead of visiting a
 	# million transparent pixels in script.
 	if not paint_selection_only and not bool(_paint_layer.properties.get("values_selection_only",false)) and _paint_image.get_used_rect().size==Vector2i.ZERO:
-		_paint_image.fill(_source_color(point)); _paint_data=_paint_image.get_data(); _upload_paint(); return
+		_paint_image.fill(Color.TRANSPARENT if _erase_modifier else _source_color(point)); _paint_data=_paint_image.get_data(); _upload_paint(); return
 	var width:=_paint_image.get_width(); var height:=_paint_image.get_height(); var start_offset:=(start.y*width+start.x)*4
 	var target:=PackedByteArray([_paint_data[start_offset],_paint_data[start_offset+1],_paint_data[start_offset+2],_paint_data[start_offset+3]])
-	var replacement:=PackedByteArray([roundi(color.r*255),roundi(color.g*255),roundi(color.b*255),roundi(color.a*255)])
+	var fill_color:=Color.TRANSPARENT if _erase_modifier else color
+	var replacement:=PackedByteArray([roundi(fill_color.r*255),roundi(fill_color.g*255),roundi(fill_color.b*255),roundi(fill_color.a*255)])
 	if target==replacement: return
 	var stack: Array[Vector2i] = [start]
 	var visited := PackedByteArray(); visited.resize(width*height)
@@ -999,7 +1175,7 @@ func _flood(point: Vector2) -> void:
 		var span_up:=false; var span_down:=false
 		while x<width and matches.call(x,p.y):
 			var pixel_index:=p.y*width+x; visited[pixel_index]=1; var offset:=pixel_index*4
-			var source:=_source_color(transform*(Vector2(x,p.y)/ratio))
+			var source:=Color.TRANSPARENT if _erase_modifier else _source_color(transform*(Vector2(x,p.y)/ratio))
 			for channel in 4: _paint_data[offset+channel]=roundi(clampf(source[channel],0,1)*255)
 			var up: bool=p.y>0 and bool(matches.call(x,p.y-1))
 			if up and not span_up: stack.append(Vector2i(x,p.y-1))
@@ -1034,7 +1210,7 @@ func _make_selection(kind: String,rect: Rect2) -> void:
 func clear_selection() -> void:
 	selection_transform=Transform2D.IDENTITY; selection_inverse=Transform2D.IDENTITY
 	selection_forward_warp=Callable(); selection_inverse_warp=Callable(); selection_preview_origin=Vector2.ZERO
-	selection=null; selection_texture=null; pixel_selection_bounds=Rect2(); queue_redraw()
+	selection=null; selection_texture=null; pixel_selection_bounds=Rect2(); _sync_selection_overlay(); queue_redraw()
 
 
 func sync_pixel_selection() -> void:
@@ -1071,13 +1247,13 @@ func _update_selection_preview() -> void:
 	if selection_texture!=null and selection_texture.get_size()==Vector2(selection.get_size()): (selection_texture as ImageTexture).update(selection)
 	else: selection_texture=ImageTexture.create_from_image(selection)
 	selection_preview_origin=Vector2.ZERO
-	var used:=selection.get_used_rect(); pixel_selection_bounds=selection_transform*Rect2(used.position,used.size); queue_redraw()
+	var used:=selection.get_used_rect(); pixel_selection_bounds=selection_transform*Rect2(used.position,used.size); _sync_selection_overlay(); queue_redraw()
 
 
 func _update_warped_selection_preview() -> void:
 	var used:=selection.get_used_rect()
 	if not used.has_area():
-		selection_texture=null; pixel_selection_bounds=Rect2(); queue_redraw(); return
+		selection_texture=null; pixel_selection_bounds=Rect2(); _sync_selection_overlay(); queue_redraw(); return
 	var bounds:=Rect2(selection_forward_warp.call(Vector2(used.position)),Vector2.ZERO)
 	for corner in [Vector2(used.end.x,used.position.y),Vector2(used.end),Vector2(used.position.x,used.end.y)]:
 		bounds=bounds.expand(selection_forward_warp.call(corner))
@@ -1087,7 +1263,7 @@ func _update_warped_selection_preview() -> void:
 	var visible:=Rect2i(Vector2i(bounds.position.floor()),Vector2i(bounds.end.ceil()-bounds.position.floor())).intersection(Rect2i(Vector2i.ZERO,document.canvas_size))
 	pixel_selection_bounds=bounds
 	if not visible.has_area():
-		selection_texture=null; queue_redraw(); return
+		selection_texture=null; _sync_selection_overlay(); queue_redraw(); return
 	var preview:=Image.create(visible.size.x,visible.size.y,false,Image.FORMAT_RGBA8)
 	for y in visible.size.y:
 		for x in visible.size.x:
@@ -1096,6 +1272,7 @@ func _update_warped_selection_preview() -> void:
 			if used.has_point(sample): preview.set_pixel(x,y,selection.get_pixelv(sample))
 	selection_preview_origin=Vector2(visible.position)
 	selection_texture=ImageTexture.create_from_image(preview)
+	_sync_selection_overlay()
 	queue_redraw()
 
 
@@ -1128,23 +1305,79 @@ func bake_selection_transform() -> void:
 	_update_selection_preview()
 
 
-func _begin_pixel_selection(point: Vector2) -> void:
+func _begin_pixel_selection(point: Vector2,lasso: bool=false) -> void:
 	if selected.is_empty() or pixel_source==null or not pixel_domain.has_point(Vector2i(point)): return
+	if _drag=="object_preview": commit_object_selection()
+	if edge_magnet and pixel_mode in ["brush","fill"] and not pixel_box_select:
+		prepare_smart_selection()
+		if smart_selection.edges==null: hint_changed.emit("Analyzing edges… try again when ready"); return
+		if smart_selection.edges.nearest(point,edge_threshold)<0: hint_changed.emit("No nearby edge at this threshold"); return
+	if pixel_mode=="object": prepare_smart_selection()
 	gesture_started.emit()
 	selection_texture=null
 	if selection==null or selection.get_size()!=document.canvas_size:
 		selection=Image.create(document.canvas_size.x,document.canvas_size.y,false,Image.FORMAT_RGBA8); selection.fill(Color(0,0,0,0))
 	else: selection=selection.duplicate()
 	_drag="pixel_select"; _last=point
-	if pixel_mode=="fill": _pixel_flood(Vector2i(point)); _finish(point)
+	_edge_follower.previous=-1
+	if pixel_box_select and pixel_mode in ["brush","erase"]:
+		_start=point; _pixel_area_base=selection.duplicate(); _pixel_area_previous=Rect2i()
+		_drag="pixel_lasso" if lasso else "pixel_box"
+		if lasso: _points=PackedVector2Array([point])
+	elif pixel_mode=="object" or (pixel_mode=="fill" and edge_magnet):
+		_smart_base=selection.duplicate(); _smart_seed=point; _smart_subtract=_erase_modifier
+		if pixel_mode=="object" and not lasso and not _smart_subtract:
+			_smart_base.fill(Color.TRANSPARENT)
+			selection=_smart_base.duplicate()
+		_smart_ready=false; _smart_has_proposal=false; _smart_apply_when_ready=false
+		_drag="object_preview" if pixel_mode=="object" else "edge_pending"
+		_smart_request=smart_selection.request("object" if pixel_mode=="object" else "edge",point,object_threshold if pixel_mode=="object" else edge_threshold,brush_size)
+		hint_changed.emit("Finding object…" if pixel_mode=="object" else "Following connected edge…")
+	elif pixel_mode=="fill": _pixel_flood(Vector2i(point)); _finish(point)
 	else: _pixel_brush_line(point,point)
 	_update_selection_preview()
 
+func _update_pixel_box(point: Vector2) -> void:
+	if _pixel_area_base==null: return
+	var rect:=Rect2(_start,point-_start).abs()
+	var area:=Rect2i(Vector2i(rect.position.floor()),Vector2i(rect.size.ceil())).intersection(pixel_domain)
+	var changed:=area.merge(_pixel_area_previous) if _pixel_area_previous.has_area() else area
+	if changed.has_area(): selection.blit_rect(_pixel_area_base,changed,changed.position)
+	if area.has_area(): selection.fill_rect(area,Color.TRANSPARENT if _erase_modifier or pixel_mode=="erase" else Color.WHITE)
+	_pixel_area_previous=area; _update_selection_preview()
+
+func _apply_pixel_lasso() -> void:
+	if _points.size()<3: return
+	var bounds:=Rect2(_points[0],Vector2.ZERO)
+	for point in _points: bounds=bounds.expand(point)
+	var area:=Rect2i(Vector2i(bounds.position.floor()),Vector2i(bounds.size.ceil())).intersection(pixel_domain)
+	var tint:=Color.TRANSPARENT if _erase_modifier or pixel_mode=="erase" else Color.WHITE
+	# Even-odd scanline filling supports concave and self-crossing lassos, with
+	# native span writes instead of testing every pixel against every edge.
+	for y in range(area.position.y,area.end.y):
+		var intersections:=PackedFloat32Array(); var line:=y+.5
+		for i in _points.size():
+			var a:=_points[i]; var b:=_points[(i+1)%_points.size()]
+			if (a.y<=line and b.y>line) or (b.y<=line and a.y>line): intersections.append(a.x+(line-a.y)*(b.x-a.x)/(b.y-a.y))
+		intersections.sort()
+		for i in range(0,intersections.size()-1,2):
+			var left:=maxi(area.position.x,ceili(intersections[i]-.5)); var right:=mini(area.end.x,ceili(intersections[i+1]-.5))
+			if right>left: selection.fill_rect(Rect2i(left,y,right-left,1),tint)
+
 
 func _pixel_brush_line(from: Vector2,to: Vector2) -> void:
+	if edge_magnet and pixel_mode=="brush" and not pixel_box_select:
+		if smart_selection.edges==null: return
+		_edge_follower.field=smart_selection.edges
+		var path:=_edge_follower.follow(to,edge_threshold,to-from)
+		_edge_preview=Vector2.INF
+		if not path.is_empty():
+			_edge_preview=path[-1]
+			KiwiPixelEdgeMagnet.paint_band(selection,path,brush_size,pixel_domain,Color.TRANSPARENT if _erase_modifier else Color.WHITE)
+		return
 	var steps:=maxi(1,ceili(from.distance_to(to)/maxf(1,brush_size*.2)))
 	var radius:=maxf(.5,brush_size*.5)
-	var tint:=Color(0,0,0,0) if pixel_mode=="erase" else Color.WHITE
+	var tint:=Color.TRANSPARENT if pixel_mode=="erase" or _erase_modifier else Color.WHITE
 	for index in steps+1:
 		var center:=from.lerp(to,float(index)/steps)
 		for y in range(maxi(pixel_domain.position.y,floori(center.y-radius)),mini(pixel_domain.end.y,ceili(center.y+radius))):
@@ -1155,7 +1388,41 @@ func _pixel_brush_line(from: Vector2,to: Vector2) -> void:
 			if right>left: selection.fill_rect(Rect2i(left,y,right-left,1),tint)
 
 
+func prepare_smart_selection() -> void:
+	if pixel_source!=null and pixel_domain.has_area() and smart_selection.source!=pixel_source:
+		smart_selection.prepare(pixel_source,pixel_domain); _edge_follower.previous=-1
+
+func set_object_threshold(value: float) -> void:
+	object_threshold=clampf(value,0,1)
+	if _drag=="object_preview":
+		_smart_ready=false
+		_smart_request=smart_selection.request("object",_smart_seed,object_threshold)
+		hint_changed.emit("Updating object selection…")
+
+func commit_object_selection() -> void:
+	if _drag!="object_preview": return
+	if not _smart_ready: _smart_apply_when_ready=true; return
+	_drag="pixel_select"; _finish(_smart_seed)
+
+func _smart_proposed(mask: Image,kind: String,request: int) -> void:
+	if request!=_smart_request or _drag not in ["object_preview","edge_pending"]: return
+	if mask==null:
+		if kind=="object":
+			selection=_smart_base.duplicate(); _smart_ready=false; _smart_has_proposal=false; _smart_apply_when_ready=false
+			_update_selection_preview()
+			hint_changed.emit("No confident boundary · Adjust Object Threshold or Esc to cancel"); return
+		cancel_gesture(); hint_changed.emit("No confident object boundary found" if kind=="object" else "No connected edge found"); return
+	selection=_smart_base.duplicate()
+	var stamp:=Image.create(mask.get_width(),mask.get_height(),false,Image.FORMAT_RGBA8)
+	stamp.fill(Color.TRANSPARENT if _smart_subtract else Color.WHITE)
+	selection.blit_rect_mask(stamp,mask,Rect2i(Vector2i.ZERO,mask.get_size()),pixel_domain.position)
+	_smart_ready=true; _smart_has_proposal=true; _update_selection_preview()
+	if kind=="edge": _drag="pixel_select"; _finish(_smart_seed)
+	elif _smart_apply_when_ready: commit_object_selection()
+	else: hint_changed.emit("Object preview · Threshold changes extent · Shift-click adds · Ctrl-click subtracts · Enter applies · Esc cancels")
+
 func _pixel_flood(start: Vector2i) -> void:
+	var tint:=Color.TRANSPARENT if _erase_modifier else Color.WHITE
 	var width:=pixel_source.get_width(); var bytes:=pixel_source.get_data()
 	var target:=(start.y*width+start.x)*4
 	var visited:=PackedByteArray(); visited.resize(width*pixel_source.get_height())
@@ -1169,7 +1436,7 @@ func _pixel_flood(start: Vector2i) -> void:
 	if pixel_match_all:
 		for y in range(pixel_domain.position.y,pixel_domain.end.y):
 			for x in range(pixel_domain.position.x,pixel_domain.end.x):
-				if matches.call(x,y): selection.set_pixel(x,y,Color.WHITE)
+				if matches.call(x,y): selection.set_pixel(x,y,tint)
 		return
 	while not stack.is_empty():
 		var at: Vector2i=stack.pop_back()
@@ -1183,7 +1450,7 @@ func _pixel_flood(start: Vector2i) -> void:
 			if up and not above: stack.append(Vector2i(x,at.y-1))
 			if down and not below: stack.append(Vector2i(x,at.y+1))
 			above=up; below=down; x+=1
-		selection.fill_rect(Rect2i(left,at.y,x-left,1),Color.WHITE)
+		selection.fill_rect(Rect2i(left,at.y,x-left,1),tint)
 
 
 func _can_drop_data(_position: Vector2,data: Variant) -> bool:
@@ -1212,7 +1479,11 @@ func _polygon_insert(at: Vector2) -> int:
 	var nearest:=0; var distance:=INF
 	for i in _points.size():
 		var next:=(i+1)%_points.size()
-		var cost:=_points[i].distance_to(at)+_points[next].distance_to(at)
+		if _points[i].is_equal_approx(_points[next]): continue
+		# Measure proximity to the edge itself, not to its endpoints. Summing
+		# endpoint distances unfairly favors short edges on the opposite side.
+		var closest:=Geometry2D.get_closest_point_to_segment(at,_points[i],_points[next])
+		var cost:=closest.distance_squared_to(at)
 		if cost<distance: distance=cost; nearest=i+1
 	return nearest
 

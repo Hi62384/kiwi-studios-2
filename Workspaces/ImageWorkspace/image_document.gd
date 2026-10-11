@@ -9,6 +9,8 @@ extends Resource
 @export var preview: Texture2D
 @export var workspace_state: Dictionary = {}
 @export var selections: Dictionary = {}
+@export var selection_masks: Dictionary = {}
+@export var active_selection_mask: String = ""
 @export var pixel_selection: Texture2D
 @export var pixel_selection_owner: String=""
 # The mask is kept in the canvas space in which it was painted.  Keeping the
@@ -86,6 +88,7 @@ func snapshot() -> KiwiImageDocument:
 	copy.preview = preview
 	copy.workspace_state = workspace_state.duplicate(true)
 	copy.selections = selections.duplicate()
+	copy.selection_masks=selection_masks.duplicate(true); copy.active_selection_mask=active_selection_mask
 	copy.pixel_selection=pixel_selection; copy.pixel_selection_owner=pixel_selection_owner
 	copy.pixel_selection_reference=pixel_selection_reference.copy_layer() if pixel_selection_reference!=null else null
 	copy.pixel_selection_reference_world=pixel_selection_reference_world
