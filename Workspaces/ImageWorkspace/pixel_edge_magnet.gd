@@ -55,14 +55,22 @@ func connected(point: Vector2,threshold: float) -> PackedVector2Array:
 
 static func paint_band(mask: Image,path: PackedVector2Array,width: float,domain: Rect2i,tint: Color,connect: bool=true) -> void:
 	var radius:=maxf(.5,width*.5)
-	for index in path.size():
-		var a:=path[maxi(0,index-1)] if connect else path[index]; var b:=path[index]
-		var steps:=maxi(1,ceili(a.distance_to(b)/maxf(.5,width*.2)))
-		for stamp in steps+1:
-			var p:=a.lerp(b,float(stamp)/steps)
-			for y in range(maxi(domain.position.y,floori(p.y-radius)),mini(domain.end.y,ceili(p.y+radius))):
-				var dy:=y+.5-p.y
-				if absf(dy)>radius: continue
-				var span:=sqrt(maxf(0,radius*radius-dy*dy))
-				var left:=maxi(domain.position.x,ceili(p.x-span-.5)); var right:=mini(domain.end.x,ceili(p.x+span-.5))
-				if right>left: mask.fill_rect(Rect2i(left,y,right-left,1),tint)
+	var spacing:=maxf(.5,width*.2)
+	var stamps:=PackedVector2Array()
+	if connect and not path.is_empty():
+		stamps.append(path[0]); var remaining:=spacing
+		for index in range(1,path.size()):
+			var a:=path[index-1]; var b:=path[index]; var length:=a.distance_to(b)
+			var offset:=remaining
+			while offset<=length:
+				stamps.append(a.lerp(b,offset/maxf(.00001,length))); offset+=spacing
+			remaining=offset-length
+		if stamps[-1].distance_to(path[-1])>.01: stamps.append(path[-1])
+	else: stamps=path
+	for p in stamps:
+		for y in range(maxi(domain.position.y,floori(p.y-radius)),mini(domain.end.y,ceili(p.y+radius))):
+			var dy:=y+.5-p.y
+			if absf(dy)>radius: continue
+			var span:=sqrt(maxf(0,radius*radius-dy*dy))
+			var left:=maxi(domain.position.x,ceili(p.x-span-.5)); var right:=mini(domain.end.x,ceili(p.x+span-.5))
+			if right>left: mask.fill_rect(Rect2i(left,y,right-left,1),tint)

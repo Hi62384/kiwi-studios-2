@@ -109,4 +109,13 @@ func run() -> void:
 	var branch_mask:=Image.create(80,80,false,Image.FORMAT_RGBA8)
 	KiwiPixelEdgeMagnet.paint_band(branch_mask,branch_magnet.connected(Vector2(37,15),.4),3,Rect2i(0,0,80,80),Color.WHITE,false)
 	check(branch_mask.get_pixel(10,39).a>.5 and branch_mask.get_pixel(69,39).a>.5 and branch_mask.get_pixel(39,71).a>.5,"Edge bucket reaches all arms of a branched outline")
+	var large_mask:=Image.create(2048,2048,false,Image.FORMAT_RGBA8)
+	var dense_path:=PackedVector2Array()
+	for i in 200: dense_path.append(Vector2(800+i,900+sin(i*.02)*20))
+	var paint_started:=Time.get_ticks_usec()
+	KiwiPixelEdgeMagnet.paint_band(large_mask,dense_path,500,Rect2i(0,0,2048,2048),Color.WHITE)
+	var paint_usec:=Time.get_ticks_usec()-paint_started
+	check(paint_usec<100000,"A maximum-size brush does not stamp hundreds of redundant circles along a short edge")
+	check(large_mask.get_pixel(800,900).a>.5 and large_mask.get_pixel(999,900).a>.5,"Spaced stamps preserve both ends of the edge stroke")
+	print("500px edge brush on a 2048px mask: %d us" % paint_usec)
 	print("Smart pixel selection checks: %d failures" % failures); quit(failures)

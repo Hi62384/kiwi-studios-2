@@ -14,10 +14,12 @@ var distances:=PackedFloat32Array()
 var last_seed: int=-1
 var border_regions: Dictionary={}
 var background_distances:=PackedFloat32Array()
+var foreground_travel:=PackedFloat32Array()
+var background_travel:=PackedFloat32Array()
 
 func build(image: Image,domain: Rect2i) -> void:
 	labels.clear(); means.clear(); areas.clear(); graph.clear(); background.clear(); border_regions.clear(); last_seed=-1
-	field=KiwiPixelEdgeField.new(); field.build(image,domain,256)
+	field=KiwiPixelEdgeField.new(); field.build(image,domain,384)
 	var size:=field.size; var count:=size.x*size.y
 	labels.resize(count); labels.fill(-1)
 	# Over-segment into connected, locally coherent superpixels. Grid limits
@@ -31,7 +33,7 @@ func build(image: Image,domain: Rect2i) -> void:
 			for next in adjacent(p):
 				var q:=Vector2i(next%size.x,next/size.x)
 				if labels[next]>=0 or q/8!=tile: continue
-				if difference(field.colors[i],field.colors[next])<=.13:
+				if difference(field.colors[i],field.colors[next])<=.09 and difference(field.colors[start],field.colors[next])<=.12:
 					labels[next]=id; queue.append(next)
 		means.append(sum/float(queue.size())); areas.append(queue.size()); graph.append({})
 	# Each shared region boundary contributes evidence; interior variation is
@@ -71,6 +73,7 @@ func background_costs(seed: int) -> void:
 	# easier to reach from the clicked object than from supported canvas edges.
 	background_distances.resize(means.size()); background_distances.fill(INF)
 	var heap: Array[Vector2]=[]
+	var seeds:=PackedInt32Array()
 	for id: int in border_regions:
 		# A clicked subject may touch the canvas. Do not label its own border
 		# appearance as background simply because it reaches the image edge.
@@ -78,18 +81,38 @@ func background_costs(seed: int) -> void:
 		# Textured borders rarely share a dominant quantized color. They still
 		# provide background evidence; dropping them leaves the flood unbounded.
 		background_distances[id]=0; heap_push(heap,Vector2(0,id))
+		seeds.append(id)
 	while not heap.is_empty():
 		var item:=heap_pop(heap); var id:=int(item.y)
 		if item.x>background_distances[id]+.00001: continue
 		for next: int in graph[id]:
 			var distance:=maxf(item.x,float(graph[id][next]))
 			if distance<background_distances[next]: background_distances[next]=distance; heap_push(heap,Vector2(distance,next))
+	background_travel=travel_costs(seeds)
+
+func travel_costs(seeds: PackedInt32Array) -> PackedFloat32Array:
+	# Accumulated geodesic cost distinguishes short coherent routes from
+	# long chains of weak boundaries. Minimax alone forgets every boundary
+	# except the strongest and can leak through a single narrow opening.
+	var result:=PackedFloat32Array(); result.resize(means.size()); result.fill(INF)
+	var heap: Array[Vector2]=[]
+	for seed in seeds: result[seed]=0; heap_push(heap,Vector2(0,seed))
+	while not heap.is_empty():
+		var item:=heap_pop(heap); var id:=int(item.y)
+		if item.x>result[id]+.000001: continue
+		for next: int in graph[id]:
+			var edge: float=graph[id][next]
+			var distance:=item.x+.001+pow(maxf(0,edge-.12)*3,2)
+			if distance<result[next]: result[next]=distance; heap_push(heap,Vector2(distance,next))
+	return result
 
 func adjacent(p: Vector2i) -> PackedInt32Array:
 	var result:=PackedInt32Array()
-	for delta in [Vector2i.LEFT,Vector2i.RIGHT,Vector2i.UP,Vector2i.DOWN]:
-		var q: Vector2i=p+delta
-		if field.inside(q): result.append(q.y*field.size.x+q.x)
+	var i:=p.y*field.size.x+p.x
+	if p.x>0: result.append(i-1)
+	if p.x+1<field.size.x: result.append(i+1)
+	if p.y>0: result.append(i-field.size.x)
+	if p.y+1<field.size.y: result.append(i+field.size.x)
 	return result
 
 static func difference(a: Color,b: Color) -> float:
@@ -105,6 +128,7 @@ func seed_costs(point: Vector2) -> bool:
 	if means[seed].a<.01: return false
 	if seed==last_seed: return true
 	background_costs(seed)
+	foreground_travel=travel_costs(PackedInt32Array([seed]))
 	last_seed=seed; distances.resize(means.size()); distances.fill(INF); distances[seed]=0
 	var heap: Array[Vector2]=[Vector2(0,seed)]
 	while not heap.is_empty():
@@ -152,13 +176,16 @@ func propose(point: Vector2,threshold: float) -> Image:
 	var margin:=lerpf(.025,.0001,amount)*maxf(.02,boundary-.12)
 	var count:=labels.size()
 	var included:=PackedByteArray(); included.resize(count); var total:=0
-	for i in count:
-		var id:=labels[i]
+	var region_included:=PackedByteArray(); region_included.resize(means.size())
+	var required_confidence:=lerpf(.9,.51,pow(amount,.45))
+	for id in means.size():
 		# Never cross into a region more strongly connected to the background,
 		# even at maximum threshold. This stops broad low-contrast floods.
 		var advantage:=background_distances[id]-distances[id]
-		if distances[id]<=cutoff and (id==last_seed or advantage>margin) and field.colors[i].a>.01:
-			included[i]=1; total+=1
+		var confidence:=background_travel[id]/maxf(.000001,foreground_travel[id]+background_travel[id])
+		if distances[id]<=cutoff and (id==last_seed or (advantage>margin and confidence>=required_confidence)) and means[id].a>.01: region_included[id]=1
+	for i in count:
+		if region_included[labels[i]]!=0 and field.colors[i].a>.01: included[i]=1; total+=1
 	# Keep only the component reached from the actual clicked pixel. Graph
 	# paths through excluded background must not select unrelated islands.
 	var seed_cell:=field.cell(point); var seed_index:=seed_cell.y*field.size.x+seed_cell.x
@@ -206,10 +233,9 @@ func propose(point: Vector2,threshold: float) -> Image:
 	var source:=field.source.get_data(); var output:=mask.get_data(); var width:=field.source.get_width()
 	for i in count:
 		var cell:=Vector2i(i%field.size.x,i/field.size.x)
-		var candidates:=adjacent(cell); var at_boundary:=false
-		for next in candidates:
-			if included[next]!=included[i]: at_boundary=true; break
+		var at_boundary:=(cell.x>0 and included[i-1]!=included[i]) or (cell.x+1<field.size.x and included[i+1]!=included[i]) or (cell.y>0 and included[i-field.size.x]!=included[i]) or (cell.y+1<field.size.y and included[i+field.size.x]!=included[i])
 		if not at_boundary: continue
+		var candidates:=adjacent(cell)
 		var begin:=Vector2i((Vector2(cell)*field.step).ceil())
 		var end:=Vector2i((Vector2(cell+Vector2i.ONE)*field.step).ceil()).min(field.domain.size)
 		for y in range(begin.y,end.y):

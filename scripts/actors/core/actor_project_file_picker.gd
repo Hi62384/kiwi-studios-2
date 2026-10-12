@@ -28,6 +28,12 @@ var _resolved: bool = false
 var _refresh_generation: int = 0
 var _tree_generation: int = 0
 var _thumbnail_cache: Dictionary = {}
+var _thumbnail_jobs: Array[Dictionary]=[]
+var _thumbnail_running:=false
+var _indexed_paths: Array[String]=[]
+var _scan_ready:=false
+var _scan_entries:=0
+var _path_match_cache: Dictionary={}
 
 
 static func pick(owner: Node, property: ActorProperty, title: String = "Choose a project asset") -> String:
@@ -220,14 +226,16 @@ func _build(property: ActorProperty, title_text: String) -> void:
 	choose_button.custom_minimum_size.x = 125
 	choose_button.pressed.connect(_choose)
 	selection_row.add_child(choose_button)
-	_rebuild_folders()
-	_refresh_files()
+	file_count.text="Scanning project…"
+	search.editable=false
+	_rebuild_folders.call_deferred()
 
 
 func _rebuild_folders() -> void:
 	_tree_generation += 1
 	folders.clear()
-	var scan := _scan_directory(project_root)
+	var scan: Dictionary = await _scan_directory(project_root)
+	if _resolved: return
 	var root_item := folders.create_item()
 	root_item.set_text(0, "%s  (%d)" % [project_root.get_file(), int(scan.count)])
 	root_item.set_icon(0, FileOperations.FOLDER_COLORED_TEXTURE)
@@ -236,7 +244,9 @@ func _rebuild_folders() -> void:
 	root_item.set_meta("is_file", false)
 	root_item.set_collapsed(false)
 	_populate_tree(root_item, scan)
+	_scan_ready=true; search.editable=true
 	folders.set_selected(root_item, 0)
+	_refresh_files()
 
 
 func _scan_directory(directory: String) -> Dictionary:
@@ -245,15 +255,22 @@ func _scan_directory(directory: String) -> Dictionary:
 	var file_names := Array(DirAccess.get_files_at(directory))
 	file_names.sort()
 	for file_name: String in file_names:
+		if _resolved: break
+		_scan_entries+=1
+		if _scan_entries%16==0: await get_tree().process_frame
 		var path := directory.path_join(file_name).simplify_path()
 		if _path_allowed(path):
 			matching_files.append(path)
+			_indexed_paths.append(path)
 	var folder_names := Array(DirAccess.get_directories_at(directory))
 	folder_names.sort()
 	for folder_name: String in folder_names:
+		if _resolved: break
 		if folder_name.begins_with("."):
 			continue
-		var child_scan := _scan_directory(directory.path_join(folder_name).simplify_path())
+		var access:=DirAccess.open(directory)
+		if access!=null and access.is_link(folder_name): continue
+		var child_scan: Dictionary = await _scan_directory(directory.path_join(folder_name).simplify_path())
 		if int(child_scan.count) > 0:
 			child_folders.append(child_scan)
 	var total := matching_files.size()
@@ -311,7 +328,7 @@ func _tree_item_activated() -> void:
 
 
 func _refresh_files() -> void:
-	if files == null:
+	if files == null or not _scan_ready or _resolved:
 		return
 	_refresh_generation += 1
 	var generation := _refresh_generation
@@ -323,12 +340,10 @@ func _refresh_files() -> void:
 	selection_path.text = "Choose a matching file from the project"
 	var paths: Array[String] = []
 	var query := search.text.strip_edges().to_lower()
-	if query.is_empty():
-		# Include descendants so opening the picker at the project root never
-		# presents an empty grid just because assets live in organized folders.
-		_collect_files(current_directory, paths, true)
-	else:
-		_collect_files(project_root, paths, true, query)
+	for path in _indexed_paths:
+		if query.is_empty():
+			if FileOperations.is_path_inside(current_directory,path): paths.append(path)
+		elif path.get_file().to_lower().contains(query): paths.append(path)
 	paths.sort()
 	for path: String in paths:
 		var display := path.get_file()
@@ -358,33 +373,36 @@ func _collect_files(directory: String, result: Array[String], recursive: bool, q
 
 
 func _load_thumbnail(path: String, index: int, generation: int) -> void:
-	var thumbnail: Texture2D
-	if _thumbnail_cache.has(path):
-		thumbnail = _thumbnail_cache[path]
-	else:
-		thumbnail = await FileOperations.get_file_thumbnail(path)
-		if thumbnail != null:
-			_thumbnail_cache[path] = thumbnail
-	if generation != _refresh_generation or not is_instance_valid(files) or index >= files.item_count:
-		return
-	if str(files.get_item_metadata(index)) != path:
-		return
-	if thumbnail != null:
-		files.set_item_icon(index, thumbnail)
-		if path == selected_path:
-			selection_preview.texture = thumbnail
+	_thumbnail_jobs.append({"path":path,"index":index,"generation":generation})
 
 
 func _load_tree_thumbnail(path: String, item: TreeItem, generation: int) -> void:
-	var thumbnail: Texture2D
-	if _thumbnail_cache.has(path):
-		thumbnail = _thumbnail_cache[path]
-	else:
-		thumbnail = await FileOperations.get_file_thumbnail(path)
-		if thumbnail != null:
-			_thumbnail_cache[path] = thumbnail
-	if generation == _tree_generation and thumbnail != null and item != null:
-		item.set_icon(0, thumbnail)
+	_thumbnail_jobs.append({"path":path,"item":item,"generation":generation})
+
+func _process(_delta: float) -> void:
+	if _resolved or _thumbnail_running or _thumbnail_jobs.is_empty(): return
+	_thumbnail_running=true
+	_process_thumbnail(_thumbnail_jobs.pop_front())
+
+func _process_thumbnail(job: Dictionary) -> void:
+	var path: String=job.path
+	var thumbnail: Texture2D=_thumbnail_cache.get(path)
+	if thumbnail==null:
+		thumbnail=await FileOperations.get_file_thumbnail(path)
+		if thumbnail!=null and maxf(thumbnail.get_width(),thumbnail.get_height())>192:
+			var bitmap:=thumbnail.get_image()
+			if bitmap!=null:
+				var ratio:=192.0/maxi(bitmap.get_width(),bitmap.get_height())
+				bitmap.resize(maxi(1,roundi(bitmap.get_width()*ratio)),maxi(1,roundi(bitmap.get_height()*ratio)),Image.INTERPOLATE_BILINEAR)
+				thumbnail=ImageTexture.create_from_image(bitmap)
+		if thumbnail!=null: _thumbnail_cache[path]=thumbnail
+	_thumbnail_running=false
+	if _resolved or thumbnail==null: return
+	if job.has("item"):
+		if job.generation==_tree_generation and is_instance_valid(job.item): job.item.set_icon(0,thumbnail)
+	elif job.generation==_refresh_generation and is_instance_valid(files) and job.index<files.item_count and str(files.get_item_metadata(job.index))==path:
+		files.set_item_icon(job.index,thumbnail)
+		if path==selected_path: selection_preview.texture=thumbnail
 
 
 func _file_selected(index: int) -> void:
@@ -413,8 +431,19 @@ func _relative_to_project(path: String) -> String:
 
 
 func _path_allowed(path: String) -> bool:
+	if _path_match_cache.has(path): return _path_match_cache[path]
+	var result:=_path_allowed_uncached(path)
+	_path_match_cache[path]=result
+	return result
+
+func _path_allowed_uncached(path: String) -> bool:
 	if not is_allowed_path(project_root, path, allowed_extensions):
 		return false
+	# Image documents embed full layer images. Read their type declaration
+	# instead of deserializing every document just to list its filename.
+	if path.get_extension().to_lower()=="tres" and allowed_native_types==PackedStringArray(["KiwiImageDocument"]):
+		var file:=FileAccess.open(path,FileAccess.READ)
+		return file!=null and file.get_line().contains('script_class="KiwiImageDocument"')
 	if not allowed_native_types.is_empty() and path.get_extension().to_lower() in ["tres", "res", "mesh"]:
 		var load_path := _godot_resource_path(path)
 		var native_resource := ResourceLoader.load(load_path, "", ResourceLoader.CACHE_MODE_IGNORE)
@@ -454,6 +483,7 @@ func _resolve(path: String) -> void:
 	if _resolved:
 		return
 	_resolved = true
+	_thumbnail_jobs.clear()
 	finished.emit(path)
 	hide()
 

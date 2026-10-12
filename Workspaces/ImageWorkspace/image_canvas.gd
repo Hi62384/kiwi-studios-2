@@ -76,6 +76,7 @@ var selection_inverse:=Transform2D.IDENTITY
 var selection_forward_warp: Callable
 var selection_inverse_warp: Callable
 var selection_preview_origin:=Vector2.ZERO
+var _selection_preview_size:=Vector2.ZERO
 var selection_texture: ImageTexture
 var pixel_selection_bounds := Rect2()
 var path_layer_id: String=""
@@ -92,6 +93,11 @@ var _edge_follower:=KiwiPixelEdgeMagnet.new()
 var _edge_preview:=Vector2.INF
 var _smart_base: Image
 var _smart_seed:=Vector2.ZERO
+var _object_committed: Dictionary={}
+var _pan_previous_drag:=""
+var _edge_motion_pending:=false
+var _edge_motion_point:=Vector2.ZERO
+var _edge_hover_pending:=false
 var _smart_request:=-1
 var _smart_subtract:=false
 var _smart_ready:=false
@@ -152,7 +158,21 @@ func _ready() -> void:
 	_selection_overlay.expand_mode=TextureRect.EXPAND_IGNORE_SIZE
 	_selection_overlay.texture_filter=CanvasItem.TEXTURE_FILTER_NEAREST
 	var mask_shader:=Shader.new()
-	mask_shader.code="shader_type canvas_item; render_mode unshaded; uniform float strength=0.65; void fragment(){ float a=texture(TEXTURE,UV).a; float stripe=step(0.5,fract((FRAGCOORD.x+FRAGCOORD.y)/12.0)); COLOR=vec4(vec3(stripe),a*strength); }"
+	mask_shader.code="""shader_type canvas_item;
+render_mode unshaded;
+uniform float strength=0.65;
+uniform bool warped=false;
+uniform vec3 row0=vec3(1.0,0.0,0.0);
+uniform vec3 row1=vec3(0.0,1.0,0.0);
+uniform vec3 row2=vec3(0.0,0.0,1.0);
+void fragment(){
+ vec2 sample_uv=UV;
+ if(warped){vec3 p=vec3(UV,1.0); float w=dot(row2,p); sample_uv=abs(w)>0.000001 ? vec2(dot(row0,p),dot(row1,p))/w : vec2(-1.0);}
+ float a=texture(TEXTURE,sample_uv).a;
+ if(any(lessThan(sample_uv,vec2(0.0))) || any(greaterThan(sample_uv,vec2(1.0)))) a=0.0;
+ float stripe=step(0.5,fract((FRAGCOORD.x+FRAGCOORD.y)/12.0));
+ COLOR=vec4(vec3(stripe),a*strength);
+}"""
 	var mask_material:=ShaderMaterial.new(); mask_material.shader=mask_shader
 	_selection_overlay.material=mask_material
 	add_child(_selection_overlay)
@@ -162,6 +182,13 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	if _drag=="paint" and _corrector!=null: _flush_corrected_stroke()
+	_flush_edge_motion()
+	if _edge_hover_pending:
+		_edge_hover_pending=false
+		if _drag.is_empty() and tool=="pixel_select" and edge_magnet and smart_selection.edges!=null:
+			var ridge:=smart_selection.edges.nearest(to_document(_mouse),edge_threshold)
+			_edge_preview=smart_selection.edges.refine(ridge) if ridge>=0 else Vector2.INF
+			queue_redraw()
 	_sync_selection_overlay()
 	if tool!="pixel_select" or not edge_magnet: _edge_preview=Vector2.INF
 
@@ -170,7 +197,7 @@ func _sync_selection_overlay() -> void:
 	if visible:
 		(_selection_overlay.material as ShaderMaterial).set_shader_parameter("strength",.65 if tool=="pixel_select" else .16)
 		_selection_overlay.texture=selection_texture
-		_selection_overlay.size=Vector2(selection_texture.get_size())
+		_selection_overlay.size=_selection_preview_size if _selection_preview_size!=Vector2.ZERO else Vector2(selection_texture.get_size())
 		# Use the Control's own transform. A raw RenderingServer override was
 		# overwritten by deferred Control layout updates, flashing an offset mask.
 		_selection_overlay.position=origin()+selection_preview_origin*zoom
@@ -409,7 +436,11 @@ func _input_canvas(event: InputEvent) -> void:
 			set_zoom(zoom*(1.15 if event.button_index==MOUSE_BUTTON_WHEEL_UP else 1/1.15),event.position)
 			accept_event(); return
 		if event.button_index == MOUSE_BUTTON_MIDDLE or (event.button_index == MOUSE_BUTTON_LEFT and Input.is_key_pressed(KEY_SPACE)):
-			_drag = "pan" if event.pressed else ""
+			if event.pressed:
+				_pan_previous_drag=_drag; _drag="pan"
+			else:
+				_drag=_pan_previous_drag; _pan_previous_drag=""
+				if _drag=="object_preview" and _smart_ready and _smart_apply_when_ready: commit_object_selection()
 			_last = event.position
 			accept_event(); return
 		if event.button_index != MOUSE_BUTTON_LEFT: return
@@ -497,8 +528,7 @@ func _input_canvas(event: InputEvent) -> void:
 		_mouse = event.position
 		var point := to_document(event.position)
 		if _drag.is_empty() and tool=="pixel_select" and edge_magnet and pixel_mode in ["brush","fill"] and not pixel_box_select and smart_selection.edges!=null:
-			var ridge:=smart_selection.edges.nearest(point,edge_threshold)
-			_edge_preview=smart_selection.edges.refine(ridge) if ridge>=0 else Vector2.INF
+			_edge_hover_pending=true
 		if _drag == "pan": pan += event.position-_last; _last=event.position
 		elif _drag == "move" or _drag.begins_with("resize") or _drag == "rotate":
 			_transform(point,event.shift_pressed,event.ctrl_pressed)
@@ -509,7 +539,10 @@ func _input_canvas(event: InputEvent) -> void:
 			_last=point
 		elif _drag=="pixel_select":
 			_set_erase_modifier(event.ctrl_pressed)
-			_pixel_brush_line(_last,point); _last=point; _update_selection_preview()
+			if edge_magnet and pixel_mode=="brush" and not pixel_box_select:
+				_edge_motion_pending=true; _edge_motion_point=point
+			else:
+				_pixel_brush_line(_last,point); _last=point; _update_selection_preview()
 		elif _drag=="pixel_box":
 			_set_erase_modifier(event.ctrl_pressed); _last=point; _update_pixel_box(point)
 		elif _drag=="pixel_lasso":
@@ -724,6 +757,7 @@ func _resize_single(point: Vector2, index: int, constrained: bool, use_snap: boo
 
 func _finish(point: Vector2) -> void:
 	if _drag in ["object_preview","edge_pending"]: return
+	_flush_edge_motion()
 	snap_guides_x.clear(); snap_guides_y.clear()
 	if _drag=="paint" and _corrector!=null:
 		_corrector.add(point,Time.get_ticks_usec()/1000000.0)
@@ -793,6 +827,8 @@ func _finish(point: Vector2) -> void:
 
 
 func cancel_gesture() -> void:
+	_edge_motion_pending=false; _edge_hover_pending=false
+	_object_committed.clear(); _pan_previous_drag=""
 	smart_selection.cancel_request(); _smart_request=-1; _smart_ready=false; _smart_apply_when_ready=false
 	_edge_follower.previous=-1; _edge_preview=Vector2.INF
 	snap_guides_x.clear(); snap_guides_y.clear()
@@ -1208,6 +1244,7 @@ func _make_selection(kind: String,rect: Rect2) -> void:
 
 
 func clear_selection() -> void:
+	_selection_preview_size=Vector2.ZERO
 	selection_transform=Transform2D.IDENTITY; selection_inverse=Transform2D.IDENTITY
 	selection_forward_warp=Callable(); selection_inverse_warp=Callable(); selection_preview_origin=Vector2.ZERO
 	selection=null; selection_texture=null; pixel_selection_bounds=Rect2(); _sync_selection_overlay(); queue_redraw()
@@ -1244,6 +1281,8 @@ func _update_selection_preview() -> void:
 	if selection_forward_warp.is_valid() and selection_inverse_warp.is_valid():
 		_update_warped_selection_preview()
 		return
+	_selection_preview_size=Vector2.ZERO
+	(_selection_overlay.material as ShaderMaterial).set_shader_parameter("warped",false)
 	if selection_texture!=null and selection_texture.get_size()==Vector2(selection.get_size()): (selection_texture as ImageTexture).update(selection)
 	else: selection_texture=ImageTexture.create_from_image(selection)
 	selection_preview_origin=Vector2.ZERO
@@ -1264,16 +1303,45 @@ func _update_warped_selection_preview() -> void:
 	pixel_selection_bounds=bounds
 	if not visible.has_area():
 		selection_texture=null; _sync_selection_overlay(); queue_redraw(); return
-	var preview:=Image.create(visible.size.x,visible.size.y,false,Image.FORMAT_RGBA8)
-	for y in visible.size.y:
-		for x in visible.size.x:
-			var source_point: Vector2=selection_inverse_warp.call(Vector2(visible.position+Vector2i(x,y))+Vector2.ONE*.5)
-			var sample:=Vector2i(source_point.floor())
-			if used.has_point(sample): preview.set_pixel(x,y,selection.get_pixelv(sample))
+	# A planar layer's translation, scale, rotation and yaw form a projective
+	# mapping. Solve its four corners once, then let the GPU sample the mask.
+	# The old per-pixel Callable loop could block every pointer update for seconds.
+	var corners:=PackedVector2Array()
+	for corner in [Vector2(used.position),Vector2(used.end.x,used.position.y),Vector2(used.end),Vector2(used.position.x,used.end.y)]:
+		corners.append((selection_forward_warp.call(corner)-Vector2(visible.position))/Vector2(visible.size))
+	var rows:=_selection_projection(corners)
+	if rows.is_empty(): return
+	var preview:=selection.get_region(used)
 	selection_preview_origin=Vector2(visible.position)
-	selection_texture=ImageTexture.create_from_image(preview)
+	_selection_preview_size=Vector2(visible.size)
+	if selection_texture!=null and selection_texture.get_size()==Vector2(preview.get_size()): selection_texture.update(preview)
+	else: selection_texture=ImageTexture.create_from_image(preview)
+	var material:=_selection_overlay.material as ShaderMaterial
+	material.set_shader_parameter("warped",true)
+	for i in 3: material.set_shader_parameter("row%d" % i,rows[i])
 	_sync_selection_overlay()
 	queue_redraw()
+
+static func _selection_projection(corners: PackedVector2Array) -> Array[Vector3]:
+	var equations: Array[PackedFloat64Array]=[]
+	var uv:=[Vector2.ZERO,Vector2.RIGHT,Vector2.ONE,Vector2.DOWN]
+	for i in 4:
+		var x:=corners[i].x; var y:=corners[i].y; var u: float=uv[i].x; var v: float=uv[i].y
+		equations.append(PackedFloat64Array([x,y,1,0,0,0,-u*x,-u*y,u]))
+		equations.append(PackedFloat64Array([0,0,0,x,y,1,-v*x,-v*y,v]))
+	for column in 8:
+		var pivot:=column
+		for row in range(column+1,8):
+			if absf(equations[row][column])>absf(equations[pivot][column]): pivot=row
+		if absf(equations[pivot][column])<.000000001: return []
+		var swapped:=equations[column]; equations[column]=equations[pivot]; equations[pivot]=swapped
+		var factor:=equations[column][column]
+		for j in range(column,9): equations[column][j]/=factor
+		for row in 8:
+			if row==column: continue
+			factor=equations[row][column]
+			for j in range(column,9): equations[row][j]-=factor*equations[column][j]
+	return [Vector3(equations[0][8],equations[1][8],equations[2][8]),Vector3(equations[3][8],equations[4][8],equations[5][8]),Vector3(equations[6][8],equations[7][8],1)]
 
 
 func bake_selection_transform() -> void:
@@ -1326,9 +1394,6 @@ func _begin_pixel_selection(point: Vector2,lasso: bool=false) -> void:
 		if lasso: _points=PackedVector2Array([point])
 	elif pixel_mode=="object" or (pixel_mode=="fill" and edge_magnet):
 		_smart_base=selection.duplicate(); _smart_seed=point; _smart_subtract=_erase_modifier
-		if pixel_mode=="object" and not lasso and not _smart_subtract:
-			_smart_base.fill(Color.TRANSPARENT)
-			selection=_smart_base.duplicate()
 		_smart_ready=false; _smart_has_proposal=false; _smart_apply_when_ready=false
 		_drag="object_preview" if pixel_mode=="object" else "edge_pending"
 		_smart_request=smart_selection.request("object" if pixel_mode=="object" else "edge",point,object_threshold if pixel_mode=="object" else edge_threshold,brush_size)
@@ -1365,6 +1430,13 @@ func _apply_pixel_lasso() -> void:
 			if right>left: selection.fill_rect(Rect2i(left,y,right-left,1),tint)
 
 
+func _flush_edge_motion() -> void:
+	if not _edge_motion_pending: return
+	_edge_motion_pending=false
+	if _drag!="pixel_select": return
+	_pixel_brush_line(_last,_edge_motion_point); _last=_edge_motion_point
+	_update_selection_preview()
+
 func _pixel_brush_line(from: Vector2,to: Vector2) -> void:
 	if edge_magnet and pixel_mode=="brush" and not pixel_box_select:
 		if smart_selection.edges==null: return
@@ -1394,18 +1466,30 @@ func prepare_smart_selection() -> void:
 
 func set_object_threshold(value: float) -> void:
 	object_threshold=clampf(value,0,1)
+	# Applied selections remain adjustable until a different edit changes the
+	# mask/source/owner. Reopen against the original base, not the last result.
+	if _drag.is_empty() and not _object_committed.is_empty() and pixel_mode=="object" and tool=="pixel_select":
+		if document.pixel_selection==_object_committed.texture and pixel_source==_object_committed.source and not selected.is_empty() and selected[-1]==_object_committed.owner:
+			gesture_started.emit()
+			_smart_base=_object_committed.base.duplicate(); _smart_seed=_object_committed.seed; _smart_subtract=_object_committed.subtract
+			_drag="object_preview"; _smart_apply_when_ready=false
+		else: _object_committed.clear()
 	if _drag=="object_preview":
 		_smart_ready=false
 		_smart_request=smart_selection.request("object",_smart_seed,object_threshold)
 		hint_changed.emit("Updating object selection…")
 
 func commit_object_selection() -> void:
+	if _drag=="pan" and _pan_previous_drag=="object_preview": _smart_apply_when_ready=true; return
 	if _drag!="object_preview": return
 	if not _smart_ready: _smart_apply_when_ready=true; return
+	var context:={"base":_smart_base.duplicate(),"seed":_smart_seed,"subtract":_smart_subtract,"source":pixel_source,"owner":selected[-1]}
 	_drag="pixel_select"; _finish(_smart_seed)
+	context.texture=document.pixel_selection; _object_committed=context
 
 func _smart_proposed(mask: Image,kind: String,request: int) -> void:
-	if request!=_smart_request or _drag not in ["object_preview","edge_pending"]: return
+	var action:=_pan_previous_drag if _drag=="pan" else _drag
+	if request!=_smart_request or action not in ["object_preview","edge_pending"]: return
 	if mask==null:
 		if kind=="object":
 			selection=_smart_base.duplicate(); _smart_ready=false; _smart_has_proposal=false; _smart_apply_when_ready=false
@@ -1419,7 +1503,7 @@ func _smart_proposed(mask: Image,kind: String,request: int) -> void:
 	_smart_ready=true; _smart_has_proposal=true; _update_selection_preview()
 	if kind=="edge": _drag="pixel_select"; _finish(_smart_seed)
 	elif _smart_apply_when_ready: commit_object_selection()
-	else: hint_changed.emit("Object preview · Threshold changes extent · Shift-click adds · Ctrl-click subtracts · Enter applies · Esc cancels")
+	else: hint_changed.emit("Object preview · Click adds · Ctrl-click subtracts · Threshold adjusts this object · Enter applies · Esc cancels")
 
 func _pixel_flood(start: Vector2i) -> void:
 	var tint:=Color.TRANSPARENT if _erase_modifier else Color.WHITE

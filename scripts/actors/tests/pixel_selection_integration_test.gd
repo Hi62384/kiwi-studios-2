@@ -14,6 +14,16 @@ func check_overlay() -> void:
 func wait_for_smart() -> void:
 	var deadline:=Time.get_ticks_msec()+15000
 	while not studio.canvas._smart_ready and studio.canvas._drag in ["object_preview","edge_pending"] and Time.get_ticks_msec()<deadline: await process_frame
+func click_threshold(fraction: float) -> void:
+	await frames(3)
+	var slider:=studio.find_child("ObjectThreshold",true,false) as HSlider
+	check(slider!=null,"Object threshold slider exists")
+	if slider==null: return
+	var at:=slider.get_global_rect().position+Vector2(8+(slider.size.x-16)*fraction,slider.size.y*.5)
+	var press:=InputEventMouseButton.new(); press.button_index=MOUSE_BUTTON_LEFT; press.pressed=true; press.position=at; press.global_position=at
+	root.push_input(press,true)
+	var release:=press.duplicate() as InputEventMouseButton; release.pressed=false; root.push_input(release,true)
+	await process_frame
 func run() -> void:
 	root.size=Vector2i(1400,850)
 	studio=KiwiImageWorkspace.new(); root.add_child(studio); studio.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -26,14 +36,29 @@ func run() -> void:
 	studio.canvas._begin_pixel_selection(Vector2(29,40)); await wait_for_smart()
 	check(studio.canvas._smart_ready and studio.canvas.selected_pixel(Vector2(40,40)),"Object proposal is applied through the worker")
 	check(studio._undo.is_empty(),"Proposals do not create undo entries")
-	studio.canvas.set_object_threshold(.1); await wait_for_smart()
+	await click_threshold(.1); await wait_for_smart()
+	check(studio.canvas.object_threshold<.2,"A real mouse click reaches the object threshold slider")
 	check(not studio.canvas.selected_pixel(Vector2(40,40)),"Lowering threshold visibly removes the stripe from the live preview")
-	studio.canvas.set_object_threshold(.2); studio.canvas.set_object_threshold(.5); await wait_for_smart()
+	studio.canvas.set_object_threshold(.2); await click_threshold(.5); await wait_for_smart()
 	check(studio.canvas._smart_seed==Vector2(29,40) and studio.canvas.selected_pixel(Vector2(58,40)),"Slider keeps the original foreground seed and discards stale proposals")
 	studio.canvas.commit_object_selection()
 	check(studio._undo.size()==1 and studio.document.pixel_selection_owner==studio.canvas.selected[-1],"An object selection commits one owned undoable mask")
 	studio.undo(); check(studio.document.pixel_selection==null,"Object selection undo restores the previous selection")
 	studio.redo(); check(studio.document.pixel_selection!=null,"Object selection redo restores the committed mask")
+	await studio._prepare_pixel_selection()
+	studio.document.pixel_selection=null; studio.canvas.clear_selection()
+	# Exercise actual mouse input after Apply, not just the setter while a
+	# proposal is still active. This used to change the number and do nothing.
+	studio.canvas._begin_pixel_selection(Vector2(29,40)); await wait_for_smart(); studio.canvas.commit_object_selection()
+	await click_threshold(.1); await wait_for_smart()
+	check(studio.canvas._drag=="object_preview" and not studio.canvas.selected_pixel(Vector2(40,40)),"Slider reopens an applied object selection and changes its pixels")
+	await click_threshold(.5); await wait_for_smart()
+	var pan_press:=InputEventMouseButton.new(); pan_press.button_index=MOUSE_BUTTON_MIDDLE; pan_press.pressed=true; pan_press.position=Vector2(60,60)
+	studio.canvas._input_canvas(pan_press)
+	var pan_release:=pan_press.duplicate() as InputEventMouseButton; pan_release.pressed=false; studio.canvas._input_canvas(pan_release)
+	await click_threshold(.1); await wait_for_smart()
+	check(studio.canvas._drag=="object_preview" and not studio.canvas.selected_pixel(Vector2(40,40)),"Panning does not disable live threshold editing")
+	await click_threshold(.5); await wait_for_smart(); studio.canvas.commit_object_selection()
 	studio._save_selection_mask(false); var first:=studio.document.active_selection_mask
 	check_overlay(); var history_count:=studio._undo.size()
 	studio._save_selection_mask(false)
@@ -69,13 +94,39 @@ func run() -> void:
 	settings=studio._ui_state(); check(settings.edge_magnet and is_equal_approx(settings.edge_threshold,.63) and is_equal_approx(settings.object_threshold,.72),"Smart selection settings are persisted")
 	await studio._prepare_pixel_selection(); studio.canvas.pixel_mode="object"
 	studio.canvas._begin_pixel_selection(Vector2(29,40)); await wait_for_smart()
-	check(not studio.canvas.selected_pixel(Vector2(8,8)),"Normal object clicks replace old selected pixels rather than hiding threshold changes underneath them")
+	check(studio.canvas.selected_pixel(Vector2(8,8)),"Normal object clicks preserve previously selected pixels")
 	studio.canvas.cancel_gesture(); await frames()
 	studio.canvas._begin_pixel_selection(Vector2(29,40),true); await wait_for_smart()
 	check(studio.canvas.selected_pixel(Vector2(8,8)),"Shift object clicks preserve the existing selection")
 	studio.canvas.cancel_gesture(); await frames()
 	studio.canvas._begin_pixel_selection(Vector2(29,40)); studio.canvas.cancel_gesture(); await frames(30)
 	check(studio.canvas._drag.is_empty() and studio.document.active_selection_mask==first,"Cancel rejects stale worker results")
+	studio.canvas.pixel_mode="brush"; studio.canvas.edge_magnet=true; studio.canvas.edge_threshold=.4; studio.canvas.brush_size=500
+	studio.canvas.prepare_smart_selection()
+	var deadline:=Time.get_ticks_msec()+15000
+	while studio.canvas.smart_selection.edges==null and Time.get_ticks_msec()<deadline: await process_frame
+	studio.canvas._begin_pixel_selection(Vector2(19,30))
+	for event_index in 1000:
+		var motion:=InputEventMouseMotion.new()
+		motion.position=studio.canvas.origin()+Vector2(19,30+event_index/999.0*30)*studio.canvas.zoom
+		motion.button_mask=MOUSE_BUTTON_MASK_LEFT
+		studio.canvas._input_canvas(motion)
+	check(studio.canvas._edge_motion_pending and studio.canvas._last==Vector2(19,30),"High-rate mouse input queues only the latest magnetic brush sample")
+	studio.canvas._finish(Vector2(19,60))
+	check(not studio.canvas._edge_motion_pending and studio.canvas._last.is_equal_approx(Vector2(19,60)),"Releasing before the next frame flushes the final brush sample")
+	var original_size:=studio.document.canvas_size
+	studio.document.canvas_size=Vector2i(2048,2048)
+	studio.canvas.selection=Image.create(2048,2048,false,Image.FORMAT_RGBA8)
+	studio.canvas.selection.fill_rect(Rect2i(400,400,800,800),Color.WHITE)
+	var inverse_calls:=[0]
+	studio.canvas.selection_forward_warp=func(p: Vector2)->Vector2: return Vector2(p.x/(1+p.y*.0001),p.y/(1+p.y*.0001))
+	studio.canvas.selection_inverse_warp=func(p: Vector2)->Vector2: inverse_calls[0]+=1; return Vector2(p.x/(1-p.y*.0001),p.y/(1-p.y*.0001))
+	var warp_start:=Time.get_ticks_usec(); studio.canvas._update_selection_preview()
+	print("2048px warped selection preview CPU: %d us" % (Time.get_ticks_usec()-warp_start))
+	check(inverse_calls[0]==0,"Warped selection previews never run a per-pixel CPU inverse transform")
+	check(bool((studio.canvas._selection_overlay.material as ShaderMaterial).get_shader_parameter("warped")),"Warped selection preview uses GPU projection")
+	await frames(3)
+	studio.document.canvas_size=original_size; studio.canvas.sync_pixel_selection()
 	studio._set_tool("effects"); check(studio.inspector.visible and not studio._effects_dock.visible,"Effects no longer replace layer properties")
 	studio._open_stack_editor(false); var editor:=studio.get_node("EffectStackEditor")
 	editor.add_entry("invert"); await frames(16)

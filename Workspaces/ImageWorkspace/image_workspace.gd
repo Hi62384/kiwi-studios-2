@@ -946,6 +946,7 @@ func _pixel_threshold_control(caption: String,value: float,changed: Callable) ->
 	var group:=_toolbar_group(caption,"hardness")
 	var label:=Label.new(); label.text=caption; group.add_child(label)
 	var slider:=HSlider.new(); slider.min_value=0; slider.max_value=100; slider.step=1; slider.value=value*100
+	slider.name=caption.replace(" ","")
 	slider.custom_minimum_size=Vector2(110,28); slider.size_flags_vertical=Control.SIZE_SHRINK_CENTER; group.add_child(slider)
 	var amount:=Label.new(); amount.custom_minimum_size.x=40; amount.text="%d%%" % slider.value; group.add_child(amount)
 	slider.value_changed.connect(func(next: float): amount.text="%d%%" % next; changed.call(next/100.0))
