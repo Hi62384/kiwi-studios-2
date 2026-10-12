@@ -6,6 +6,7 @@ signal document_changed
 signal image_saved(source: Variant)
 
 const IMAGE_EXTENSIONS := ["png","jpg","jpeg","webp","bmp","tga","svg","hdr","exr"]
+const AVAILABLE_EFFECTS := ["mirror","curves","blur","motion_blur","radial_blur","sharpen","emboss","edge_detect","shadow","glow","outline","gradient_map","color_replace","grain","pixelate","halftone","scanlines","chromatic","vignette","wave","twirl","ripple","kaleidoscope"]
 const SAVE_FORMATS := ["png","jpg","webp"]
 const Layer = preload("res://Workspaces/ImageWorkspace/image_layer.gd")
 const Document = preload("res://Workspaces/ImageWorkspace/image_document.gd")
@@ -92,6 +93,7 @@ var _recent_commands: Array[String] = []
 var _crop_canvas := false
 var _crop_action := 0 # 0 extract, 1 copy, 2 remove only
 var _rasterizing := false
+var _selection_fill_color:=Color.WHITE
 var _sizing_preview := false
 var _selection_transform_active:=false
 var _context_fields: Dictionary = {}
@@ -126,6 +128,8 @@ func _ready() -> void:
 	add_child(renderer)
 	_build_ui()
 	canvas.gesture_started.connect(_begin)
+	canvas.warp_tool.settings_changed.connect(_refresh_context)
+	canvas.repair_tool.initialize(self); canvas.repair_tool.settings_changed.connect(_refresh_context)
 	canvas.gesture_changed.connect(_preview)
 	canvas.gesture_finished.connect(_commit)
 	canvas.gesture_cancelled.connect(_cancel)
@@ -238,6 +242,69 @@ func _icon(name: String) -> Texture2D:
 	paths["aspect"]="<rect x='3' y='6' width='18' height='12' rx='2'/><path d='M7 14l10-4M7 10v4h4M13 10h4v4'/>"
 	paths["parent"]="<path d='M9 7H6a4 4 0 000 8h3M15 7h3a4 4 0 010 8h-3M8 11h8v4H8z'/>"
 	paths["unparent"]="<path d='M3 3l18 18M9 7H6a4 4 0 000 8h3M15 7h3a4 4 0 012 7M8 11h8v4H8z'/>"
+	paths["warp"]="<path d='M4 4c5 3 11-3 16 0-3 5 3 11 0 16-5-3-11 3-16 0 3-5-3-11 0-16zM4 12c6-4 10 4 16 0M12 4c4 6-4 10 0 16'/>"
+	paths["repair"]="<path d='m4 14 10-10 6 6-10 10zM9 9l6 6M7 15h1M11 7h1M16 11h1M11 17h1'/><path d='M18 2v5M16 4h5'/>"
+	paths["pattern"]="<path d='M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18'/><circle cx='6' cy='6' r='1'/><circle cx='12' cy='12' r='1'/><circle cx='18' cy='18' r='1'/>"
+	paths["noise"]="<path d='M3 3h18v18H3zM6 7h1M13 5h1M17 10h1M9 12h1M5 17h1M14 18h1M18 15h1'/>"
+	paths.merge({
+		"mirror":"<path d='M12 2v20M8 5 3 12l5 7zM16 5l5 7-5 7z'/>",
+		"blur":"<circle cx='12' cy='12' r='3'/><circle cx='12' cy='12' r='7' stroke-dasharray='2 3'/><circle cx='12' cy='12' r='10' stroke-dasharray='1 5'/>",
+		"motion_blur":"<path d='M2 5h12M2 12h7M2 19h12'/><circle cx='17' cy='12' r='4'/>",
+		"radial_blur":"<circle cx='12' cy='12' r='3'/><path d='m4 4 4 4m8 8 4 4M4 20l4-4M16 8l4-4M12 2v4M12 18v4M2 12h4M18 12h4'/>",
+		"sharpen":"<path d='m3 20 9-17 9 17-9-5zM12 3v12'/>",
+		"emboss":"<path d='m4 7 8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10'/>",
+		"edge_detect":"<path d='M4 18V5h14M7 21V8h14'/>",
+		"shadow":"<rect x='9' y='9' width='12' height='12' rx='2' stroke-dasharray='2 2'/><rect x='3' y='3' width='12' height='12' rx='2'/>",
+		"glow":"<circle cx='12' cy='12' r='4'/><path d='M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2'/><circle cx='12' cy='12' r='7' stroke-dasharray='1 3'/>",
+		"outline":"<rect x='2' y='2' width='20' height='20' rx='5'/><rect x='6' y='6' width='12' height='12' rx='2'/>",
+		"vignette":"<ellipse cx='12' cy='12' rx='10' ry='8'/><ellipse cx='12' cy='12' rx='6' ry='4'/><path d='M3 8l3 2M18 14l3 2'/>",
+		"wave":"<path d='M2 8c5-12 5 12 10 0s5 12 10 0M2 16c5-12 5 12 10 0s5 12 10 0'/>",
+		"twirl":"<path d='M12 12c0-6 9-5 9 1 0 10-18 12-18 0C3 3 14 0 20 5'/>",
+		"ripple":"<ellipse cx='12' cy='12' rx='3' ry='2'/><ellipse cx='12' cy='12' rx='7' ry='5'/><ellipse cx='12' cy='12' rx='10' ry='8'/>",
+		"kaleidoscope":"<path d='m12 2 9 5v10l-9 5-9-5V7zM12 2v20M3 7l18 10M3 17 21 7'/>",
+		"chromatic":"<circle cx='9' cy='9' r='5'/><circle cx='15' cy='9' r='5'/><circle cx='12' cy='15' r='5'/>",
+		"grain":"<path d='M4 4h16v16H4zM7 7h1M14 6h1M10 11h1M17 12h1M6 16h1M13 18h1M17 17h1'/>",
+		"pixelate":"<path d='M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z'/>",
+		"halftone":"<circle cx='6' cy='6' r='3'/><circle cx='17' cy='6' r='2'/><circle cx='6' cy='17' r='2'/><circle cx='17' cy='17' r='1'/>",
+		"scanlines":"<path d='M3 4h18M3 8h18M3 12h18M3 16h18M3 20h18'/>",
+		"curves":"<path d='M3 3v18h18M4 18c4 0 5-12 10-12s3 10 7-2'/><circle cx='14' cy='6' r='2'/>",
+		"gradient_map":"<path d='M3 6h18v12H3zM7 6v12M12 6v12M17 6v12M5 2l3 2-3 2'/>",
+		"color_replace":"<circle cx='6' cy='7' r='4'/><circle cx='18' cy='17' r='4'/><path d='M13 4h8v6M21 4l-8 8M3 14v6h8'/>",
+		"shader":"<path d='m8 5-6 7 6 7M16 5l6 7-6 7M14 3l-4 18'/>",
+		"shadows":"<path d='M15 3a9 9 0 1 0 6 14A8 8 0 0 1 15 3z'/>",
+		"midtones":"<circle cx='12' cy='12' r='8'/><path d='M8 5v14M12 4v16M16 5v14'/>",
+		"highlights":"<path d='m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3z'/>",
+		"black_point":"<path d='M3 20h18M4 17l8-13 8 13z'/><circle cx='12' cy='13' r='2' fill='#c5dfdf'/>",
+		"white_point":"<path d='M3 20h18M4 17l8-13 8 13zM8 14h8'/>",
+		"lift":"<path d='M4 20h16M12 17V3M6 9l6-6 6 6'/>",
+		"fade":"<circle cx='12' cy='12' r='9'/><path d='M5 9h14M7 13h10M9 17h6' stroke-dasharray='1 3'/>",
+		"vibrance":"<path d='m12 3 9 16H3zM12 8v6M8 17h8'/><circle cx='12' cy='17' r='1'/>",
+		"cyan_red":"<circle cx='8' cy='12' r='6'/><path d='M14 6h7v12h-7M17 9v6M15 12h4'/>",
+		"magenta_green":"<path d='m3 12 6-8 6 8-6 8z'/><circle cx='17' cy='12' r='4'/>",
+		"yellow_blue":"<path d='M3 5h8v14H3zM14 5l7 7-7 7z'/>",
+		"shadow_warmth":"<path d='M13 4a8 8 0 1 0 6 13A7 7 0 0 1 13 4zM17 3v6M14 6h6'/>",
+		"highlight_warmth":"<circle cx='8' cy='12' r='4'/><path d='M8 3v2M8 19v2M1 12h2M13 12h2M19 6v12M16 9l3-3 3 3'/>",
+		"red":"<path d='M4 20V4h6a4 4 0 0 1 0 8H4M10 12l6 8M18 4v5'/>",
+		"green":"<path d='M18 7a7 7 0 1 0 0 10v-5h-6M20 4v4'/>",
+		"blue":"<path d='M5 3v18h7a4 4 0 0 0 0-8H5M5 3h6a5 5 0 0 1 0 10'/>",
+		"grayscale":"<rect x='3' y='5' width='18' height='14' rx='2'/><path d='M7 5v14M12 5v14M17 5v14'/>",
+		"sepia":"<path d='M6 3h12l3 6-9 12L3 9zM3 9h18M8 9l4 12 4-12'/>",
+		"posterize":"<path d='M3 21V3M3 18h5v-5h5V8h5V3h3'/>",
+		"solarize":"<path d='M3 19 8 5l5 14 5-14 3 14M3 12h18'/>",
+		"threshold":"<rect x='3' y='3' width='18' height='18' rx='2'/><path d='M12 3v18M12 3h9v18h-9z' fill='#c5dfdf'/>",
+		"colorize":"<path d='M4 18c-5-8 2-16 11-14 8 2 9 9 5 11-2 1-5-2-7 1s1 6-5 5z'/><circle cx='8' cy='9' r='1'/><circle cx='13' cy='7' r='1'/><circle cx='18' cy='10' r='1'/>",
+		"add":"<path d='M4 12h16M12 4v16'/><circle cx='12' cy='12' r='10'/>",
+		"subtract":"<circle cx='12' cy='12' r='9'/><path d='M5 12h14'/>",
+		"multiply":"<path d='m5 5 14 14M19 5 5 19'/>",
+		"divide":"<path d='M4 12h16'/><circle cx='12' cy='5' r='2'/><circle cx='12' cy='19' r='2'/>",
+		"power":"<path d='m3 10 8 11M11 10 3 21M14 4c0-5 7-5 7 0 0 3-7 5-7 8h7'/>",
+		"clamp":"<path d='M7 3H3v18h4M17 3h4v18h-4M7 12h10'/>",
+		"lerp":"<path d='M3 19 21 5M3 5v14h18'/><circle cx='12' cy='12' r='3'/>",
+		"minimum":"<path d='m4 15 8-10 8 10M4 20h16'/>",
+		"maximum":"<path d='m4 9 8 10 8-10M4 4h16'/>",
+		"absolute":"<path d='M3 3v18M21 3v18M7 16l5-10 5 10'/>",
+		"invert":"<circle cx='7' cy='8' r='4'/><circle cx='17' cy='16' r='4' fill='#c5dfdf'/><path d='m14 4 6 0-2 5M10 20H4l2-5'/>",
+		"smoothstep":"<path d='M3 3v18h18M4 18h3c8 0 1-12 9-12h5'/>"},true)
 	var svg: String="<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><g fill='none' stroke='#c5dfdf' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'>"+str(paths.get(name,paths.image))+"</g></svg>"
 	var bitmap:=Image.new(); bitmap.load_svg_from_string(svg)
 	var texture:=ImageTexture.create_from_image(bitmap)
@@ -305,6 +372,7 @@ func _build_ui() -> void:
 	var rail:=VBoxContainer.new(); rail.custom_minimum_size.x=42; rail.add_theme_constant_override("separation",3); stage.add_child(rail)
 	_tool_section(rail,"SELECT",[["move","Move · V"],["pixel_select","Pixel selection · M"]])
 	_tool_section(rail,"PAINT",[["brush","Draw · B"],["eraser","Erase · E"],["fill","Bucket · G"]])
+	_tool_section(rail,"DEFORM",[["warp","Warp & Liquify · W"],["repair","Texture & Repair"]])
 	_tool_section(rail,"ADJUST",[["values","Color adjustments"],["effects","Effects & Styles"]])
 	_effects_button=tool_buttons.effects
 	color_picker.color=Color("62d9bc")
@@ -438,11 +506,15 @@ func open_source(value: Variant,state: Dictionary={}) -> void:
 	_effects_signature=""; _effects_button.set_pressed_no_signal(canvas.tool=="effects")
 	canvas.paint_selection_only=bool(ui.get("paint_selection_only",false))
 	canvas.stroke_correct=bool(ui.get("stroke_correct",canvas.stroke_correct))
+	canvas.brush_type=str(ui.get("brush_type",canvas.brush_type)); canvas.soften_strength=float(ui.get("soften_strength",canvas.soften_strength))
 	canvas.correction_strength=float(ui.get("correction_strength",canvas.correction_strength))
 	canvas.correction_scale=clampf(float(ui.get("correction_scale",canvas.correction_scale)),.1,16)
 	canvas.pixel_match_all=bool(ui.get("pixel_match_all",false))
 	canvas.edge_magnet=bool(ui.get("edge_magnet",false)); canvas.edge_threshold=float(ui.get("edge_threshold",.4))
 	canvas.object_threshold=float(ui.get("object_threshold",.5)); canvas.smart_selection.invalidate()
+	canvas.selection_alpha=float(ui.get("selection_alpha",1)); canvas.selection_falloff=float(ui.get("selection_falloff",0))
+	canvas.warp_tool.restore_settings(ui.get("warp_settings",{}))
+	canvas.repair_tool.restore_settings(ui.get("repair_settings",{}))
 	canvas.sync_pixel_selection()
 	_main_split.split_offset=int(ui.get("main_split",1000)); _side_split.split_offset=int(ui.get("side_split",280))
 	renderer._topology="_unbuilt_"; renderer.sync(document); canvas.preview=renderer.texture()
@@ -463,9 +535,13 @@ func _ui_state() -> Dictionary:
 	return {"selected":canvas.selected.duplicate(),"zoom":canvas.zoom,"pan":canvas.pan,"tool":canvas.tool,
 		"pixel_mode":canvas.pixel_mode,"pixel_box_select":canvas.pixel_box_select,"effects_open":_effects_open,"effects_filter":_effects_filter,
 		"stroke_correct":canvas.stroke_correct,"correction_strength":canvas.correction_strength,
+		"brush_type":canvas.brush_type,"soften_strength":canvas.soften_strength,
 		"correction_scale":canvas.correction_scale,
 		"paint_selection_only":canvas.paint_selection_only,"pixel_match_all":canvas.pixel_match_all,
 		"edge_magnet":canvas.edge_magnet,"edge_threshold":canvas.edge_threshold,"object_threshold":canvas.object_threshold,
+		"warp_settings":canvas.warp_tool.settings(),
+		"repair_settings":canvas.repair_tool.settings(),
+		"selection_alpha":canvas.selection_alpha,"selection_falloff":canvas.selection_falloff,
 		"main_split":_main_split.split_offset,"side_split":_side_split.split_offset,
 		"macros":_macros.duplicate(true),"variants":_variants.duplicate(),"recent_assets":_recent_assets.duplicate(),"custom_shortcuts":_custom_shortcuts.duplicate()}
 
@@ -562,6 +638,8 @@ func _cancel() -> void:
 
 
 func _finish_pending() -> void:
+	if canvas.warp_tool.active: canvas.warp_tool.finish()
+	if canvas.repair_tool.active: canvas.repair_tool.cancel()
 	if canvas._drag in ["object_preview","edge_pending"]:
 		if canvas._drag=="object_preview" and canvas._smart_ready: canvas.commit_object_selection()
 		else: canvas.cancel_gesture()
@@ -602,6 +680,8 @@ func _restored() -> void:
 		if polygon!=null: _draw_custom_shape(polygon)
 		else: _set_tool("move")
 	_refresh_pending=true; _refresh_layers(); _refresh_inspector(); _refresh_context()
+	var material_browser:=get_node_or_null("MaterialBrowser")
+	if material_browser!=null: material_browser.refresh_from_layer()
 	_dirty=true; _update_title(); document_changed.emit()
 
 
@@ -682,6 +762,10 @@ func _create_at(kind: String,bounds: Rect2,points: PackedVector2Array) -> void:
 
 
 func _set_tool(id: String) -> void:
+	if canvas.repair_tool.active:
+		canvas.repair_tool.finish()
+		while canvas.repair_tool.active: await get_tree().process_frame
+	if canvas.warp_tool.active: canvas.warp_tool.finish()
 	if canvas._drag=="object_preview" and canvas._smart_ready: canvas.commit_object_selection()
 	canvas.grab_focus()
 	canvas.cancel_gesture()
@@ -700,6 +784,10 @@ func _set_tool(id: String) -> void:
 
 
 func _tool_hint() -> String:
+	if canvas.tool=="warp":
+		if canvas.warp_tool.mode=="mesh": return "Drag points to deform · Shift+wheel: radius · Shift-click: select mesh points · Esc: cancel"
+		return "Drag to deform · Shift+wheel: size · Shift-click: select mesh points · Ctrl-click pin: lock · Right-click pin: delete · Esc: cancel"
+	if canvas.tool=="repair": return "Drag: repair or paint texture · Alt-click / drag: sample · Shift+wheel: size · Space: pan · Esc: cancel"
 	if canvas.tool=="pixel_select" and canvas.pixel_mode in ["crop","lasso_crop"]:
 		return "Drag a crop region · Release applies · Right-click / Esc cancels"
 	if canvas.tool=="pixel_select" and canvas.pixel_box_select and canvas.pixel_mode in ["brush","erase"]:
@@ -735,6 +823,9 @@ func _tool_section(rail: Node,caption: String,entries: Array) -> void:
 func _refresh_context() -> void:
 	_clear(context)
 	_context_host=context
+	if canvas.tool in ["pixel_select","repair"]:
+		var rows:=VBoxContainer.new(); rows.name="ContextRows"; rows.size_flags_horizontal=Control.SIZE_EXPAND_FILL; rows.add_theme_constant_override("separation",3); context.add_child(rows)
+		_next_toolbar_row()
 	if canvas.tool=="brush":
 		# Brush controls are one row; narrow windows scroll instead of wrapping
 		# controls onto a second row and taking space away from the canvas.
@@ -752,6 +843,12 @@ func _refresh_context() -> void:
 	var label:=Label.new(); label.text=canvas.tool.replace("_"," ").capitalize()
 	label.custom_minimum_size.x=62; label.size_flags_vertical=Control.SIZE_SHRINK_CENTER; label.add_theme_color_override("font_color",Color("7fe3cd")); _context_host.add_child(label)
 	if canvas.tool=="brush": label.custom_minimum_size.x=48
+	if canvas.tool=="warp":
+		preload("res://Workspaces/ImageWorkspace/image_warp_toolbar.gd").build(self)
+		return
+	if canvas.tool=="repair":
+		preload("res://Workspaces/ImageWorkspace/image_repair_toolbar.gd").build(self)
+		return
 	if canvas.tool in ["values","effects"]:
 		_button(context,"Adjustments" if canvas.tool=="values" else "Effects",func(): _open_stack_editor(canvas.tool=="values"),"Choose, order, and preview adjustments" if canvas.tool=="values" else "Choose, order, and preview effects",canvas.tool)
 		if not canvas.selected.is_empty():
@@ -759,13 +856,12 @@ func _refresh_context() -> void:
 			if layer!=null:
 				if canvas.tool=="effects": _effect_selection_control(context,layer)
 				else:
-					_check(context,"Affect selected pixels only",bool(layer.properties.get("values_selection_only",false)),func(value: bool):
-						layer.properties.values_selection_only=value
-						layer.properties.values_selection=document.pixel_selection
-						layer.properties.values_selection_frame=document.world_transform(layer)
-						layer.properties.values_selection_dimensions=layer.dimensions)
+					var selected_only:=CheckButton.new(); selected_only.name="ValuesSelectionOnly"; selected_only.text="Affect selected pixels only"; selected_only.button_pressed=layer.properties.get("values_selection_only",false); context.add_child(selected_only)
+					selected_only.toggled.connect(_set_adjustment_selection_only)
 		return
 	if canvas.tool=="pixel_select":
+		_pixel_threshold_control("Selection Alpha",canvas.selection_alpha,func(value: float): canvas.selection_alpha=value; if canvas._drag=="object_preview": canvas.set_object_threshold(canvas.object_threshold))
+		_pixel_threshold_control("Selection Falloff",canvas.selection_falloff,func(value: float): canvas.selection_falloff=value; if canvas._drag=="object_preview": canvas.set_object_threshold(canvas.object_threshold))
 		var modes:=_toolbar_group("SELECT PIXELS","mask")
 		for entry in [["brush","brush","Paint selection"],["erase","eraser","Erase selection"],["fill","fill","Select connected colors"],["object","mask","Object Selector"]]:
 			var mode: String=entry[0]
@@ -803,11 +899,16 @@ func _refresh_context() -> void:
 			else: value.queue_free()
 		else:
 			value.queue_free(); _crop_controls()
+		_next_toolbar_row()
 		var actions:=_toolbar_group("SELECTED PIXELS","layers")
 		_button(actions,"Copy",func(): _apply_pixel_selection("copy"),"Copy selected pixels into a new layer","duplicate")
 		_button(actions,"Delete",func(): _apply_pixel_selection("delete"),"Delete selected pixels","trash")
 		_button(actions,"Extract",func(): _apply_pixel_selection("extract"),"Move selected pixels to a new layer","crop")
 		var selection_tools:=_toolbar_group("SELECTION","mask")
+		var fill_group:=_toolbar_group("COLOR FILL","fill")
+		var fill_color:=ColorPickerButton.new(); fill_color.color=_selection_fill_color; fill_color.custom_minimum_size=Vector2(48,28); fill_group.add_child(fill_color)
+		fill_color.color_changed.connect(func(value: Color): _selection_fill_color=value)
+		_button(fill_group,"Confirm",func(): preload("res://Workspaces/ImageWorkspace/image_selection_fill.gd").apply(self,_selection_fill_color),"Fill selected pixels on the active layer","check")
 		_button(selection_tools,"Clear",func(): _action(func(): document.pixel_selection=null); canvas.sync_pixel_selection(),"Clear the pixel selection")
 		_button(selection_tools,"Opaque",func(): _select_pixel_region(false),"Select every pixel with non-zero alpha")
 		_button(selection_tools,"Invert",func(): _select_pixel_region(true),"Invert pixel selection · Ctrl+I")
@@ -826,27 +927,28 @@ func _refresh_context() -> void:
 		var hardness:=HSlider.new(); hardness.min_value=0; hardness.max_value=1; hardness.step=.01; hardness.value=canvas.hardness; hardness.custom_minimum_size=Vector2(80,32); hardness.size_flags_vertical=Control.SIZE_SHRINK_CENTER; hardness_group.add_child(hardness)
 		hardness.value_changed.connect(func(value: float): canvas.hardness=value)
 		if canvas.tool=="brush":
-			var paint_group:=_toolbar_group("PAINT","layers")
-			_context_color("Color",paint_group)
-			_toolbar_toggle(paint_group,"plus",canvas.paint_new_layer,"Draw each stroke on a new layer",func(value: bool): canvas.paint_new_layer=value)
+			if canvas.brush_type!="soften":
+				var paint_group:=_toolbar_group("PAINT","layers")
+				_context_color("Color",paint_group)
+				_toolbar_toggle(paint_group,"plus",canvas.paint_new_layer,"Draw each stroke on a new layer",func(value: bool): canvas.paint_new_layer=value)
 			var correction_group:=_toolbar_group("STROKE","effects")
 			# Prioritize correction beside the tool title, before groups that can wrap.
 			_context_host.move_child(correction_group.get_parent().get_parent(),2)
-			var correction:=CheckButton.new(); correction.text="Stroke Correct"; correction.button_pressed=canvas.stroke_correct; correction_group.add_child(correction)
-			correction.name="StrokeCorrect"
+			preload("res://Workspaces/ImageWorkspace/image_warp_picker.gd").build(self,correction_group,"BrushType","BRUSH TYPE",["normal","stroke_correct","soften"],["Normal","Stroke Correct","Soften"],canvas.brush_type,func(index: int):
+				_finish_pending(); canvas.cancel_gesture(); canvas.brush_type=["normal","stroke_correct","soften"][index]; _refresh_context(); status.text=_tool_hint(); _persist_paint_presets())
 			var strength:=HSlider.new(); strength.min_value=0; strength.max_value=100; strength.step=1
-			strength.name="CorrectionStrength"
-			strength.value=canvas.correction_strength*100; strength.custom_minimum_size=Vector2(85,28)
-			strength.tooltip_text="Correction Strength: %d%%" % strength.value
+			strength.name="SoftenStrength" if canvas.brush_type=="soften" else "CorrectionStrength"
+			strength.value=(canvas.soften_strength if canvas.brush_type=="soften" else canvas.correction_strength)*100; strength.custom_minimum_size=Vector2(85,28)
+			strength.tooltip_text="Soften strength" if canvas.brush_type=="soften" else "Correction strength"
+			var strength_caption:=Label.new(); strength_caption.text="Strength"; strength_caption.add_theme_font_size_override("font_size",11); strength_caption.visible=canvas.brush_type!="normal"; correction_group.add_child(strength_caption)
 			strength.size_flags_vertical=Control.SIZE_SHRINK_CENTER; correction_group.add_child(strength)
 			var strength_label:=Label.new(); strength_label.text="%d%%" % strength.value; strength_label.custom_minimum_size.x=34; correction_group.add_child(strength_label)
-			strength.visible=canvas.stroke_correct; strength_label.visible=canvas.stroke_correct
-			correction.toggled.connect(func(enabled: bool):
-				canvas.stroke_correct=enabled; strength.visible=enabled; strength_label.visible=enabled; status.text=_tool_hint(); _persist_paint_presets())
+			strength.visible=canvas.brush_type!="normal"; strength_label.visible=canvas.brush_type!="normal"
 			strength.drag_started.connect(func(): strength.set_meta("dragging",true))
 			strength.value_changed.connect(func(value: float):
-				canvas.correction_strength=value/100.0; strength_label.text="%d%%" % value
-				strength.tooltip_text="Correction Strength: %d%%" % value
+				if canvas.brush_type=="soften": canvas.soften_strength=value/100.0
+				else: canvas.correction_strength=value/100.0
+				strength_label.text="%d%%" % value
 				if not bool(strength.get_meta("dragging",false)): _persist_paint_presets())
 			strength.drag_ended.connect(func(_changed: bool):
 				strength.set_meta("dragging",false); _persist_paint_presets())
@@ -856,7 +958,6 @@ func _refresh_context() -> void:
 			scale.tooltip_text="Smooth broader shapes at larger scales · Gap closing stays within 16 image pixels · Alt+wheel"
 			correction_group.add_child(scale); _context_fields.correction_scale=scale
 			scale.visible=canvas.stroke_correct; scale_label.visible=canvas.stroke_correct
-			correction.toggled.connect(func(enabled: bool): scale.visible=enabled; scale_label.visible=enabled)
 			scale.value_changed.connect(func(value: float): canvas.correction_scale=value; _persist_paint_presets())
 			scale.preview_changed.connect(func(value: float): canvas.correction_scale=value)
 			scale.drag_committed.connect(func(value: float): canvas.correction_scale=value; _persist_paint_presets())
@@ -1017,6 +1118,7 @@ func _load_paint_presets(path: String=PAINT_PRESETS_PATH) -> void:
 		var saved:=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE)
 		if saved!=null:
 			canvas.stroke_correct=bool(saved.get_meta("stroke_correct",false))
+			canvas.brush_type=str(saved.get_meta("brush_type",canvas.brush_type)); canvas.soften_strength=clampf(float(saved.get_meta("soften_strength",.5)),0,1)
 			canvas.correction_strength=clampf(float(saved.get_meta("correction_strength",.5)),0,1)
 			canvas.correction_scale=clampf(float(saved.get_meta("correction_scale",1.0)),.1,16)
 			var stored: Variant=saved.get_meta("presets",{})
@@ -1087,6 +1189,7 @@ func _apply_paint_preset(kind: String,preset: Dictionary) -> void:
 	canvas.color=preset.get("color",canvas.color); color_picker.color=canvas.color
 	if kind=="brush":
 		canvas.stroke_correct=bool(preset.get("stroke_correct",canvas.stroke_correct))
+		canvas.brush_type=str(preset.get("brush_type",canvas.brush_type)); canvas.soften_strength=clampf(float(preset.get("soften_strength",canvas.soften_strength)),0,1)
 		canvas.correction_strength=clampf(float(preset.get("correction_strength",canvas.correction_strength)),0,1)
 		canvas.correction_scale=clampf(float(preset.get("correction_scale",canvas.correction_scale)),.1,16)
 		_persist_paint_presets()
@@ -1109,6 +1212,7 @@ func _current_paint_preset(label: String) -> Dictionary:
 	var result:=_preset(label,canvas.brush_size,canvas.brush_opacity,canvas.hardness,canvas.color,canvas.fill_threshold)
 	if canvas.tool=="brush": result.stroke_correct=canvas.stroke_correct; result.correction_strength=canvas.correction_strength
 	if canvas.tool=="brush": result.correction_scale=canvas.correction_scale
+	if canvas.tool=="brush": result.brush_type=canvas.brush_type; result.soften_strength=canvas.soften_strength
 	result.mode=canvas.brush_mode; return result
 
 
@@ -1123,6 +1227,7 @@ func _persist_paint_presets(path: String=PAINT_PRESETS_PATH) -> void:
 	var library:=Resource.new(); library.set_meta("presets",_paint_presets)
 	library.set_meta("stroke_correct",canvas.stroke_correct); library.set_meta("correction_strength",canvas.correction_strength)
 	library.set_meta("correction_scale",canvas.correction_scale)
+	library.set_meta("brush_type",canvas.brush_type); library.set_meta("soften_strength",canvas.soften_strength)
 	ResourceSaver.save(library,path)
 
 
@@ -1154,10 +1259,11 @@ func _select_pixel_region(invert: bool) -> void:
 	for y in range(domain.position.y,domain.end.y):
 		for x in range(domain.position.x,domain.end.x):
 			var offset: int=(y*document.canvas_size.x+x)*4
-			var selected: bool=(previous.is_empty() or previous[offset+3]<128) if invert else source_bytes[offset+3]>0
-			if selected:
-				for channel in 4: bytes[offset+channel]=255
+			var coverage: float=(1.0-(float(previous[offset+3])/255.0 if not previous.is_empty() else 0.0)) if invert else (canvas.selection_alpha if source_bytes[offset+3]>0 else 0.0)
+			for channel in 3: bytes[offset+channel]=255
+			bytes[offset+3]=roundi(coverage*255)
 	var bitmap:=Image.create_from_data(document.canvas_size.x,document.canvas_size.y,false,Image.FORMAT_RGBA8,bytes)
+	if not invert and canvas.selection_falloff>0: bitmap=preload("res://Workspaces/ImageWorkspace/pixel_selection_alpha.gd").feather(bitmap,canvas.selection_falloff)
 	_action(func():
 		document.pixel_selection=ImageTexture.create_from_image(bitmap); document.pixel_selection_owner=canvas.selected[-1]
 		var owner:=document.layer_for_id(canvas.selected[-1])
@@ -1165,6 +1271,32 @@ func _select_pixel_region(invert: bool) -> void:
 		document.pixel_selection_reference_world=document.world_transform(owner) if owner!=null else Transform2D.IDENTITY)
 	canvas.sync_pixel_selection()
 
+
+func _set_adjustment_selection_only(enabled: bool) -> void:
+	_finish_pending()
+	var layer:=_main_layer(); var owner:=document
+	if layer==null: return
+	var mask: Texture2D
+	if enabled:
+		canvas.sync_pixel_selection()
+		if canvas.selection==null or not canvas.selection.get_used_rect().has_area():
+			status.text="Select pixels first, then enable Affect selected pixels only"; _refresh_context(); return
+		mask=await preload("res://Workspaces/ImageWorkspace/image_selection_fill.gd").capture_local_mask(self,layer)
+		if mask==null: _refresh_context(); return
+	if document!=owner or document.layer_for_id(layer.id)!=layer: return
+	_action(func():
+		layer.properties.values_selection_only=enabled
+		if enabled:
+			layer.properties.values_selection=mask; layer.properties.values_selection_local=true
+			layer.properties.erase("values_selection_frame"); layer.properties.erase("values_selection_dimensions"))
+
+func _next_toolbar_row() -> void:
+	var rows:=context.get_node_or_null("ContextRows")
+	if rows==null: return
+	var line:=HBoxContainer.new(); line.size_flags_horizontal=Control.SIZE_EXPAND_FILL; rows.add_child(line)
+	var scroll:=ScrollContainer.new(); scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED; scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_AUTO; line.add_child(scroll)
+	var row:=HBoxContainer.new(); row.size_flags_horizontal=Control.SIZE_EXPAND_FILL; row.add_theme_constant_override("separation",4); scroll.add_child(row); _context_host=row
 
 func _toolbar_group(caption: String,icon_name: String) -> HBoxContainer:
 	var panel:=PanelContainer.new(); panel.tooltip_text=caption.capitalize(); panel.add_theme_stylebox_override("panel",_box(Color("131e2a"),Color("304555"),6,3)); _context_host.add_child(panel)
@@ -1312,6 +1444,19 @@ func _refresh_inspector() -> void:
 	_clear(inspector); _text_input=null
 	var layer:=_main_layer()
 	if layer==null: return
+	if layer.properties.get("texture_material") is KiwiTextureMaterial:
+		if canvas.tool=="repair" and get_node_or_null("MaterialBrowser")==null:
+			canvas.repair_tool.material=layer.properties.texture_material.copy_material()
+			canvas.repair_tool.material.coverage=null; canvas.repair_tool.material.source=null
+		_button(inspector,"Edit painted material",func():
+			canvas.repair_tool.material=layer.properties.texture_material.copy_material(); canvas.repair_tool.main_mode="texture"; _set_tool("repair")
+			load("res://Workspaces/ImageWorkspace/texture_material_browser.gd").open(self),"Change the material without repainting its coverage","noise")
+		_button(inspector,"Bake material",rasterize_selected,"Convert this material layer into ordinary editable pixels","check")
+	if layer.properties.get("texture_recipe") is KiwiImageTextureRecipe:
+		_button(inspector,"Edit procedural texture",func():
+			canvas.repair_tool.recipe=layer.properties.texture_recipe.copy_recipe()
+			canvas.repair_tool.mode="procedural"; _set_tool("repair")
+			canvas.repair_tool.generate(),"Reopen the saved texture recipe","noise")
 	if layer.kind=="image":
 		_image_source_property(layer)
 	elif layer.kind=="text":
@@ -1749,7 +1894,7 @@ func _build_effects(layer: KiwiImageLayer) -> void:
 	var effects:=_section("Effects")
 	_effect_selection_control(effects,layer)
 	var choices: Array=[]
-	for kind in ["mirror","brightness","contrast","saturation","curves","blur","sharpen","outline","shadow","glow","wave","twirl","chromatic","grain","pixelate","halftone","posterize","vignette","gradient_map","color_replace","grayscale","invert"]:
+	for kind in AVAILABLE_EFFECTS:
 		var effect_kind: String=kind
 		choices.append([effect_kind.capitalize(),func(): add_effect(effect_kind)])
 	choices.append(["Canvas shader…",_choose_shader_effect])
@@ -1788,12 +1933,7 @@ func _build_effects(layer: KiwiImageLayer) -> void:
 		if effect.type=="shader" and effect.get("shader") is Shader: _shader_fields(fields,effect)
 		if effect.type=="mirror": _mirror_fields(fields,effect)
 		if effect.type=="curves":
-			var graph:=ActorValueCurve.new(); graph.curve=effect.curve; graph.editable=true; graph.custom_minimum_size.y=145; fields.add_child(graph)
-			graph.edit_started.connect(_begin)
-			graph.preview_changed.connect(func(curve: Curve): effect.curve=curve; _preview())
-			graph.edit_committed.connect(_commit)
-			graph.edit_cancelled.connect(_cancel)
-			_button(fields,"Reset curve",func(): _action(func(): effect.curve=ActorValueCurve.preset("Linear")))
+			_curve_effect_fields(fields,effect)
 
 
 func add_effect(kind: String) -> void:
@@ -1805,11 +1945,15 @@ func add_effect(kind: String) -> void:
 			layer.effects.append(_new_effect(kind)))
 
 func _new_effect(kind: String) -> Dictionary:
-	return {"id":ActorData.new_id(),"type":kind,"enabled":true,
+	var effect:={"id":ActorData.new_id(),"type":kind,"enabled":true,
 		"amount":0.0 if kind=="brightness" else (8.0 if kind in ["blur","outline","shadow","glow","wave","chromatic","halftone"] else (6.0 if kind in ["pixelate","posterize"] else 1.0)),
 		"color":Color.WHITE if kind in ["outline","glow"] else Color(0,0,0,.65),"offset":Vector2(8,8),
 		"color2":Color.WHITE,"mirror_side":0,"mirror_position":0.5,
 		"curve":ActorValueCurve.preset("Linear") if kind=="curves" else null}
+	var amounts:={"emboss":1.0,"edge_detect":1.0,"motion_blur":12.0,"radial_blur":8.0,"kaleidoscope":6.0,"ripple":8.0,"scanlines":.35}
+	if amounts.has(kind): effect.amount=amounts[kind]
+	effect.angle=0.0; effect.spacing=6.0 if kind=="scanlines" else 12.0
+	return effect
 
 
 func _move_effect(index: int,direction: int) -> void:
@@ -2085,7 +2229,7 @@ func rasterize_selected() -> void:
 	var roots:=document.selected_roots(canvas.selected)
 	var targets: Array[KiwiImageLayer]=[]
 	for layer in roots:
-		if layer.kind not in ["image","paint","basic"]: targets.append(layer)
+		if layer.kind not in ["image","paint","basic"] or layer.properties.get("texture_material") is KiwiTextureMaterial: targets.append(layer)
 	if targets.is_empty(): return
 	_rasterizing=true; status.text="Preparing layer for pixel editing…"
 	var replacements:={}
@@ -2408,7 +2552,7 @@ func selection_to_layer() -> void:
 	if bitmap==null or bitmap.is_empty(): status.text="Could not read the canvas."; return
 	for y in bitmap.get_height():
 		for x in bitmap.get_width():
-			if not canvas.selected_pixel(Vector2(x,y)): bitmap.set_pixel(x,y,Color.TRANSPARENT)
+			var pixel:=bitmap.get_pixel(x,y); pixel.a*=canvas.selection_coverage(Vector2(x,y)); bitmap.set_pixel(x,y,pixel)
 	var layer:=Layer.create("image",document.canvas_size); layer.label="Selection"; layer.texture=ImageTexture.create_from_image(bitmap); layer.paint_base=layer.texture
 	_action(func(): document.layers.append(layer); canvas.selected.assign([layer.id]))
 	canvas.clear_selection()
@@ -2446,16 +2590,14 @@ func _apply_pixel_selection(action: String) -> void:
 	if not canvas.selection.get_used_rect().has_area(): return
 	var pixels: Image=canvas.pixel_source.duplicate()
 	var extracted:=Image.create(pixels.get_width(),pixels.get_height(),false,Image.FORMAT_RGBA8); extracted.fill(Color(0,0,0,0))
-	var area:=canvas.selection.get_used_rect(); var mask:=canvas.selection.get_data(); var width:=pixels.get_width()
+	var area:=Rect2i(Vector2i(canvas.pixel_selection_bounds.position.floor()),Vector2i(canvas.pixel_selection_bounds.size.ceil())).intersection(Rect2i(Vector2i.ZERO,pixels.get_size()))
 	for y in range(area.position.y,area.end.y):
-		var x:=area.position.x
-		while x<area.end.x:
-			if mask[(y*width+x)*4+3]==0: x+=1; continue
-			var left:=x
-			while x<area.end.x and mask[(y*width+x)*4+3]>0: x+=1
-			var span:=Rect2i(left,y,x-left,1)
-			extracted.blit_rect(pixels,span,span.position)
-			if action!="copy": pixels.fill_rect(span,Color(0,0,0,0))
+		for x in range(area.position.x,area.end.x):
+			var coverage:=canvas.selection_coverage(Vector2(x+.5,y+.5))
+			if coverage<=0: continue
+			var original:=pixels.get_pixel(x,y); var taken:=original; taken.a*=coverage
+			extracted.set_pixel(x,y,taken)
+			if action!="copy": pixels.set_pixel(x,y,original.lerp(Color.TRANSPARENT,coverage))
 	var selection_layer:=_basic_from_image(extracted,"Selected pixels")
 	_action(func():
 		if action!="copy":
@@ -2465,7 +2607,7 @@ func _apply_pixel_selection(action: String) -> void:
 			var parent:=document.layer_for_id(layer.parent_id)
 			var inverse:=document.world_transform(parent).affine_inverse() if parent!=null else Transform2D.IDENTITY
 			layer.kind="basic"; layer.dimensions=baked.dimensions; layer.position=inverse*(baked.position+baked.dimensions*.5)-baked.dimensions*.5
-			layer.rotation=0; layer.opacity=1; layer.texture=baked.texture; layer.paint_base=baked.paint_base; layer.mask=null; layer.effects.clear(); layer.properties=baked.properties
+			layer.rotation=0; layer.opacity=1; layer.texture=baked.texture; layer.paint_base=baked.paint_base; layer.mask=null; layer.warp=null; layer.effects.clear(); layer.properties=baked.properties
 			layer.set_linear_basis(inverse)
 			var new_inverse:=document.world_transform(layer).affine_inverse()
 			for child in document.children(layer.id):
@@ -2660,8 +2802,13 @@ func save_project_as() -> void:
 	await _save_targets(false,true)
 
 
+func _wait_for_repair() -> void:
+	if canvas.repair_tool.active: canvas.repair_tool.finish()
+	while canvas.repair_tool.active or (canvas.repair_tool.engine.busy() and not canvas.repair_tool._generation_target.is_empty()): await get_tree().process_frame
+
 func _save_targets(write_image: bool,write_project: bool) -> void:
 	if _busy: return
+	await _wait_for_repair()
 	_finish_pending()
 	if document.output_path.is_empty() and document_path.is_empty() and not source is ImageTexture:
 		await save_as(); return
@@ -2757,6 +2904,7 @@ func export_image() -> void:
 
 
 func _export_to(destination: String) -> void:
+	await _wait_for_repair()
 	_finish_pending(); renderer.sync(document)
 	var bitmap:=await renderer.flattened()
 	if bitmap==null or bitmap.is_empty(): status.text="Could not render the image."; return
@@ -2922,7 +3070,7 @@ func _current_selection_bitmap() -> Image:
 	if canvas.selection==null: return result
 	for y in document.canvas_size.y:
 		for x in document.canvas_size.x:
-			if canvas.selected_pixel(Vector2(x,y)): result.set_pixel(x,y,Color.WHITE)
+			result.set_pixel(x,y,Color(1,1,1,canvas.selection_coverage(Vector2(x,y))))
 	return result
 
 
@@ -3049,7 +3197,7 @@ func _refresh_effects_dock() -> void:
 	var label:=Label.new(); label.text=layer.label; label.clip_text=true; label.add_theme_color_override("font_color",Color("9db3c6")); _effects_content.add_child(label)
 	_effect_selection_control(_effects_content,layer)
 	var choices: Array=[]
-	for kind in ["mirror","brightness","contrast","saturation","curves","blur","sharpen","shadow","glow","outline","gradient_map","color_replace","grain","pixelate","halftone","posterize","chromatic","vignette","wave","twirl","grayscale","invert"]:
+	for kind in AVAILABLE_EFFECTS:
 		var effect_kind: String=kind; var title: String=effect_kind.replace("_"," ").capitalize()
 		if title.to_lower().contains(_effects_filter.to_lower()): choices.append([title,func(): add_effect(effect_kind)])
 	if "canvas shader".contains(_effects_filter.to_lower()): choices.append(["Canvas shader…",_choose_shader_effect])
@@ -3105,6 +3253,13 @@ func _sync_linked_styles() -> void:
 
 
 func _effect_fields(fields: Node,effect: Dictionary) -> void:
+	if effect.get("type","")=="emboss": _check(fields,"Preserve color",bool(effect.get("preserve_color",false)),func(value: bool): effect.preserve_color=value)
+	var extra:={"emboss":Vector2(0,4),"edge_detect":Vector2(0,4),"motion_blur":Vector2(0,64),"radial_blur":Vector2(0,32),"kaleidoscope":Vector2(2,16),"ripple":Vector2(0,40),"scanlines":Vector2(0,1)}
+	if extra.has(effect.type):
+		var limits: Vector2=extra[effect.type]
+		_slider(fields,"Amount",float(effect.get("amount",1)),limits.x,limits.y,func(value: float): effect.amount=value)
+	if effect.type in ["motion_blur","kaleidoscope"]: _slider(fields,"Angle",float(effect.get("angle",0)),-180,180,func(value: float): effect.angle=value)
+	if effect.type in ["ripple","scanlines"]: _slider(fields,"Frequency" if effect.type=="ripple" else "Line spacing",float(effect.get("spacing",12)),1,64,func(value: float): effect.spacing=value)
 	var ranges:={"brightness":Vector2(-1,1),"contrast":Vector2(0,3),"saturation":Vector2(0,3),"blur":Vector2(0,24),"sharpen":Vector2(0,2),"outline":Vector2(0,24),"shadow":Vector2(0,24),"glow":Vector2(0,32),"wave":Vector2(0,40),"twirl":Vector2(-12,12),"chromatic":Vector2(0,32),"grain":Vector2(0,1),"pixelate":Vector2(1,128),"halftone":Vector2(2,64),"posterize":Vector2(2,32),"vignette":Vector2(0,2),"color_replace":Vector2(.001,1)}
 	if ranges.has(effect.type):
 		var limits: Vector2=ranges[effect.type]; _slider(fields,"Amount",float(effect.get("amount",1)),limits.x,limits.y,func(value: float): effect.amount=value)
@@ -3116,8 +3271,32 @@ func _effect_fields(fields: Node,effect: Dictionary) -> void:
 	if effect.type=="mirror": _mirror_fields(fields,effect)
 	if effect.type=="shader" and effect.get("shader") is Shader: _shader_fields(fields,effect)
 	if effect.type=="curves":
-		var graph:=ActorValueCurve.new(); graph.curve=effect.curve; graph.editable=true; graph.custom_minimum_size.y=180; fields.add_child(graph)
-		graph.edit_started.connect(_begin); graph.preview_changed.connect(func(curve: Curve): effect.curve=curve; _preview()); graph.edit_committed.connect(_commit); graph.edit_cancelled.connect(_cancel)
+		_curve_effect_fields(fields,effect)
+
+func _curve_effect_fields(fields: Node,effect: Dictionary) -> void:
+	var channel:=OptionButton.new(); channel.name="CurveChannel"
+	for caption in ["Overall RGB","Red","Green","Blue","Alpha"]: channel.add_item(caption)
+	fields.add_child(channel)
+	var keys: Array[String]=["master","red","green","blue","alpha"]
+	var graph:=ActorValueCurve.new(); graph.editable=true; graph.custom_minimum_size.y=150; fields.add_child(graph)
+	var update:=func():
+		var key:=keys[channel.selected]
+		graph.curve=effect.get("curve",ActorValueCurve.preset("Linear")) if key=="master" else effect.get("curves",{}).get(key,ActorValueCurve.preset("Linear"))
+		graph.queue_redraw()
+	channel.item_selected.connect(func(_index: int): update.call()); update.call()
+	graph.edit_started.connect(_begin)
+	graph.preview_changed.connect(func(curve: Curve):
+		if channel.selected==0: effect.curve=curve
+		else:
+			if not effect.has("curves"): effect.curves={}
+			effect.curves[keys[channel.selected]]=curve
+		_preview())
+	graph.edit_committed.connect(_commit); graph.edit_cancelled.connect(_cancel)
+	_button(fields,"Reset channel",func():
+		_action(func():
+			if channel.selected==0: effect.curve=ActorValueCurve.preset("Linear")
+			elif effect.has("curves"): effect.curves.erase(keys[channel.selected]))
+		update.call(),"Reset the selected curve","reset")
 
 
 func _asset_shelf() -> void:
@@ -3297,6 +3476,7 @@ func _quick_export(size: Vector2i,suffix: String,format: String) -> void:
 
 
 func _export_selected_layer() -> void:
+	await _wait_for_repair()
 	var layer:=_main_layer()
 	if layer==null: return
 	var bitmap:=await _render_layers([layer.id])
@@ -3306,6 +3486,7 @@ func _export_selected_layer() -> void:
 
 
 func _export_layers() -> void:
+	await _wait_for_repair()
 	var result:=await ActorProjectResourceSaveDialog.pick(self,"Choose layer export folder","Layers","png",false,PackedStringArray(["png"]))
 	if result.get("cancelled",true): return
 	var base:=str(result.path).get_base_dir()
@@ -3382,7 +3563,7 @@ func _register_commands() -> void:
 		{"name":"Fit canvas","category":"View","shortcut":"F","run":canvas.fit},{"name":"Load canvas shader effect","category":"Effect","run":_choose_shader_effect}]
 	for mode in ["left","center_x","right","top","center_y","bottom"]:
 		var align_mode: String=mode; _commands.append({"name":"Align "+mode.replace("_"," "),"category":"Transform","run":func(): align_selected(align_mode)})
-	for kind in ["mirror","brightness","contrast","saturation","curves","blur","sharpen","shadow","outline","glow","wave","twirl","chromatic","grain","pixelate","halftone","posterize","vignette","gradient_map","color_replace","grayscale","invert"]:
+	for kind in AVAILABLE_EFFECTS:
 		var id: String=kind
 		_commands.append({"name":"Add "+id.replace("_"," ")+" effect","category":"Effect","run":func(): add_effect(id)})
 	for key in tool_buttons:
@@ -3502,6 +3683,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			KEY_L: _set_tool("lasso_crop")
 			KEY_C: _set_tool("crop")
 			KEY_M: _set_tool("pixel_select")
+			KEY_W: _set_tool("warp")
 			KEY_BRACKETLEFT: canvas.brush_size=maxf(1,canvas.brush_size-4); _refresh_context()
 			KEY_BRACKETRIGHT: canvas.brush_size=minf(500,canvas.brush_size+4); _refresh_context()
 			_: return

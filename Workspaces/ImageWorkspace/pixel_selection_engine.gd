@@ -27,9 +27,9 @@ func cancel_request() -> void:
 	_request+=1
 	if _pending.get("kind","")!="analyze": _pending.clear()
 
-func request(kind: String,seed: Vector2,threshold: float,width: float=1) -> int:
+func request(kind: String,seed: Vector2,threshold: float,width: float=1,coverage: Dictionary={}) -> int:
 	_request+=1
-	_pending={"kind":kind,"generation":_generation,"request":_request,"seed":seed,"threshold":threshold,"width":width}
+	_pending={"kind":kind,"generation":_generation,"request":_request,"seed":seed,"threshold":threshold,"width":width,"coverage":coverage}
 	return _request
 
 func _process(_delta: float) -> void:
@@ -56,14 +56,20 @@ func _work(job: Dictionary) -> Dictionary:
 	if job.kind=="object":
 		var segmenter: KiwiPixelObjectSegmenter=job.objects
 		if segmenter==null: segmenter=KiwiPixelObjectSegmenter.new(); segmenter.build(job.image,job.domain)
-		return {"mask":segmenter.propose(job.seed,job.threshold),"objects":segmenter}
+		return {"mask":_finish_mask(segmenter.propose(job.seed,job.threshold),job),"objects":segmenter}
 	var magnet:=KiwiPixelEdgeMagnet.new(); magnet.field=job.edges
 	var path:=magnet.connected(job.seed,job.threshold)
 	if path.is_empty(): return {}
 	var mask:=Image.create(job.domain.size.x,job.domain.size.y,false,Image.FORMAT_RGBA8)
 	for index in path.size(): path[index]-=Vector2(job.domain.position)
 	KiwiPixelEdgeMagnet.paint_band(mask,path,job.width,Rect2i(Vector2i.ZERO,job.domain.size),Color.WHITE,false)
-	return {"mask":mask}
+	return {"mask":_finish_mask(mask,job)}
+
+func _finish_mask(mask: Image,job: Dictionary) -> Image:
+	var coverage: Dictionary=job.get("coverage",{})
+	if mask==null or coverage.is_empty(): return mask
+	mask=preload("res://Workspaces/ImageWorkspace/pixel_selection_alpha.gd").feather(mask,float(coverage.falloff))
+	return preload("res://Workspaces/ImageWorkspace/pixel_selection_alpha.gd").blend(coverage.base,mask,float(coverage.alpha),bool(coverage.subtract),coverage.origin)
 
 func _exit_tree() -> void:
 	if _thread!=null: _thread.wait_to_finish(); _thread=null

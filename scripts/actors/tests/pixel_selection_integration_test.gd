@@ -132,16 +132,32 @@ func run() -> void:
 	editor.add_entry("invert"); await frames(16)
 	check(editor.preview.texture!=null and studio.document.layers[0].effects.size()==1,"Effect stack has a live GPU preview")
 	editor.whole=true; await frames()
-	check(editor.preview.texture==studio.renderer.texture(),"Whole-viewport preview is selectable")
+	check(editor.preview.texture==studio.renderer.composition_texture(),"Whole-composition preview is selectable")
 	editor.search.text="mirror"; editor.search.text_changed.emit("mirror")
 	check(editor.library.get_child_count()==1,"Effect library search filters available effects")
 	await frames(4); editor.get_texture().get_image().save_png("res://.godot/effects_stack_ui.png")
 	editor.close_editor(); await frames()
 	studio._set_tool("values"); studio._open_stack_editor(true); editor=studio.get_node("AdjustmentStackEditor")
+	var effect_catalog:=preload("res://Workspaces/ImageWorkspace/image_stack_editor.gd").EFFECT_CATEGORIES
+	var adjustment_catalog:=preload("res://Workspaces/ImageWorkspace/image_stack_editor.gd").CATEGORIES
+	var seen_icons: Dictionary={}; var adjustment_types: Array=[]
+	for category in adjustment_catalog:
+		for kind: String in adjustment_catalog[category]:
+			adjustment_types.append(kind)
+			var fingerprint:=hash(studio._icon(kind).get_image().get_data())
+			check(not seen_icons.has(fingerprint),"Every adjustment icon is distinct: "+kind); seen_icons[fingerprint]=true
+	for category in effect_catalog:
+		for kind: String in effect_catalog[category]:
+			check(not adjustment_types.has(kind),"Effects and adjustments do not duplicate library items: "+kind)
+			var fingerprint:=hash(studio._icon(kind).get_image().get_data())
+			check(not seen_icons.has(fingerprint),"Every effect icon is distinct: "+kind); seen_icons[fingerprint]=true
+	editor.add_entry("clamp")
+	check(editor.stack.find_children("*","OptionButton",true,false).is_empty(),"Simple math parameters have no operand type/source dropdowns")
+	studio._action(func(): editor.entries().clear()); editor.rebuild_stack()
 	editor.add_entry("brightness"); editor.add_entry("contrast"); editor.add_entry("vibrance"); editor.move_entry(2,0)
 	check(studio.document.layers[0].properties.value_operations[0].type=="vibrance","Adjustment stack supports adding and reordering real color operations")
 	await frames(16); check(editor.preview.texture!=null,"Adjustment stack has a live GPU preview")
-	check(editor.library.get_child_count()>20,"Adjustment library exposes the full set of available color operations")
+	check(editor.library.find_children("*","Button",true,false).size()>40,"Categorized adjustment library exposes all color controls and simple math")
 	editor.get_texture().get_image().save_png("res://.godot/adjustment_stack_ui.png")
 	editor.close_editor(); await frames()
 	studio.free(); await frames(2)

@@ -24,6 +24,10 @@ uniform sampler2D curve_lut;
 uniform vec2 yaw = vec2(0.0);
 uniform int mirror_side = 0;
 uniform float mirror_position = 0.5;
+uniform float effect_angle = 0.0;
+uniform float spacing = 12.0;
+uniform vec2 blur_direction=vec2(1.0,0.0);
+uniform bool preserve_color=false;
 uniform sampler2D effect_original;
 uniform sampler2D effect_selection;
 uniform bool effects_selection_only = false;
@@ -52,18 +56,34 @@ void fragment() {
  }
  vec4 c = outside ? vec4(0.0) : texture(TEXTURE, sample_uv);
  c.rgb /= max(c.a, .00001);
- if (mode == 0 && masked) {
+ if (mode == 25 || mode == 26) {
+  vec2 px=TEXTURE_PIXEL_SIZE;
+  vec3 dx=texture(TEXTURE,UV+vec2(px.x,0.0)).rgb-texture(TEXTURE,UV-vec2(px.x,0.0)).rgb;
+  vec3 dy=texture(TEXTURE,UV+vec2(0.0,px.y)).rgb-texture(TEXTURE,UV-vec2(0.0,px.y)).rgb;
+  if(mode==25 && preserve_color){float relief=dot(dx+dy,vec3(.2126,.7152,.0722))*amount; c.rgb=clamp(c.rgb*(1.0+relief*2.0),vec3(0.0),vec3(1.0));}
+  else{c.rgb=mode==25 ? clamp(vec3(.5)+(dx+dy)*amount,vec3(0.0),vec3(1.0)) : clamp(sqrt(dx*dx+dy*dy)*amount*4.0,vec3(0.0),vec3(1.0));}
+ } else if (mode == 27 || mode == 31) {
+  vec2 direction=mode==27 ? vec2(cos(effect_angle),sin(effect_angle))*TEXTURE_PIXEL_SIZE*amount : (UV-vec2(.5))*amount*.015;
+  vec4 sum=vec4(0.0);
+  for(int i=-6;i<=6;i++){sum+=texture(TEXTURE,UV+direction*float(i)/6.0);}
+  c=sum/13.0; c.rgb/=max(c.a,.00001);
+ } else if (mode == 28 || mode == 29) {
+  vec2 p=(UV/TEXTURE_PIXEL_SIZE-vec2(48.0))/content_size-vec2(.5);
+  if(mode==28){float sector=6.2831853/max(2.0,floor(amount)); float a=atan(p.y,p.x)+effect_angle; a=abs(mod(a,sector)-sector*.5); p=length(p)*vec2(cos(a),sin(a));}
+  else{float r=length(p); p+=normalize(p+vec2(.00001))*sin(r*spacing*6.2831853)*amount/content_size;}
+  vec2 mapped=((p+vec2(.5))*content_size+vec2(48.0))*TEXTURE_PIXEL_SIZE;
+  c=texture(TEXTURE,mapped); c.rgb/=max(c.a,.00001);
+ } else if(mode==30){float line=step(.5,fract((UV.y/TEXTURE_PIXEL_SIZE.y-48.0)/max(1.0,spacing))); c.rgb*=1.0-line*amount;
+ } else if (mode == 0 && masked) {
   vec2 p = (UV / TEXTURE_PIXEL_SIZE - vec2(48.0)) / content_size;
   c.a *= texture(layer_mask, clamp(p, vec2(0.0), vec2(1.0))).r;
  } else if (mode == 1) { c.rgb = clamp(c.rgb + amount, vec3(0.0), vec3(1.0));
  } else if (mode == 2) { c.rgb = clamp((c.rgb - .5) * amount + .5, vec3(0.0), vec3(1.0));
  } else if (mode == 3) { float l = dot(c.rgb, vec3(.2126,.7152,.0722)); c.rgb = clamp(mix(vec3(l), c.rgb, amount), vec3(0.0), vec3(1.0));
  } else if (mode == 4) {
-  vec4 sum = vec4(0.0); float alpha = 0.0;
-  for(int x=-2; x<=2; x++) { for(int y=-2; y<=2; y++) {
-   vec4 s = texture(TEXTURE, UV + vec2(float(x),float(y)) * TEXTURE_PIXEL_SIZE * amount * .5);
-   sum.rgb += s.rgb; alpha += s.a;
-  }} c = vec4(sum.rgb / max(alpha,.00001), alpha / 25.0);
+  vec4 sum=vec4(0.0); float total=0.0; float sigma=max(.001,amount*.4); float stride=max(1.0,amount/16.0);
+  for(int i=-16;i<=16;i++){float sample_offset=float(i)*stride; float weight=exp(-.5*sample_offset*sample_offset/(sigma*sigma)); sum+=texture(TEXTURE,UV+blur_direction*TEXTURE_PIXEL_SIZE*sample_offset)*weight; total+=weight;}
+  c=sum/max(.00001,total); c.rgb/=max(c.a,.00001);
  } else if (mode == 5 || mode == 6 || mode == 9) {
   float a = 0.0;
   for(int x=-2; x<=2; x++) { for(int y=-2; y<=2; y++) {
@@ -79,7 +99,9 @@ void fragment() {
   c = texture(TEXTURE,UV+vec2(sin(UV.y*20.0)*amount*TEXTURE_PIXEL_SIZE.x,0.0));
   c.rgb /= max(c.a,.00001);
  } else if (mode == 11) {
-  c.rgb = vec3(texture(curve_lut,vec2(c.r,.5)).r,texture(curve_lut,vec2(c.g,.5)).r,texture(curve_lut,vec2(c.b,.5)).r);
+  c=vec4(texture(curve_lut,vec2(c.r,.5)).r,texture(curve_lut,vec2(c.g,.5)).g,texture(curve_lut,vec2(c.b,.5)).b,texture(curve_lut,vec2(c.a,.5)).a);
+  vec2 p=UV/TEXTURE_PIXEL_SIZE-vec2(48.0);
+  if(any(lessThan(p,vec2(0.0))) || any(greaterThan(p,content_size))) c.a=0.0;
  } else if (mode == 13) {
   vec3 n=texture(TEXTURE,UV+vec2(0.0,-1.0)*TEXTURE_PIXEL_SIZE).rgb;
   vec3 s=texture(TEXTURE,UV+vec2(0.0,1.0)*TEXTURE_PIXEL_SIZE).rgb;
@@ -233,6 +255,9 @@ class LayerDrawing extends Node2D:
 
 var viewport := SubViewport.new()
 var export_viewport := SubViewport.new()
+var composition_viewport:=SubViewport.new()
+var _composition_enabled:=false
+var _warp_shader:=Shader.new()
 var _export_display := TextureRect.new()
 var document: KiwiImageDocument
 var views: Dictionary = {}
@@ -247,6 +272,7 @@ var preview_transform:=Transform2D.IDENTITY
 
 func _ready() -> void:
 	_shader.code = EFFECT_CODE
+	_warp_shader.code=preload("res://Workspaces/ImageWorkspace/image_warp_render.gd").CODE
 	viewport.transparent_bg = true
 	viewport.render_target_clear_mode=SubViewport.CLEAR_MODE_ALWAYS
 	viewport.disable_3d = true
@@ -262,6 +288,10 @@ func _ready() -> void:
 	var straight := ShaderMaterial.new(); straight.shader = _straight_shader
 	_export_display.material = straight
 	export_viewport.add_child(_export_display)
+	composition_viewport.transparent_bg=true; composition_viewport.disable_3d=true
+	composition_viewport.world_2d=viewport.world_2d
+	composition_viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED
+	add_child(composition_viewport)
 
 
 func _surface(dimensions: Vector2i) -> SubViewport:
@@ -280,15 +310,16 @@ func sync(value: KiwiImageDocument) -> void:
 	viewport.size = preview_size if preview_size!=Vector2i.ZERO and not exporting else Vector2i((Vector2(document.canvas_size)*render_scale).round().max(Vector2.ONE))
 	viewport.canvas_transform=preview_transform if not exporting else Transform2D.IDENTITY
 	export_viewport.size = viewport.size
+	composition_viewport.size=Vector2i((Vector2(document.canvas_size)*render_scale).round()).max(Vector2i.ONE)
 	_export_display.size = Vector2(viewport.size)
 	var topology := ""
 	for layer in document.layers:
-		topology += layer.id + layer.parent_id + layer.kind + str(layer.properties.get("effects_selection_only",false))
+		topology += layer.id + layer.parent_id + layer.kind + str(layer.properties.get("effects_selection_only",false))+str(layer.warp!=null)
 		for effect in layer.effects: topology += str(effect.get("id", "")) + str(effect.get("type", "")) + str(effect.get("shader", ""))
 	if topology != _topology:
 		_topology = topology
 		for child in get_children():
-			if child != viewport and child != export_viewport: remove_child(child); child.queue_free()
+			if child != viewport and child != export_viewport and child != composition_viewport: remove_child(child); child.queue_free()
 		for child in viewport.get_children(): viewport.remove_child(child); child.queue_free()
 		views.clear()
 		for layer in document.children(): _build_layer(layer, viewport)
@@ -297,9 +328,13 @@ func sync(value: KiwiImageDocument) -> void:
 
 
 func _effect_stages(layer: KiwiImageLayer) -> Array:
-	var result: Array=[{"type":"mask","enabled":true}]
+	var result: Array=[]
+	if layer.warp!=null: result.append({"type":"warp","enabled":true})
+	result.append({"type":"mask","enabled":true})
 	for effect in layer.effects:
 		result.append(effect)
+		if effect.get("type","")=="blur":
+			var vertical: Dictionary=effect.duplicate(true); vertical.type="blur_vertical"; result.append(vertical)
 		if bool(layer.properties.get("effects_selection_only",false)): result.append({"type":"effects_selection","enabled":true})
 	result.append({"type":"values"}); result.append({"type":"perspective"})
 	return result
@@ -317,7 +352,7 @@ func _build_layer(layer: KiwiImageLayer, parent: Node) -> void:
 	var effects: Array = _effect_stages(layer)
 	var original: Texture2D
 	for effect: Dictionary in effects:
-		if effect.get("type","") not in ["mask","values","perspective","effects_selection"]: original=previous.get_texture()
+		if effect.get("type","") not in ["mask","values","perspective","effects_selection","blur_vertical"]: original=previous.get_texture()
 		var input_surface: SubViewport
 		var input_display: TextureRect
 		if effect.get("type", "") == "shader":
@@ -337,6 +372,7 @@ func _build_layer(layer: KiwiImageLayer, parent: Node) -> void:
 		var material := ShaderMaterial.new()
 		if effect.get("type", "") == "shader" and effect.get("shader") is Shader:
 			material.shader = effect.shader
+		elif effect.get("type","")=="warp": material.shader=_warp_shader
 		else: material.shader = _shader
 		display.material = material
 		surface.add_child(display)
@@ -368,7 +404,7 @@ func _update_layer(layer: KiwiImageLayer, view: Dictionary) -> void:
 	view.output.position=-Vector2.ONE*PAD
 	view.blend.blend_mode = CanvasItemMaterial.BLEND_MODE_PREMULT_ALPHA if layer.blend==0 else layer.blend
 	# Plain text is drawn directly: resizing must not recreate a chain of render targets.
-	var direct: bool=layer.kind=="text" and layer.blend==0 and layer.effects.is_empty() and preload("res://Workspaces/ImageWorkspace/image_values.gd").operations(layer).is_empty() and layer.mask==null and not layer.clip_to_below and is_zero_approx(float(layer.properties.get("yaw_up_down",0))) and is_zero_approx(float(layer.properties.get("yaw_left_right",0)))
+	var direct: bool=layer.kind=="text" and layer.warp==null and layer.blend==0 and layer.effects.is_empty() and preload("res://Workspaces/ImageWorkspace/image_values.gd").operations(layer).is_empty() and layer.mask==null and not layer.clip_to_below and is_zero_approx(float(layer.properties.get("yaw_up_down",0))) and is_zero_approx(float(layer.properties.get("yaw_left_right",0)))
 	view.direct_text.visible=direct and document.isolation_allows(layer)
 	view.output.visible=not direct and document.isolation_allows(layer)
 	if direct:
@@ -386,6 +422,9 @@ func _update_layer(layer: KiwiImageLayer, view: Dictionary) -> void:
 	view.base.size = target_size.max(Vector2i.ONE)
 	var raster_scale:=Vector2(target_size-Vector2i.ONE*PAD*2)/_content_dimensions(layer).max(Vector2.ONE)
 	view.drawing.layer = layer
+	if layer.properties.get("texture_material") is KiwiTextureMaterial:
+		view.drawing.material=preload("res://Workspaces/ImageWorkspace/texture_material_renderer.gd").material(layer.properties.texture_material,layer.dimensions,document.world_transform(layer))
+	else: view.drawing.material=null
 	view.drawing.scale = raster_scale if stable else Vector2.ONE * (1.0 if layer.kind=="group" else render_scale)
 	if stable:
 		view.output.scale=Vector2.ONE*render_scale/raster_scale
@@ -396,7 +435,7 @@ func _update_layer(layer: KiwiImageLayer, view: Dictionary) -> void:
 		view.drawing.queue_redraw()
 	var effects: Array = _effect_stages(layer)
 	var modes := {"mask":0,"brightness":1,"contrast":2,"saturation":3,"blur":4,"outline":5,"shadow":6,"grayscale":7,"invert":8,"glow":9,"wave":10,"curves":11,"perspective":12,
-		"sharpen":13,"pixelate":14,"grain":15,"chromatic":16,"halftone":17,"posterize":18,"vignette":19,"gradient_map":20,"color_replace":21,"twirl":22,"mirror":23,"effects_selection":24}
+		"sharpen":13,"pixelate":14,"grain":15,"chromatic":16,"halftone":17,"posterize":18,"vignette":19,"gradient_map":20,"color_replace":21,"twirl":22,"mirror":23,"effects_selection":24,"emboss":25,"edge_detect":26,"motion_blur":27,"kaleidoscope":28,"ripple":29,"scanlines":30,"radial_blur":31}
 	for index in view.stages.size():
 		var stage: Dictionary = view.stages[index]
 		var effect: Dictionary = effects[index]
@@ -417,38 +456,55 @@ func _update_layer(layer: KiwiImageLayer, view: Dictionary) -> void:
 			material.set_shader_parameter("selection_only",bool(layer.properties.get("values_selection_only",false)))
 			material.set_shader_parameter("selection_mask",layer.properties.get("values_selection"))
 			material.set_shader_parameter("has_selection",layer.properties.get("values_selection")!=null)
+			material.set_shader_parameter("selection_local",bool(layer.properties.get("values_selection_local",false)))
 			material.set_shader_parameter("selection_origin",mapping.origin)
 			material.set_shader_parameter("selection_x",mapping.x/(raster_scale.x if stable else render_scale))
 			material.set_shader_parameter("selection_y",mapping.y/(raster_scale.y if stable else render_scale))
 			material.set_shader_parameter("document_size",Vector2(document.canvas_size))
 			material.set_shader_parameter("content_extent",_content_dimensions(layer)*(raster_scale if stable else Vector2.ONE*render_scale))
+		elif effect.get("type","")=="warp" and layer.warp!=null:
+			material.set_shader_parameter("deformation",layer.warp.texture())
+			material.set_shader_parameter("field_size",Vector2(layer.warp.grid_size))
+			material.set_shader_parameter("enabled",layer.warp.enabled)
+			material.set_shader_parameter("content_size",_content_dimensions(layer)*(raster_scale if stable else Vector2.ONE*render_scale))
 		elif effect.get("type","") == "shader":
 			stage.display.material = material if enabled else null
 			for key in effect.get("uniforms",{}): material.set_shader_parameter(key,effect.uniforms[key])
 		else:
-			material.set_shader_parameter("mode",int(modes.get(effect.get("type",""),0)) if enabled else 0)
+			material.set_shader_parameter("mode",4 if enabled and effect.get("type","")=="blur_vertical" else (int(modes.get(effect.get("type",""),0)) if enabled else 0))
+			material.set_shader_parameter("blur_direction",Vector2.DOWN if effect.get("type","")=="blur_vertical" else Vector2.RIGHT)
 			material.set_shader_parameter("mirror_side",int(effect.get("mirror_side",0)))
+			material.set_shader_parameter("preserve_color",bool(effect.get("preserve_color",false)))
 			material.set_shader_parameter("mirror_position",float(effect.get("mirror_position",0.5)))
+			material.set_shader_parameter("effect_angle",deg_to_rad(float(effect.get("angle",0.0))))
+			material.set_shader_parameter("spacing",float(effect.get("spacing",12.0)))
 			material.set_shader_parameter("effects_selection_only",bool(layer.properties.get("effects_selection_only",false)))
 			material.set_shader_parameter("has_effect_selection",layer.properties.get("effects_selection")!=null)
 			material.set_shader_parameter("effect_selection",layer.properties.get("effects_selection"))
 			if effect.get("type","")=="effects_selection": material.set_shader_parameter("effect_original",stage.original)
-			material.set_shader_parameter("masked",index == 0 and layer.mask != null)
+			material.set_shader_parameter("masked",effect.get("type","")=="mask" and layer.mask != null)
 			material.set_shader_parameter("layer_mask",layer.mask)
 			material.set_shader_parameter("content_size",layer.dimensions*(raster_scale if stable else Vector2.ONE*render_scale))
 			material.set_shader_parameter("yaw",Vector2(deg_to_rad(float(layer.properties.get("yaw_up_down",0))),deg_to_rad(float(layer.properties.get("yaw_left_right",0)))))
-			material.set_shader_parameter("amount",float(effect.get("amount",1.0))*(render_scale if effect.get("type","") in ["blur","outline","shadow","glow","wave","chromatic","pixelate","halftone"] else 1.0))
+			material.set_shader_parameter("amount",float(effect.get("amount",1.0))*(render_scale if effect.get("type","") in ["blur","blur_vertical","outline","shadow","glow","wave","chromatic","pixelate","halftone"] else 1.0))
 			material.set_shader_parameter("tint",effect.get("color",Color(0,0,0,.7)))
 			material.set_shader_parameter("tint2",effect.get("color2",Color.WHITE))
 			material.set_shader_parameter("offset",effect.get("offset",Vector2(8,8))*render_scale)
 			if effect.get("curve") is Curve:
-				if not stage.has("curve_texture"):
-					stage.curve_texture=CurveTexture.new()
-					stage.curve_texture.width=256
-				stage.curve_texture.curve=effect.curve
+				var lut:=Image.create(256,1,false,Image.FORMAT_RGBAF)
+				var channels: Dictionary=effect.get("curves",{})
+				for sample in 256:
+					var input:=float(sample)/255; var master: float=effect.curve.sample_baked(input)
+					var color:=Color(master,master,master,input)
+					for channel in 4:
+						var curve: Curve=channels.get(["red","green","blue","alpha"][channel])
+						if curve!=null: color[channel]=curve.sample_baked(master if channel<3 else input)
+					lut.set_pixel(sample,0,color)
+				if not stage.has("curve_texture"): stage.curve_texture=ImageTexture.create_from_image(lut)
+				else: stage.curve_texture.update(lut)
 				material.set_shader_parameter("curve_lut",stage.curve_texture)
-			material.set_shader_parameter("clipped",index==0 and layer.clip_to_below)
-			if index==0 and layer.clip_to_below:
+			material.set_shader_parameter("clipped",effect.get("type","")=="mask" and layer.clip_to_below)
+			if effect.get("type","")=="mask" and layer.clip_to_below:
 				var siblings:=document.children(layer.parent_id)
 				var previous:=siblings.find(layer)-1
 				if previous>=0 and views.has(siblings[previous].id):
@@ -484,6 +540,12 @@ func sync_transforms(value: KiwiImageDocument) -> void:
 func texture() -> Texture2D:
 	return viewport.get_texture()
 
+func composition_texture() -> Texture2D: return composition_viewport.get_texture()
+
+func set_composition_preview_enabled(enabled: bool) -> void:
+	_composition_enabled=enabled
+	composition_viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS if enabled else SubViewport.UPDATE_DISABLED
+
 
 func _content_dimensions(layer: KiwiImageLayer) -> Vector2:
 	return layer.content_dimensions()
@@ -492,6 +554,7 @@ func _content_dimensions(layer: KiwiImageLayer) -> Vector2:
 func set_enabled(enabled: bool) -> void:
 	for child in get_children():
 		if child is SubViewport: child.render_target_update_mode = SubViewport.UPDATE_ALWAYS if enabled else SubViewport.UPDATE_DISABLED
+	composition_viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS if enabled and _composition_enabled else SubViewport.UPDATE_DISABLED
 
 
 func flattened() -> Image:
@@ -504,12 +567,13 @@ func flattened() -> Image:
 	# longest actual dependency chain, including custom shader input conversion.
 	var frames:=3
 	for layer in document.layers:
-		var passes:=2
+		var passes:=4+(2 if layer.warp!=null else 0)
 		var current: KiwiImageLayer=layer
 		while current!=null:
 			passes+=4+current.effects.size()*(2 if bool(current.properties.get("effects_selection_only",false)) else 1)
 			for effect in current.effects:
 				if effect.get("type","")=="shader": passes+=1
+				if effect.get("type","")=="blur": passes+=1
 			current=document.layer_for_id(current.parent_id)
 		frames=maxi(frames,passes)
 	for frame in frames: await RenderingServer.frame_post_draw

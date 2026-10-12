@@ -80,6 +80,11 @@ func run() -> void:
 			check(joined.has("replace"),"A 16px gap closes at scale %s with brush width %s" % [scale,brush_width])
 			if joined.has("replace"):
 				check(joined.replace[0].is_equal_approx(joined.replace[-1]),"Corrected loops close with an exact seam")
+				var span:=mini(clampi(ceili(8/maxf(.1,closer.spacing)),1,12),(closer.knots.size()-1)/5)
+				var length:=closer.knots[span].distance_to(closer.knots[closer.knots.size()-1-span])
+				var count:=clampi(ceili(length/.5),8,128)
+				for point in joined.replace.slice(joined.replace.size()-count):
+					check(closer._raw_bounds.grow(.001).has_point(point),"Gap connector stays within the drawn shape instead of bulging outward")
 	var corner:=PackedVector2Array()
 	for i in 51: corner.append(Vector2(i*2,0))
 	for i in range(1,51): corner.append(Vector2(100,i*2))

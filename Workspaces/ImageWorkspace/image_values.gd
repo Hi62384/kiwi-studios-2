@@ -5,7 +5,7 @@ const BASICS := {"brightness":0.0,"contrast":1.0,"saturation":1.0,"exposure":0.0
 
 static func new_operation(kind: String) -> Dictionary:
 	var amount:=1.0 if kind in ["multiply","divide","power","minimum"] else (.1 if kind=="snap" else 0.0)
-	return {"type":kind,"enabled":true,"preserve_hue":true,"a":{"kind":"pixel"},"b":{"kind":"float","value":amount},"c":{"kind":"float","value":.5 if kind=="lerp" else 1.0}}
+	return {"type":kind,"enabled":true,"preserve_hue":true,"a":{"kind":"pixel"},"b":{"kind":"vector","channels":[1.0,1.0,1.0,1.0]} if kind=="lerp" else {"kind":"float","value":amount},"c":{"kind":"float","value":.5 if kind=="lerp" else 1.0}}
 
 static func operand_value(operand: Dictionary, pixel: Vector4) -> Vector4:
 	match str(operand.get("kind","pixel")):
@@ -110,6 +110,16 @@ static func expression(kind: String, amount: float) -> String:
 		"highlights": return "c+vec3("+a+")*pow(clamp(dot(c,vec3(.2126,.7152,.0722)),0.0,1.0),2.0)"
 		"black_point": return "(c-vec3("+a+"))/"+str(maxf(.001,1-amount))
 		"white_point": return "c/"+str(maxf(.001,amount))
+		"midtones": return "c+vec3("+a+")*(4.0*clamp(dot(c,vec3(.2126,.7152,.0722)),0.0,1.0)*(1.0-clamp(dot(c,vec3(.2126,.7152,.0722)),0.0,1.0)))"
+		"lift": return "c+(vec3(1.0)-c)*"+a
+		"fade": return "mix(c,vec3(.5),"+a+")"
+		"threshold": return "vec3(step("+a+",dot(c,vec3(.2126,.7152,.0722))))"
+		"cyan_red": return "c+vec3("+a+","+str(-amount*.5)+","+str(-amount*.5)+")"
+		"magenta_green": return "c+vec3("+str(-amount*.5)+","+a+","+str(-amount*.5)+")"
+		"yellow_blue": return "c+vec3("+str(-amount*.5)+","+str(-amount*.5)+","+a+")"
+		"shadow_warmth": return "c+vec3("+a+",0.0,"+str(-amount)+")*pow(1.0-clamp(dot(c,vec3(.2126,.7152,.0722)),0.0,1.0),2.0)"
+		"highlight_warmth": return "c+vec3("+a+",0.0,"+str(-amount)+")*pow(clamp(dot(c,vec3(.2126,.7152,.0722)),0.0,1.0),2.0)"
+		"colorize": return "mix(c,vec3(dot(c,vec3(.2126,.7152,.0722)))*vec3(1.35,.95,.65),"+a+")"
 	return "c"
 
 static func shader_code(layer: KiwiImageLayer) -> String:
@@ -118,6 +128,7 @@ render_mode unshaded, blend_disabled;
 uniform sampler2D selection_mask;
 uniform bool selection_only=false;
 uniform bool has_selection=false;
+uniform bool selection_local=false;
 uniform vec2 selection_origin;
 uniform vec2 selection_x;
 uniform vec2 selection_y;
@@ -134,7 +145,7 @@ void fragment(){ vec4 original=texture(TEXTURE,UV); vec3 c=original.rgb/max(orig
 		if op.has("a"):
 			code+="{vec4 next="+operation_code(op)+"; v="+("next" if op.get("affect_alpha",false) else "vec4(next.rgb,v.a)")+"; c=v.rgb;}\n"
 		else: code+="c="+expression(str(op.type),float(op.get("amount",1)))+"; v.rgb=c;\n"
-	code+="vec2 p=UV/TEXTURE_PIXEL_SIZE-vec2(48.0); vec2 q=(selection_origin+selection_x*p.x+selection_y*p.y)/document_size; float mask=selection_only ? (has_selection && all(greaterThanEqual(q,vec2(0.0))) && all(lessThanEqual(q,vec2(1.0))) ? texture(selection_mask,q).a : 0.0) : 1.0; v=clamp(v,vec4(0.0),vec4(1.0)); if(original.a==0.0 && (any(lessThan(p,vec2(0.0))) || any(greaterThan(p,content_extent)))) {v.a=0.0;} COLOR=mix(original,vec4(v.rgb*v.a,v.a),mask); }"
+	code+="vec2 p=UV/TEXTURE_PIXEL_SIZE-vec2(48.0); vec2 q=selection_local ? p/content_extent : (selection_origin+selection_x*p.x+selection_y*p.y)/document_size; float mask=selection_only ? (has_selection && all(greaterThanEqual(q,vec2(0.0))) && all(lessThanEqual(q,vec2(1.0))) ? texture(selection_mask,q).a : 0.0) : 1.0; v=clamp(v,vec4(0.0),vec4(1.0)); if(original.a==0.0 && (any(lessThan(p,vec2(0.0))) || any(greaterThan(p,content_extent)))) {v.a=0.0;} COLOR=mix(original,vec4(v.rgb*v.a,v.a),mask); }"
 	return code
 
 static func evaluate(value: Vector3, ops: Array) -> Vector3:
@@ -195,6 +206,18 @@ static func _legacy_evaluate(value: Vector3, ops: Array) -> Vector3:
 			"highlights": c+=Vector3.ONE*a*pow(clampf(c.dot(Vector3(.2126,.7152,.0722)),0,1),2)
 			"black_point": c=(c-Vector3.ONE*a)/maxf(.001,1-a)
 			"white_point": c/=maxf(.001,a)
+			"midtones":
+				var luminance:=clampf(c.dot(Vector3(.2126,.7152,.0722)),0,1)
+				c+=Vector3.ONE*a*4*luminance*(1-luminance)
+			"lift": c+=(Vector3.ONE-c)*a
+			"fade": c=c.lerp(Vector3.ONE*.5,a)
+			"threshold": c=Vector3.ONE if c.dot(Vector3(.2126,.7152,.0722))>=a else Vector3.ZERO
+			"cyan_red": c+=Vector3(a,-a*.5,-a*.5)
+			"magenta_green": c+=Vector3(-a*.5,a,-a*.5)
+			"yellow_blue": c+=Vector3(-a*.5,-a*.5,a)
+			"shadow_warmth": c+=Vector3(a,0,-a)*pow(1-clampf(c.dot(Vector3(.2126,.7152,.0722)),0,1),2)
+			"highlight_warmth": c+=Vector3(a,0,-a)*pow(clampf(c.dot(Vector3(.2126,.7152,.0722)),0,1),2)
+			"colorize": c=c.lerp(Vector3(1.35,.95,.65)*c.dot(Vector3(.2126,.7152,.0722)),a)
 	return c
 
 static func inverse_color(color: Color, layer: KiwiImageLayer) -> Color:

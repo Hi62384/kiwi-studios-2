@@ -141,7 +141,7 @@ func check_actual_input(settings: SettingsStudio) -> void:
 		settings.canvas.brush_size=3; settings.canvas.brush_opacity=1; settings.canvas.hardness=1
 		settings.canvas.zoom=1; settings.canvas.pan=Vector2.ZERO
 		settings.canvas.stroke_correct=not enabled; settings._refresh_context()
-		(settings.context.find_child("StrokeCorrect",true,false) as CheckButton).button_pressed=enabled
+		(settings.context.find_child("BrushType",true,false) as MenuButton).get_popup().id_pressed.emit(1 if enabled else 0)
 		(settings.context.find_child("CorrectionStrength",true,false) as HSlider).value=100
 		var down:=InputEventMouseButton.new(); down.button_index=MOUSE_BUTTON_LEFT; down.pressed=true
 		down.position=settings.canvas.origin()+outline[0]

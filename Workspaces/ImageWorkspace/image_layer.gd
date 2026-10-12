@@ -20,6 +20,7 @@ extends Resource
 @export var mask: Texture2D
 @export var effects: Array[Dictionary] = []
 @export var properties: Dictionary = {}
+@export var warp: KiwiImageWarpData
 
 
 static func create(type: String, canvas_size: Vector2i) -> KiwiImageLayer:
@@ -139,6 +140,9 @@ func copy_layer() -> KiwiImageLayer:
 	for key in ["id","label","kind","parent_id","position","dimensions","rotation","visible","isolated","locked","opacity","blend","clip_to_below","texture","paint_base","mask"]:
 		copy.set(key,get(key))
 	copy.properties = properties.duplicate(true)
+	if warp!=null: copy.warp=warp.copy_warp()
+	if properties.get("texture_recipe") is KiwiImageTextureRecipe: copy.properties.texture_recipe=properties.texture_recipe.copy_recipe()
+	if properties.get("texture_material") is KiwiTextureMaterial: copy.properties.texture_material=properties.texture_material.copy_material()
 	if properties.get("text_settings") is ActorObjectData:
 		copy.properties.text_settings=(properties.text_settings as ActorObjectData).copy_object()
 	if properties.get("noise_object") is ActorObjectData:
@@ -146,4 +150,6 @@ func copy_layer() -> KiwiImageLayer:
 	copy.effects.assign(effects.duplicate(true))
 	for effect in copy.effects:
 		if effect.get("curve") is Curve: effect.curve=effect.curve.duplicate()
+		for channel in effect.get("curves",{}):
+			if effect.curves[channel] is Curve: effect.curves[channel]=effect.curves[channel].duplicate()
 	return copy

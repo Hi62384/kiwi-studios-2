@@ -453,6 +453,7 @@ func _path_allowed_uncached(path: String) -> bool:
 			or (allowed_native_types.has("Texture2D") and native_resource is Texture2D) \
 			or (allowed_native_types.has("ActorSceneData") and native_resource is ActorSceneData) \
 			or (allowed_native_types.has("KiwiImageDocument") and native_resource is KiwiImageDocument) \
+			or (allowed_native_types.has("KiwiImagePatternPreset") and native_resource is KiwiImagePatternPreset) \
 			or (native_resource is ActorObjectData and not allowed_resource_type.is_empty() and accepted_object_types.has(str(native_resource.type_id)))
 	if allowed_resource_type.is_empty():
 		return true

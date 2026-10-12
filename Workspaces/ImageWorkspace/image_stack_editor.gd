@@ -2,8 +2,21 @@ extends Window
 ## Shared searchable library, ordered stack and live GPU preview. Parameters
 ## reuse the editor's draggable numbers, colors, sliders and undo transactions.
 const Math=preload("res://Workspaces/ImageWorkspace/image_values.gd")
-const EFFECTS=["mirror","blur","sharpen","shadow","glow","outline","curves","gradient_map","color_replace","grain","pixelate","halftone","posterize","chromatic","vignette","wave","twirl","grayscale","invert","brightness","contrast","saturation"]
+const EFFECTS=["mirror","blur","sharpen","shadow","glow","outline","curves","gradient_map","color_replace","grain","pixelate","halftone","chromatic","vignette","wave","twirl","emboss","edge_detect","motion_blur","radial_blur","kaleidoscope","ripple","scanlines"]
+const EFFECT_CATEGORIES={
+	"Detail & blur":["blur","motion_blur","radial_blur","sharpen","emboss","edge_detect"],
+	"Light & outline":["shadow","glow","outline","vignette"],
+	"Distortion":["mirror","wave","twirl","ripple","kaleidoscope","chromatic"],
+	"Texture & style":["grain","pixelate","halftone","scanlines"],
+	"Mapping & custom":["curves","gradient_map","color_replace","shader"]}
 const RANGES={"brightness":Vector3(-1,1,0),"contrast":Vector3(0,4,1),"saturation":Vector3(0,4,1),"exposure":Vector3(-6,6,0),"gamma":Vector3(.1,4,1),"hue":Vector3(-PI,PI,0),"temperature":Vector3(-1,1,0),"tint":Vector3(-1,1,0),"red":Vector3(0,4,1),"green":Vector3(0,4,1),"blue":Vector3(0,4,1),"vibrance":Vector3(-1,2,0),"grayscale":Vector3(0,1,1),"sepia":Vector3(0,1,1),"posterize":Vector3(2,32,6),"solarize":Vector3(0,1,.5),"shadows":Vector3(-1,1,0),"highlights":Vector3(-1,1,0),"black_point":Vector3(0,.95,0),"white_point":Vector3(.05,2,1)}
+const EXTRA_RANGES={"midtones":Vector3(-1,1,0),"lift":Vector3(-1,1,0),"fade":Vector3(0,1,0),"threshold":Vector3(0,1,.5),"cyan_red":Vector3(-1,1,0),"magenta_green":Vector3(-1,1,0),"yellow_blue":Vector3(-1,1,0),"shadow_warmth":Vector3(-1,1,0),"highlight_warmth":Vector3(-1,1,0),"colorize":Vector3(0,1,.5)}
+const CATEGORIES={
+	"Light & tone":["brightness","exposure","contrast","gamma","shadows","midtones","highlights","black_point","white_point","lift","fade"],
+	"Color & balance":["saturation","vibrance","hue","temperature","tint","cyan_red","magenta_green","yellow_blue","shadow_warmth","highlight_warmth"],
+	"Channels":["red","green","blue"],
+	"Creative looks":["grayscale","sepia","posterize","solarize","threshold","colorize"],
+	"Math":["add","subtract","multiply","divide","power","snap","clamp","lerp","minimum","maximum","absolute","invert","smoothstep"]}
 var workspace: KiwiImageWorkspace
 var layer_id: String
 var adjustments:=false
@@ -13,6 +26,9 @@ var stack:=VBoxContainer.new()
 var preview:=preload("res://Workspaces/ImageWorkspace/image_operation_preview.gd").new()
 var whole:=false
 var _signature:=""
+var _category_collapsed: Dictionary={}
+
+func adjustment_range(kind: String) -> Vector3: return EXTRA_RANGES.get(kind,RANGES.get(kind,Vector3(-16,64,1)))
 
 func _ready() -> void:
 	title=("Color Adjustments" if adjustments else "Effects & Styles")+" · "+workspace.document.layer_for_id(layer_id).label
@@ -79,7 +95,27 @@ func entries() -> Array:
 
 func rebuild_library() -> void:
 	workspace._clear(library)
-	var choices: Array=RANGES.keys()+Math.TYPES if adjustments else EFFECTS
+	var groups: Dictionary=CATEGORIES if adjustments else EFFECT_CATEGORIES
+	if not groups.is_empty():
+		for category: String in groups:
+			var matches: Array=[]
+			for kind: String in groups[category]:
+				if search.text.is_empty() or kind.replace("_"," ").contains(search.text.to_lower()) or category.to_lower().contains(search.text.to_lower()): matches.append(kind)
+			if matches.is_empty(): continue
+			var section:=VBoxContainer.new(); section.add_theme_constant_override("separation",3); library.add_child(section)
+			var header:=workspace._button(section,category,func():
+				_category_collapsed[category]=not bool(_category_collapsed.get(category,false)); rebuild_library(),"Expand or collapse "+category)
+			header.alignment=HORIZONTAL_ALIGNMENT_LEFT; header.add_theme_color_override("font_color",Color("80d9c4"))
+			header.text=("▸ " if _category_collapsed.get(category,false) and search.text.is_empty() else "▾ ")+category
+			if _category_collapsed.get(category,false) and search.text.is_empty(): continue
+			for kind: String in matches:
+				var type:=kind; var caption:="Canvas shader…" if kind=="shader" else kind.replace("_"," ").capitalize()
+				var button:=workspace._button(section,caption,func():
+					if type=="shader": workspace._choose_shader_effect()
+					else: add_entry(type),"Add "+caption,kind)
+				button.alignment=HORIZONTAL_ALIGNMENT_LEFT; button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+		return
+	var choices: Array=EFFECTS
 	for type in choices:
 		var kind: String=type; var caption:=kind.replace("_"," ").capitalize()
 		if not search.text.is_empty() and not caption.to_lower().contains(search.text.to_lower()): continue
@@ -90,7 +126,7 @@ func rebuild_library() -> void:
 func add_entry(kind: String) -> void:
 	if adjustments:
 		workspace._action(func():
-			var op:=Math.new_operation(kind) if kind in Math.TYPES else {"type":kind,"amount":RANGES[kind].z,"enabled":true}
+			var op:=Math.new_operation(kind) if kind in Math.TYPES else {"type":kind,"amount":adjustment_range(kind).z,"enabled":true}
 			op.id=ActorData.new_id(); entries().append(op))
 	else: workspace.add_effect(kind)
 	rebuild_stack()
@@ -106,19 +142,16 @@ func rebuild_stack() -> void:
 		var fields:=VBoxContainer.new(); fields.mouse_filter=Control.MOUSE_FILTER_PASS; card.add_child(fields)
 		var header:=HBoxContainer.new(); fields.add_child(header)
 		var enabled:=CheckButton.new(); enabled.text="⠿ %d · %s" % [i+1,str(op.type).replace("_"," ").capitalize()]
+		enabled.icon=workspace._icon(op.type); enabled.expand_icon=true; enabled.add_theme_constant_override("icon_max_width",18)
 		enabled.add_theme_font_size_override("font_size",12); enabled.button_pressed=op.get("enabled",true); enabled.size_flags_horizontal=Control.SIZE_EXPAND_FILL; header.add_child(enabled)
 		enabled.toggled.connect(func(value: bool): workspace._action(func(): op.enabled=value))
 		workspace._button(header,"×",func(): workspace._action(func(): entries().remove_at(index)),"Remove","trash")
 		if adjustments:
 			if op.has("a"):
-				var rebuild:=func(): rebuild_stack()
-				workspace._operand_controls(fields,"A",op,"a",rebuild)
-				if op.type not in ["absolute","invert"]: workspace._operand_controls(fields,"B",op,"b",rebuild)
-				if op.type in ["clamp","lerp","smoothstep"]: workspace._operand_controls(fields,"C",op,"c",rebuild)
+				_simple_math_fields(fields,op)
 				if op.type=="snap": workspace._check(fields,"Preserve hue",op.get("preserve_hue",true),func(value: bool): op.preserve_hue=value)
-				workspace._check(fields,"Affect alpha",op.get("affect_alpha",false),func(value: bool): op.affect_alpha=value)
 			else:
-				var limits: Vector3=RANGES.get(op.type,Vector3(-16,64,1))
+				var limits:=adjustment_range(op.type)
 				workspace._slider(fields,"Amount",float(op.get("amount",limits.z)),limits.x,limits.y,func(value: float): op.amount=value)
 		else: workspace._effect_fields(fields,op)
 		var actions:=HBoxContainer.new(); fields.add_child(actions)
@@ -134,12 +167,33 @@ func reset_entry(index: int) -> void:
 	workspace._action(func():
 		var op: Dictionary=entries()[index]
 		if adjustments:
-			entries()[index]=Math.new_operation(op.type) if op.type in Math.TYPES else {"type":op.type,"amount":RANGES.get(op.type,Vector3(0,1,0)).z,"enabled":true}
+			entries()[index]=Math.new_operation(op.type) if op.type in Math.TYPES else {"type":op.type,"amount":adjustment_range(op.type).z,"enabled":true}
 		else:
 			var replacement:=workspace._new_effect(op.type)
 			replacement.id=op.get("id",replacement.id); replacement.enabled=op.get("enabled",true)
 			entries()[index]=replacement)
 	rebuild_stack()
+
+func _simple_math_fields(parent: Node,op: Dictionary) -> void:
+	if op.type in ["absolute","invert"]: return
+	var captions: Dictionary={"add":"Amount","subtract":"Amount","multiply":"Factor","divide":"Divisor","power":"Exponent","snap":"Step size","minimum":"Ceiling","maximum":"Floor","clamp":"Minimum","smoothstep":"Lower edge","lerp":"Target value"}
+	var limits:=Vector2(-4,4)
+	if op.type in ["divide","power"]: limits=Vector2(.01,8)
+	elif op.type=="snap": limits=Vector2(.001,1)
+	var b: Dictionary=op.get("b",{})
+	var value:=float(b.get("value",1)) if b.get("kind","")=="float" else float(Math.operand_value(b,Vector4.ONE).x)
+	if op.type=="lerp":
+		var rgba:=Math.operand_value(b,Vector4.ONE)
+		workspace._color(parent,"Target color",Color(rgba.x,rgba.y,rgba.z,rgba.w),func(next: Color):
+			op.a={"kind":"pixel"}; op.b={"kind":"vector","channels":[next.r,next.g,next.b,next.a]})
+	else:
+		workspace._slider(parent,captions.get(op.type,"Amount"),value,limits.x,limits.y,func(next: float):
+			op.a={"kind":"pixel"}; op.b={"kind":"float","value":next})
+	if op.type in ["clamp","smoothstep","lerp"]:
+		var c: Dictionary=op.get("c",{"kind":"float","value":1.0})
+		var second:=float(c.get("value",1)) if c.get("kind","")=="float" else float(Math.operand_value(c,Vector4.ONE).x)
+		workspace._slider(parent,"Blend" if op.type=="lerp" else ("Maximum" if op.type=="clamp" else "Upper edge"),second,0 if op.type=="lerp" else -4,1 if op.type=="lerp" else 4,func(next: float):
+			op.a={"kind":"pixel"}; op.c={"kind":"float","value":next})
 
 func move_entry(from: int,to: int) -> void:
 	if from==to: return
@@ -154,10 +208,12 @@ func signature() -> String:
 func _process(_delta: float) -> void:
 	if layer()==null: close_editor(); return
 	if signature()!=_signature: rebuild_stack()
-	if whole: preview.texture=workspace.renderer.texture()
+	workspace.renderer.set_composition_preview_enabled(whole)
+	if whole: preview.texture=workspace.renderer.composition_texture()
 	elif workspace.renderer.views.has(layer_id): preview.texture=workspace.renderer.views[layer_id].output.texture
 
 func close_editor() -> void:
+	workspace.renderer.set_composition_preview_enabled(false)
 	workspace._finish_pending(); queue_free()
 
 func _unhandled_key_input(event: InputEvent) -> void:

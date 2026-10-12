@@ -383,6 +383,7 @@ static func get_file_thumbnail(file: String) -> Texture2D:
 	
 	if file.get_extension().to_lower() in ["tres", "res"]:
 		var resource := ResourceLoader.load(file, "", ResourceLoader.CACHE_MODE_IGNORE)
+		if resource is KiwiImagePatternPreset: return resource.texture if resource.texture!=null else FILE_COLORED_TEXTURE
 		if resource is KiwiImageDocument:
 			if resource.preview==null: return load("res://resources/Images/ActorIcons/Image2D.svg") as Texture2D
 			var thumbnail:=Image.create(192,144,false,Image.FORMAT_RGBA8); thumbnail.fill(Color(0,0,0,0))

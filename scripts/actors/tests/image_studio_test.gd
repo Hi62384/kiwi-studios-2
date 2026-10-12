@@ -2,6 +2,13 @@ extends SceneTree
 ## Model and real-renderer coverage. -- --visual also writes a UI screenshot.
 
 const Studio = preload("res://Workspaces/ImageWorkspace/image_workspace.gd")
+class TestStudio extends KiwiImageWorkspace:
+	func _load_paint_presets(path: String=PAINT_PRESETS_PATH) -> void:
+		super._load_paint_presets(path)
+		canvas.brush_type="normal"
+		for preset in _paint_presets.brush: preset.brush_type="normal"; preset.stroke_correct=false
+	func _persist_paint_presets(path: String=PAINT_PRESETS_PATH) -> void:
+		if path!=PAINT_PRESETS_PATH: super._persist_paint_presets(path)
 var failures := 0
 
 func check(ok: bool,message: String) -> void:
@@ -78,9 +85,10 @@ func check_value_adjustments(studio: Control) -> void:
 
 func run() -> void:
 	root.size=Vector2i(1440,900)
-	var studio:=Studio.new()
+	var studio:=TestStudio.new()
 	root.add_child(studio)
 	await process_frame
+	studio.canvas.brush_type="normal"
 	studio.open_source(null)
 	await check_value_adjustments(studio)
 	studio.open_source(null)
@@ -416,7 +424,7 @@ func check_workflow_panels(studio: KiwiImageWorkspace) -> void:
 		var found:=false
 		for child in studio.get_children():
 			if child is PopupPanel and is_instance_valid(child): found=true; child.hide()
-		check(found,"Workflow panel opens without runtime errors")
+		check(found,"Workflow panel opens without runtime errors: "+action.get_method())
 		await process_frame
 
 

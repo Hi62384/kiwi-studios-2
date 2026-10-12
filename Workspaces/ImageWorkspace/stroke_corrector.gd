@@ -157,25 +157,25 @@ func _close_gap(count: int) -> PackedVector2Array:
 	for index in range(0,count,stride): area+=knots[index].cross(knots[mini(count-1,index+stride)])
 	area+=knots[-1].cross(knots[0])
 	if absf(area)*.5<_raw_bounds.get_area()*.15: return PackedVector2Array()
-	# Replace just the seam neighborhood with two joined Hermite curves.
-	# This closes gaps without leaving an overlap, hook or straight connector.
-	var span:=mini(12,(count-1)/5)
+	# Keep the edited seam neighborhood small in document pixels even at
+	# high correction scales. Long tangent handles were bulging the outline.
+	var span:=mini(clampi(ceili(8/maxf(.1,spacing)),1,12),(count-1)/5)
 	var first:=knots[span]; var last:=knots[count-1-span]
-	var join:=points[0]
-	var incoming:=(last-knots[count-1-span-3]).normalized()
-	var outgoing:=(knots[span+3]-first).normalized()
-	var tangent:=(first-last).normalized()
-	var sharp:=absf(incoming.angle_to(outgoing))>1.1
-	var joint_length:=minf(last.distance_to(join),first.distance_to(join))
+	var incoming:=(last-knots[maxi(0,count-1-span-2)]).normalized()
+	var outgoing:=(knots[mini(count-1,span+2)]-first).normalized()
+	var chord:=first-last; var direction:=chord.normalized()
+	var handle:=minf(4,chord.length()/3)
+	# Backward tangents make hooks. Blend unreliable directions toward the
+	# connector and constrain the Bezier hull to the observed outline bounds.
+	if incoming.dot(direction)<.1: incoming=direction
+	if outgoing.dot(direction)<.1: outgoing=direction
+	var control_a:=(last+incoming*handle).clamp(_raw_bounds.position,_raw_bounds.end)
+	var control_b:=(first-outgoing*handle).clamp(_raw_bounds.position,_raw_bounds.end)
 	var result:=_path(span,count-1-span)
-	for part in 2:
-		var a:=last if part==0 else join; var b:=join if part==0 else first
-		var ta:=incoming*a.distance_to(b) if part==0 else (outgoing if sharp else tangent)*joint_length
-		var tb:=(incoming if sharp else tangent)*joint_length if part==0 else outgoing*a.distance_to(b)
-		var divisions:=clampi(ceili(a.distance_to(b)/maxf(.5,spacing*.5)),8,64)
-		for step in range(1,divisions+1):
-			var t:=float(step)/divisions; var t2:=t*t; var t3:=t2*t
-			result.append(a*(2*t3-3*t2+1)+ta*(t3-2*t2+t)+b*(-2*t3+3*t2)+tb*(t3-t2))
+	var divisions:=clampi(ceili(chord.length()/.5),8,128)
+	for step in range(1,divisions+1):
+		var t:=float(step)/divisions; var u:=1-t
+		result.append(last*u*u*u+control_a*3*u*u*t+control_b*3*u*t*t+first*t*t*t)
 	result[-1]=result[0]
 	return result
 
