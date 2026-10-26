@@ -12,6 +12,8 @@ static func type_for_path(path: String) -> StringName:
 	if extension in ["tres", "res"]:
 		var resource := ResourceLoader.load(path)
 		if resource is ActorSceneData: return &"scene_instance"
+		if resource is KiwiModelDocument: return &"basic_mesh"
+		if resource is KiwiTransformationImage2D: return &"transform_image_2d"
 		if resource is ActorObjectData:
 			if resource.type_id == &"text_settings": return &"text_3d"
 			if resource.type_id == &"environment": return &"world_environment"
@@ -37,6 +39,7 @@ static func values_for_path(path: String, registry: ActorRegistry) -> Dictionary
 	var extension := path.get_extension().to_lower()
 	var resource: Resource = ResourceLoader.load(path) if extension in ["tres", "res"] else null
 	match type:
+		&"transform_image_2d": return {&"transformation": path}
 		&"text_3d": return {&"text_settings": ActorObjectReference.from_asset(path, &"text_settings")}
 		&"video": return {&"video": path}
 		&"audio": return {&"audio": resource if resource is AudioStream else path}

@@ -3,6 +3,7 @@ extends Resource
 ## An instance is independent of its preset. Coverage belongs to the layer,
 ## while these parameters describe the material revealed by that coverage.
 @export var material_id:="wood/oak"
+@export var format_version:=2
 @export var label:="Oak"
 @export var parameters: Dictionary={}
 @export var image: Texture2D
@@ -31,10 +32,13 @@ extends Resource
 @export var shadow:=1.0
 @export var coverage: Texture2D
 @export var source: Texture2D
+@export var surface_mapping:="uv"
+@export var triplanar_sharpness:=4.0
+@export var metallic:=-1.0
 
 func copy_material() -> KiwiTextureMaterial:
 	var result:=KiwiTextureMaterial.new()
-	for key in ["material_id","label","image","texture_size","rotation","alignment","application","spacing","jitter","random_rotation","random_scale","follow_direction","direction_smoothing","mapping_origin","tint_strength","tiling","blending","mix_amount","mix_distribution","mix_mask","relief","relief_softness","light_direction","highlight","shadow","coverage","source"]: result.set(key,get(key))
+	for key in ["material_id","format_version","label","image","texture_size","rotation","alignment","application","spacing","jitter","random_rotation","random_scale","follow_direction","direction_smoothing","mapping_origin","tint_strength","tiling","blending","mix_amount","mix_distribution","mix_mask","relief","relief_softness","light_direction","highlight","shadow","coverage","source","surface_mapping","triplanar_sharpness","metallic"]: result.set(key,get(key))
 	result.parameters=parameters.duplicate(true)
 	if secondary!=null: result.secondary=secondary.copy_material()
 	return result

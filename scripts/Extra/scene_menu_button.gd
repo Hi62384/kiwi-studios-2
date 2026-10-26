@@ -64,6 +64,7 @@ func _open_menu() -> void:
 	column.add_child(separator)
 	_add_action(column, "Save Scene", "Ctrl+S", "Save every actor and editor state", _save)
 	_add_action(column, "Save Scene As…", "Ctrl+Shift+S", "Choose a new project location", _save_as)
+	_add_action(column, "Save to Super Clipboard", "F8 opens library", "Store an independent editable scene",func(): KiwiSuperClipboardService.instance.quick_save(timeline.capture_scene_data(),scene_tabs.current_scene_name() if scene_tabs!=null else "Scene"))
 	_add_action(column, "Load Scene…", "Ctrl+O", "Open a .tres editable scene", _load)
 	_add_action(column, "Instantiate Scene…", "", "Add another scene under a linked 3D point", _instantiate_scene)
 	menu.popup_hide.connect(func(): if is_instance_valid(menu): menu.queue_free())
@@ -101,7 +102,7 @@ func _save_as() -> void:
 		return
 	var active_path := scene_tabs.current_scene_path() if scene_tabs != null else current_scene_path
 	var suggested := active_path.get_file().get_basename() if not active_path.is_empty() else (scene_tabs.current_scene_name() if scene_tabs != null else "New Scene")
-	var result := await ActorProjectResourceSaveDialog.pick(self, "Save editable scene", suggested, "tres", false)
+	var result := await ActorProjectResourceSaveDialog.pick(self, "Save editable scene", suggested, "tres", false,PackedStringArray(),func(): return timeline.capture_scene_data())
 	if result.get("cancelled", true):
 		return
 	var path := str(result.get("path", ""))

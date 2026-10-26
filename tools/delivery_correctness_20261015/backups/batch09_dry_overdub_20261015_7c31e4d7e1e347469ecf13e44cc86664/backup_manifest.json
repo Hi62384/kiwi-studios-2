@@ -1,0 +1,12 @@
+[
+    {
+        "path":  "Workspaces/AudioWorkspace/audio_workspace.gd",
+        "bytes":  230433,
+        "sha256":  "a423439ad768080cc95b75e932b828119f52f53886ac0dbe6ad0becc6d46d8bd"
+    },
+    {
+        "path":  "scripts/actors/core/actor_audio_recorder.gd",
+        "bytes":  9394,
+        "sha256":  "bc74709880e14b521e2d9205c46fd0533b5068a6117fa16aef600ef8c10effa2"
+    }
+]

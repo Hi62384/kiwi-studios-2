@@ -1,0 +1,722 @@
+--- a/Workspaces/AudioWorkspace/audio_automation_canvas.gd
++++ b/Workspaces/AudioWorkspace/audio_automation_canvas.gd
+@@ -7,6 +7,8 @@
+ var effect_id:=""
+ var lane_id:=""
+ var _drag_before:KiwiAudioDocument
++var _gesture:=KiwiAudioEditSession.Gesture.new()
++var _drag_changed:=false
+ var parameter:="volume_db"
+ var duration:=10.0
+ var minimum:=-60.0
+@@ -15,9 +17,10 @@
+ var selected:=-1
+ var _drag:=false
+ func _ready()->void:
++ focus_mode=Control.FOCUS_ALL
+  custom_minimum_size=Vector2(360,230);mouse_default_cursor_shape=Control.CURSOR_CROSS;clip_contents=true
+  if session!=null:session.changed.connect(func():
+-  if session._before!=_drag_before:_drag=false;_drag_before=null
++  if _drag and not _gesture.valid(session):finish_edit(false)
+   queue_redraw())
+ func owner_data()->Dictionary:
+  if session==null:return {}
+@@ -70,8 +73,19 @@
+  for i in points().size():
+   if position.distance_to(position_for(points()[i]))<10:return i
+  return -1
++func finish_edit(keep:bool=true)->void:
++ var changed:=_drag_changed
++ if keep and _gesture.valid(session):points().sort_custom(func(a:Dictionary,b:Dictionary):return float(a.time)<float(b.time))
++ _drag=false;_drag_before=null;_drag_changed=false
++ _gesture.finish(session,keep and changed)
++ queue_redraw()
++func _notification(what:int)->void:
++ if what==NOTIFICATION_FOCUS_EXIT:finish_edit()
+ func _gui_input(event:InputEvent)->void:
+- if not can_edit():return
++ if _drag and not _gesture.valid(session):finish_edit(false)
++ if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:finish_edit(false);accept_event();return
++ if not can_edit():
++  finish_edit();return
+  if event is InputEventMouseButton:
+   if event.button_index==MOUSE_BUTTON_RIGHT and event.pressed:
+    var hit:=_hit(event.position)
+@@ -79,25 +93,25 @@
+    accept_event();return
+   if event.button_index!=MOUSE_BUTTON_LEFT:return
+   if not event.pressed:
+-   if _drag and session._before==_drag_before:points().sort_custom(func(a:Dictionary,b:Dictionary):return float(a.time)<float(b.time));session.commit()
+-   _drag_before=null
+-   _drag=false;queue_redraw();accept_event();return
+-  selected=_hit(event.position)
++   finish_edit();accept_event();return
++  grab_focus();selected=_hit(event.position)
+   var proposed:=value_for(event.position)
+   if selected<0:
+    for i in points().size():
+     if absf(float(points()[i].time)-float(proposed.time))<0.000001:selected=i;break
+   if selected<0 and points().size()>=10000:return
+-  session.begin("Edit automation");_drag_before=session._before
++  _gesture.begin(session,"Edit automation");_drag_before=session._before;_drag_changed=false
+   if selected<0:
+-   var point:=proposed;var curves:Dictionary=owner_data().get("automation",{});var values:Array=curves.get(parameter,[]);values.append(point);values.sort_custom(func(a:Dictionary,b:Dictionary):return float(a.time)<float(b.time));curves[parameter]=values;owner_data()["automation"]=curves;selected=values.find(point)
++   var point:=proposed;var curves:Dictionary=owner_data().get("automation",{});var values:Array=curves.get(parameter,[]);values.append(point);values.sort_custom(func(a:Dictionary,b:Dictionary):return float(a.time)<float(b.time));curves[parameter]=values;owner_data()["automation"]=curves;selected=values.find(point);_drag_changed=true;session.preview()
+   _drag=true;queue_redraw();accept_event()
+  elif event is InputEventMouseMotion and _drag:
+   if selected>=0 and selected<points().size():
+    var value:=value_for(event.position);var point:Dictionary=points()[selected]
+    var low:=float(points()[selected-1].time)+0.000001 if selected>0 else 0.0
+    var high:=float(points()[selected+1].time)-0.000001 if selected+1<points().size() else duration
+-   point.time=clampf(float(value.time),low,maxf(low,high));point.value=value.value
++   var time:=clampf(float(value.time),low,maxf(low,high))
++   if not is_equal_approx(float(point.time),time) or not is_equal_approx(float(point.value),float(value.value)):
++    point.time=time;point.value=value.value;_drag_changed=true;session.preview()
+   queue_redraw();accept_event()
+ func set_curve(curve:String)->void:
+  if not can_edit():return
+@@ -130,7 +144,4 @@
+  return output
+ 
+ func _exit_tree()->void:
+- if _drag and session!=null and session._before==_drag_before:
+-  points().sort_custom(func(a:Dictionary,b:Dictionary):return float(a.time)<float(b.time))
+-  session.commit()
+- _drag=false;_drag_before=null
++ finish_edit()
+--- a/Workspaces/AudioWorkspace/audio_edit_session.gd
++++ b/Workspaces/AudioWorkspace/audio_edit_session.gd
+@@ -17,11 +17,38 @@
+ var dirty: bool = false
+ var _before: KiwiAudioDocument
+ var _label := ""
++var _pending_preview := false
+ var _clipboard: Array[Dictionary] = []
+ var _effect_clipboard: Array = []
+ var last_action := Callable()
+ 
++# An outer UI gesture owns one exact session/document/transaction. Late events
++# may discard their own handle, but must never finish a replacement transaction.
++class Gesture extends RefCounted:
++	var owner: KiwiAudioEditSession
++	var document: KiwiAudioDocument
++	var before: KiwiAudioDocument
++	func valid(current: KiwiAudioEditSession) -> bool:
++		return owner != null and current == owner and current.document == document and before != null and current._before == before
++	func clear() -> void:
++		owner = null; document = null; before = null
++	func begin(current: KiwiAudioEditSession, label: String) -> void:
++		clear()
++		if current._before != null: current.commit()
++		current.begin(label)
++		owner = current; document = current.document; before = current._before
++	func finish(current: KiwiAudioEditSession, keep: bool = true) -> void:
++		var target := owner
++		var owns := valid(current)
++		clear() # commit/cancel emit signals synchronously.
++		if owns:
++			if keep: target.commit()
++			else: target.cancel()
++
+ func open(value: KiwiAudioDocument) -> void:
++	_before = null
++	_label = ""
++	_pending_preview = false
+ 	document = value
+ 	if document.tracks.is_empty(): document.add_track()
+ 	history.clear_history()
+@@ -40,9 +67,11 @@
+ func begin(label: String) -> void:
+ 	if _before != null: return
+ 	_before = document.snapshot()
++	_pending_preview = false
+ 	_label = label
+ 
+ func preview() -> void:
++	if _before != null: _pending_preview = true
+ 	revision += 1
+ 	changed.emit()
+ 
+@@ -188,10 +217,22 @@
+ 	selection_changed.emit()
+ 
+ func undo() -> void:
+-	if _before != null: cancel()
++	if _before != null:
++		# Preserve a meaningful live edit as the newest redoable action. A click
++		# with no preview is only a cancelled gesture, not an older Undo.
++		if _pending_preview:
++			commit()
++			history.undo()
++		else: cancel()
++		return
+ 	if history.has_undo(): history.undo()
+ 
+ func redo() -> void:
++	# Redo during a live edit cancels that gesture first; it must not combine
++	# a restored history snapshot with an old canvas/slider transaction.
++	if _before != null:
++		cancel()
++		return
+ 	if history.has_redo(): history.redo()
+ 
+ func select(id: String, additive: bool = false) -> void:
+--- a/Workspaces/AudioWorkspace/audio_pattern_canvas.gd
++++ b/Workspaces/AudioWorkspace/audio_pattern_canvas.gd
+@@ -13,6 +13,9 @@
+ var selected: Array[String] = []
+ var _clipboard: Array = []
+ var _drag := ""
++var _gesture := KiwiAudioEditSession.Gesture.new()
++var _drag_clip := ""
++var _drag_changed := false
+ var _origin := Vector2.ZERO
+ var _original: Dictionary = {}
+ var _font: Font
+@@ -108,7 +111,17 @@
+  actor.values[&"pattern_beats"]=length;pattern_beats=length
+ func _changed()->void:
+  notes_changed.emit();queue_redraw()
++func finish_edit(keep:bool=true)->void:
++ var changed:=_drag_changed
++ _drag="";_original.clear();_drag_clip="";_drag_changed=false
++ _gesture.finish(session,keep and changed)
++ if changed:_changed()
++func _notification(what:int)->void:
++ if what==NOTIFICATION_FOCUS_EXIT or what==NOTIFICATION_EXIT_TREE:finish_edit()
+ func _gui_input(event:InputEvent)->void:
++ if not _drag.is_empty() and (not _gesture.valid(session) or session.primary_clip()==null or session.primary_clip().id!=_drag_clip):finish_edit()
++ if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
++  finish_edit(false);accept_event();return
+  if session==null or session.primary_actor()==null or not session.can_edit(session.primary_clip().id):return
+  if event is InputEventMouseButton:
+   if event.button_index in [MOUSE_BUTTON_WHEEL_UP,MOUSE_BUTTON_WHEEL_DOWN] and event.pressed:
+@@ -123,8 +136,7 @@
+    return
+   if event.button_index!=MOUSE_BUTTON_LEFT:return
+   if not event.pressed:
+-   if not _drag.is_empty():_mark_changed();session.commit();_changed()
+-   _drag="";return
++   finish_edit();return
+   grab_focus();_origin=event.position
+   if event.position.x<KEYS:audition.emit(_pitch(event.position.y));return
+   var note:=_hit(event.position)
+@@ -141,7 +153,7 @@
+   _original.clear()
+   for entry in notes():
+    if selected.has(str(entry.id)):_original[entry.id]=entry.duplicate(true)
+-  session.begin("Edit notes");queue_redraw()
++  _gesture.begin(session,"Edit notes");_drag_clip=session.primary_clip().id;_drag_changed=false;queue_redraw()
+  elif event is InputEventMouseMotion and not _drag.is_empty():
+   var delta:Vector2=event.position-_origin
+   var earliest:=INF;var lowest:=127;var highest:=0
+@@ -152,12 +164,15 @@
+   for note in notes():
+    if not _original.has(note.id):continue
+    var original:Dictionary=_original[note.id]
++   var previous:Dictionary=note.duplicate(true)
+    match _drag:
+     "move":
+      note.start=float(original.start)+beat_delta
+      if mode=="piano":note.pitch=int(original.pitch)+pitch_delta
+     "resize":note.duration=maxf(snap_beat,snappedf(float(original.duration)+delta.x/pixels_per_beat,snap_beat))
+     "velocity":note.velocity=clampf(float(original.get("velocity",0.8))-delta.y/100,0.01,1)
++   if note!=previous:_drag_changed=true
++  if _drag_changed:_mark_changed();session.preview()
+   queue_redraw()
+ func delete_selected()->void:
+  if not editable():return
+@@ -190,7 +205,8 @@
+  _changed()
+ func _unhandled_key_input(event:InputEvent)->void:
+  if not has_focus() or not event is InputEventKey or not event.pressed or event.echo:return
+- if event.keycode==KEY_DELETE:delete_selected()
++ if event.keycode==KEY_ESCAPE:finish_edit(false)
++ elif event.keycode==KEY_DELETE:finish_edit();delete_selected()
+  elif event.ctrl_pressed and event.keycode==KEY_A:
+   selected.clear()
+   for note in notes():selected.append(str(note.id))
+--- a/Workspaces/AudioWorkspace/audio_timeline_canvas.gd
++++ b/Workspaces/AudioWorkspace/audio_timeline_canvas.gd
+@@ -17,6 +17,7 @@
+ var snap_beats: float = 0.25
+ var time_selection := Vector2.ZERO
+ var _drag := ""
++var _gesture := KiwiAudioEditSession.Gesture.new()
+ var _origin := Vector2.ZERO
+ var _clip_originals: Dictionary = {}
+ var _changed := false
+@@ -168,6 +169,9 @@
+  var style:=StyleBoxFlat.new();style.bg_color=fill;style.border_color=border;style.set_border_width_all(1);style.set_corner_radius_all(4);return style
+ func _gui_input(event:InputEvent)->void:
+  if session==null:return
++ if not _clip_originals.is_empty() and not _gesture.valid(session):finish_edit(false)
++ if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
++  finish_edit(false);finish_automation_edit(false);accept_event();return
+  if _handle_automation_input(event):accept_event();return
+  if event is InputEventMouseButton:
+   if event.button_index in [MOUSE_BUTTON_WHEEL_UP,MOUSE_BUTTON_WHEEL_DOWN] and event.pressed:
+@@ -184,8 +188,7 @@
+   if event.button_index!=MOUSE_BUTTON_LEFT:return
+   if not event.pressed:
+    if _drag in ["move","trim_left","trim_right","slip","stretch","fade_in","fade_out"]:
+-    if _changed:session.commit()
+-    else:session.cancel()
++    finish_edit(_changed)
+    _drag="";accept_event();return
+   grab_focus();_origin=event.position;_changed=false
+   if event.position.x<LABEL_WIDTH and event.position.y>=RULER:
+@@ -230,7 +233,7 @@
+   for id in session.selected_ids:
+    var current:=session.document.clip_for_id(id)
+    if current!=null:_clip_originals[id]={"start":current.start_time,"duration":current.duration,"offset":current.source_offset,"speed":current.playback_speed,"track":session.document.track_for_clip(id).id,"fade_in":session.document.actor_for_clip(id).values.get(&"fade_in",0),"fade_out":session.document.actor_for_clip(id).values.get(&"fade_out",0)}
+-  session.begin(_drag.capitalize()+" clips");accept_event()
++  _gesture.begin(session,_drag.capitalize()+" clips");accept_event()
+  elif event is InputEventMouseMotion and not _drag.is_empty():
+   if _drag=="seek":seek_requested.emit(snap_time(time_at(event.position.x)),true)
+   elif _drag=="range":
+@@ -241,6 +244,7 @@
+     var original:Dictionary=_clip_originals[id];var clip:=session.document.clip_for_id(id)
+     if clip==null or not session.can_edit(id):continue
+     var actor:=session.document.actor_for_clip(id)
++    var previous:Array=[clip.start_time,clip.duration,clip.source_offset,clip.playback_speed,actor.values.get(&"track_id",""),actor.values.get(&"fade_in",0),actor.values.get(&"fade_out",0)]
+     var changes:Dictionary={"start_time":original.start,"duration":original.duration,"source_offset":original.offset,"playback_speed":original.speed}
+     match _drag:
+      "move":
+@@ -256,9 +260,17 @@
+       changes.duration=maxf(1.0/44100,snap_time(float(original.start)+float(original.duration)+delta,session.selected_ids)-float(original.start));changes.playback_speed=clampf(float(original.speed)*float(original.duration)/float(changes.duration),0.05,16)
+      "fade_in":actor.values[&"fade_in"]=clampf(float(original.fade_in)+delta,0,clip.duration)
+      "fade_out":actor.values[&"fade_out"]=clampf(float(original.fade_out)-delta,0,clip.duration)
+-    if session.edit_clip(id,changes):_changed=true
+-   session.preview()
++    if session.edit_clip(id,changes):
++     var current:Array=[clip.start_time,clip.duration,clip.source_offset,clip.playback_speed,actor.values.get(&"track_id",""),actor.values.get(&"fade_in",0),actor.values.get(&"fade_out",0)]
++     if current!=previous:_changed=true
++   if _changed:session.preview()
+   queue_redraw();accept_event()
++func finish_edit(keep:bool=true)->void:
++ var changed:=_changed
++ _drag="";_clip_originals.clear();_changed=false
++ _gesture.finish(session,keep and changed)
++ queue_redraw()
++
+ func _can_drop_data(_at:Vector2,data:Variant)->bool:
+  if session==null:return false
+  var destination:=track_at(_at.y)
+@@ -337,7 +349,9 @@
+    if at<0:finish_automation_edit();return true
+    var low:=float(points[at-1].time)+0.000001 if at>0 else 0.0
+    var high:=float(points[at+1].time)-0.000001 if at+1<points.size() else (float(info.duration) if str(info.target.owner_kind)=="clip" else 10000000.0)
+-   _lane_point.time=clampf(float(value.time),low,maxf(low,high));_lane_point.value=value.value
++   var time:=clampf(float(value.time),low,maxf(low,high))
++   if not is_equal_approx(float(_lane_point.time),time) or not is_equal_approx(float(_lane_point.value),float(value.value)):
++    _lane_point.time=time;_lane_point.value=value.value;session.preview()
+    queue_redraw();return true
+  if not event is InputEventMouseButton or not event.pressed:return false
+  if not event.button_index in [MOUSE_BUTTON_LEFT,MOUSE_BUTTON_RIGHT]:return false
+@@ -368,20 +382,24 @@
+   for i in values.size():
+    if absf(float(values[i].time)-float(point.time))<0.000001:hit=i;break
+  if hit<0 and values.size()>=10000:return true
++ if session._before!=null:session.commit()
+  session.begin("Edit lane automation")
+  _lane_id=str(lane.id);_lane_session=session;_lane_before=session._before
+  if hit<0:
+   var curves:Dictionary=info.owner.get("automation",{});values.append(point);values.sort_custom(func(a:Dictionary,b:Dictionary):return float(a.time)<float(b.time))
+-  curves[str(info.parameter)]=values;info.owner["automation"]=curves;_lane_point=point
++  curves[str(info.parameter)]=values;info.owner["automation"]=curves;_lane_point=point;session.preview()
+  else:_lane_point=values[hit]
+  queue_redraw();return true
+ 
+-func finish_automation_edit()->void:
++func finish_automation_edit(keep:bool=true)->void:
+  var owner:=_lane_session;var before:=_lane_before
+  _lane_id="";_lane_point={};_lane_session=null;_lane_before=null
+- if owner!=null and before!=null and owner._before==before:owner.commit()
++ if owner!=null and before!=null and owner._before==before:
++  if keep and owner._pending_preview:owner.commit()
++  else:owner.cancel()
+  queue_redraw()
+ 
+ func _notification(what:int)->void:
+  if what==NOTIFICATION_FOCUS_EXIT or what==NOTIFICATION_EXIT_TREE:
++  finish_edit()
+   if not _lane_id.is_empty():finish_automation_edit()
+--- a/Workspaces/AudioWorkspace/audio_workspace.gd
++++ b/Workspaces/AudioWorkspace/audio_workspace.gd
+@@ -53,6 +53,12 @@
+ var snap_button: CheckButton
+ var tempo_input: SpinBox
+ var _edit_timer := Timer.new()
++var _parameter_gesture := KiwiAudioEditSession.Gesture.new()
++var _parameter_control_id := 0
++var _edit_control_id := 0
++var _mixer_gestures: Array[Dictionary] = []
++var _interaction_epoch := 0
++var _controls_generation := 0
+ var _preview_timer := Timer.new()
+ var _refresh_pending := false
+ var _syncing := false
+@@ -105,9 +111,10 @@
+  asset_file_preview.failed.connect(func(message:String):status.text=message)
+  asset_file_preview.player.volume_db=-6
+  preview_player.volume_db=-6
+- _edit_timer.one_shot=true;_edit_timer.wait_time=0.3;add_child(_edit_timer);_edit_timer.timeout.connect(func():session.commit())
++ _edit_timer.one_shot=true;_edit_timer.wait_time=0.3;add_child(_edit_timer);_edit_timer.timeout.connect(_commit_parameter_edit)
+  _automation_release_timer.one_shot=true;_automation_release_timer.wait_time=0.25;add_child(_automation_release_timer)
+- _automation_release_timer.timeout.connect(func():automation_recording.release(playback.position))
++ _automation_release_timer.timeout.connect(func():
++  if not _automation_gesture_held:automation_recording.release(playback.position))
+  automation_recording.status_changed.connect(_automation_status_changed)
+  automation_recording.bind(session,playback)
+  _preview_timer.one_shot=true;_preview_timer.wait_time=0.18;add_child(_preview_timer);_preview_timer.timeout.connect(_generate_preview)
+@@ -148,11 +155,18 @@
+  for child in parent.get_children():parent.remove_child(child);child.queue_free()
+ func _heading(parent:Node,text:String)->void:
+  var label:=_label(parent,text.to_upper());label.add_theme_color_override("font_color",Color("7bdfc6"));label.add_theme_font_size_override("font_size",11)
+-func _number(parent:Node,label:String,value:float,minimum:float,maximum:float,step:float,callback:Callable)->SpinBox:
++func _number(parent:Node,label:String,value:float,minimum:float,maximum:float,step:float,callback:Callable,live_context:bool=false)->SpinBox:
+  var row:=HBoxContainer.new();parent.add_child(row)
+  var caption:=Label.new();caption.text=label;caption.custom_minimum_size.x=104;row.add_child(caption)
+  var number:=SpinBox.new();number.min_value=minimum;number.max_value=maximum;number.step=step;number.value=value;number.size_flags_horizontal=Control.SIZE_EXPAND_FILL;row.add_child(number)
+- number.value_changed.connect(callback);return number
++ var owner:=session;var document:=session.document;var generation:=_controls_generation
++ number.value_changed.connect(func(next:float):
++  if not number.is_inside_tree() or number.is_queued_for_deletion():return
++  if not live_context and (session!=owner or session.document!=document or generation!=_controls_generation):return
++  var previous:=_edit_control_id;_edit_control_id=number.get_instance_id()
++  callback.call(next)
++  _edit_control_id=previous)
++ return number
+ func _check(parent:Node,label:String,value:bool,callback:Callable)->CheckBox:
+  var button:=CheckBox.new();button.text=label;button.button_pressed=value;button.toggled.connect(callback);parent.add_child(button);return button
+ func _choice(parent:Node,label:String,items:Array,current:String,callback:Callable)->OptionButton:
+@@ -167,7 +181,78 @@
+ func _edit(label:String,callback:Callable)->void:
+  if _syncing:return
+  _finish_automation_pass("Another parameter edit ended the pass")
+- session.begin(label);callback.call();session.preview();_edit_timer.start()
++ if not _parameter_gesture.valid(session) or _parameter_control_id!=_edit_control_id:
++  _commit_parameter_edit()
++  _parameter_gesture.begin(session,label);_parameter_control_id=_edit_control_id
++ callback.call();session.preview();_edit_timer.start()
++func _commit_parameter_edit()->void:
++ _edit_timer.stop();_parameter_control_id=0
++ _parameter_gesture.finish(session)
++func _discard_parameter_handle()->void:
++ _edit_timer.stop();_parameter_control_id=0;_parameter_gesture.clear()
++func _finish_control_edits()->void:
++ _commit_parameter_edit()
++ for state in _mixer_gestures:_finish_mixer_gesture(state,true)
++ canvas.finish_edit();piano.finish_edit();steps.finish_edit();canvas.finish_automation_edit()
++ _interaction_epoch+=1
++func _mixer_context_current(control:Control,owner:KiwiAudioEditSession,document:KiwiAudioDocument)->bool:
++ return control.is_inside_tree() and not control.is_queued_for_deletion() and session==owner and session.document==document
++func _finish_mixer_gesture(state:Dictionary,keep:bool)->void:
++ var held:bool=state.held;state.held=false
++ if held:state.blocked=true
++ if not held:return
++ if state.automation:
++  if int(state.epoch)==_interaction_epoch:
++   if keep:_automation_gesture_end()
++   else:
++    _interaction_epoch+=1;automation_recording.discard("Read: gesture cancelled.")
++ else:state.gesture.finish(session,keep and bool(state.changed))
++func _bind_mixer_slider(slider:Slider,target:Dictionary,track:Dictionary)->void:
++ var owner:=session;var document:=session.document
++ var state:Dictionary={"held":false,"blocked":false,"automation":false,"epoch":0,"changed":false,"gesture":KiwiAudioEditSession.Gesture.new()}
++ _mixer_gestures.append(state)
++ slider.drag_started.connect(func():
++  if not _mixer_context_current(slider,owner,document) or not _mixer_target_editable(target):return
++  _finish_mixer_gesture(state,true)
++  state.blocked=false;state.automation=_automation_consumes(target);state.changed=false
++  if state.automation:
++   _commit_parameter_edit();_automation_gesture_start()
++  else:
++   _finish_automation_pass("Mixer edit ended the pass")
++   # Range can emit the initial click value before drag_started. Adopt that
++   # same control's pending numeric edit instead of splitting one drag.
++   if _parameter_gesture.valid(session) and _parameter_control_id==slider.get_instance_id():
++    state.gesture=_parameter_gesture;state.changed=true
++    _parameter_gesture=KiwiAudioEditSession.Gesture.new();_edit_timer.stop();_parameter_control_id=0
++   else:
++    _commit_parameter_edit();state.gesture.begin(session,"Mix volume")
++  state.epoch=_interaction_epoch;state.held=true)
++ slider.value_changed.connect(func(value:float):
++  if state.blocked:return
++  if not _mixer_context_current(slider,owner,document) or not _mixer_target_editable(target):return
++  if state.held:
++   if int(state.epoch)!=_interaction_epoch:return
++   if state.automation:
++    if _automation_consumes(target):_automation_control_changed(value)
++    return # Never reinterpret an interrupted automation drag as a static edit.
++   if not state.gesture.valid(session):return
++   if is_equal_approx(float(track.get("volume_db",0)),value):return
++   track.volume_db=value;state.changed=true;session.preview()
++  else:
++   if _automation_consumes(target):_automation_control_changed(value);return
++   var previous:=_edit_control_id;_edit_control_id=slider.get_instance_id()
++   _edit("Mix volume",func():track.volume_db=value)
++   _edit_control_id=previous
++  playback.synchronize())
++ slider.drag_ended.connect(func(_changed:bool):_finish_mixer_gesture(state,true);state.blocked=false)
++ slider.focus_exited.connect(func():_finish_mixer_gesture(state,true))
++ slider.focus_entered.connect(func():
++  if not state.held:state.blocked=false)
++ slider.tree_exiting.connect(func():_finish_mixer_gesture(state,true))
++ slider.gui_input.connect(func(event:InputEvent):
++  if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
++   _finish_mixer_gesture(state,false);slider.accept_event())
++
+ func _build_ui()->void:
+  var background:=Panel.new();background.add_theme_stylebox_override("panel",_box(Color("101923"),Color("101923"),0));background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);add_child(background)
+  var root:=VBoxContainer.new();root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);root.add_theme_constant_override("separation",5);add_child(root)
+@@ -243,12 +328,13 @@
+  var row:=HFlowContainer.new();tab.add_child(row)
+  _button(row,"New Pattern",new_pattern.bind(sequencer));_button(row,"Quantize",pattern.quantize);_button(row,"Copy",pattern.copy);_button(row,"Paste",pattern.paste);_button(row,"Humanize",humanize_notes)
+  _button(row,"Chord",chord_dialog);_button(row,"Arpeggiate",arpeggiate_notes);_button(row,"Harmonize",harmonize_notes);_button(row,"Arrangement",arrangement_dialog)
+- _pattern_lengths[pattern] = _number(row,"Beats",4,1,128,1,func(value:float):pattern.pattern_beats=value;var actor:=session.primary_actor();if actor!=null and session.can_edit(session.primary_clip().id):session.action("Pattern length",func():actor.values[&"pattern_beats"]=value;actor.values[&"notes_dirty"]=true);_render_dirty_notes())
++ _pattern_lengths[pattern] = _number(row,"Beats",4,1,128,1,func(value:float):pattern.pattern_beats=value;var actor:=session.primary_actor();if actor!=null and session.can_edit(session.primary_clip().id):session.action("Pattern length",func():actor.values[&"pattern_beats"]=value;actor.values[&"notes_dirty"]=true);_render_dirty_notes(),true)
+  _button(row,"Save Pattern",save_preset.bind("pattern"));_button(row,"Import JSON",import_pattern_json);_button(row,"Export JSON",export_pattern_json);_button(row,"Tags",pattern_tags_dialog)
+  if sequencer:tab.add_child(step_controls);step_controls.setup(session,pattern);step_controls.changed.connect(_render_dirty_notes)
+  pattern.session=session;pattern.mode="steps" if sequencer else "piano";pattern.row_height=23 if sequencer else 16;pattern.size_flags_vertical=Control.SIZE_EXPAND_FILL;tab.add_child(pattern)
+  pattern.notes_changed.connect(_render_dirty_notes);pattern.audition.connect(audition_note)
+ func _session_changed()->void:
++ if not _parameter_gesture.valid(session):_discard_parameter_handle()
+  automation_recording.document_changed()
+  canvas.queue_redraw();piano.queue_redraw();steps.queue_redraw()
+  if session._before!=null:playback.synchronize();return
+@@ -257,6 +343,8 @@
+ func _refresh_all()->void:
+  _refresh_pending=false
+  if not is_inside_tree():return
++ # A refresh queued by the previous edit must not destroy a new live control.
++ if session._before!=null:return
+  if automation_recording.active:_finish_automation_pass("Document refresh ended the pass")
+  _syncing=true;tempo_input.set_value_no_signal(session.document.tempo);title_label.text=session.document.title+(" •" if session.dirty else "");_syncing=false
+  if not _record_processed_capture:
+@@ -284,10 +372,11 @@
+   pattern.pattern_beats=beats
+   if _pattern_lengths.has(pattern):(_pattern_lengths[pattern] as SpinBox).set_value_no_signal(beats)
+ func _selection_changed()->void:
++ _finish_control_edits()
+  _finish_automation_pass("Selection changed")
+  _sync_pattern_lengths()
+  _library_entry={}
+- if _edit_timer.time_left>0:_edit_timer.stop();session.commit()
++ _commit_parameter_edit()
+  _refresh_inspector();_refresh_effects();piano.queue_redraw();steps.queue_redraw();canvas.queue_redraw()
+ static func resolve_document(value:Variant)->Dictionary:
+  var document:KiwiAudioDocument
+@@ -309,6 +398,7 @@
+   var resolved:=resolve_document(value)
+   if not str(resolved.get("error","")).is_empty():notice(str(resolved.error));return
+   document=resolved.document
++ _finish_control_edits();_controls_generation+=1
+  _finish_automation_pass("Composition changed")
+  canvas.finish_automation_edit()
+  for child in get_children():
+@@ -337,6 +427,7 @@
+   waveform.selection=wave.get("selection",Vector2i.ZERO);waveform.channel=int(wave.get("channel",-1));waveform.zero_crossing=bool(wave.get("zero_crossing",true))
+  _refresh_all()
+ func capture_state()->Dictionary:
++ _finish_control_edits()
+  _finish_automation_pass("Composition saved or switched")
+  if session._before!=null:session.commit()
+  var ui:Dictionary={"zoom":canvas.zoom,"scroll_time":canvas.scroll_time,"track_scroll":canvas.track_scroll,"snap":canvas.snap,"main_split":main_split.split_offset,"right_split":right_split.split_offset,"vertical_split":vertical_split.split_offset,"bottom_open":bottom.visible,"bottom_tab":bottom.current_tab,"playhead":playback.position,"selected_ids":session.selected_ids,"selected_track":session.selected_track}
+@@ -402,7 +493,11 @@
+  if not track.is_empty():
+   _heading(inspector,"Track · "+str(track.name))
+   var track_name:=LineEdit.new();track_name.text=str(track.name);inspector.add_child(track_name);track_name.text_submitted.connect(func(value:String):session.action("Rename track",func():track.name=value))
+-  var color:=ColorPickerButton.new();color.color=track.get("color",Color("63d9bc"));inspector.add_child(color);color.color_changed.connect(func(value:Color):_edit("Track color",func():track.color=value))
++  var color:=ColorPickerButton.new();color.color=track.get("color",Color("63d9bc"));inspector.add_child(color);var color_session:=session;var color_document:=session.document
++  color.color_changed.connect(func(value:Color):
++   if not _mixer_context_current(color,color_session,color_document):return
++   var previous:=_edit_control_id;_edit_control_id=color.get_instance_id()
++   _edit("Track color",func():track.color=value);_edit_control_id=previous)
+   _number(inspector,"Volume (dB)",float(track.get("volume_db",0)),-60,12,0.1,func(value:float):_edit("Track volume",func():track.volume_db=value))
+   _number(inspector,"Pan",float(track.get("pan",0)),-1,1,0.01,func(value:float):_edit("Track pan",func():track.pan=value))
+   var destinations:Array=["Master"];var ids:Array=[""]
+@@ -537,7 +632,7 @@
+  for name in KiwiAudioTemplates.chain_names():_button(dialog.host,name,func():var owner:=_effect_owner();session.action("Apply effect chain",func():owner["effects"]=KiwiAudioTemplates.chain(name));dialog.window.queue_free())
+ func _refresh_mixer()->void:
+  var focused:=get_viewport().gui_get_focus_owner();var focus_id:=str(focused.get_meta("audio_mixer_id","")) if focused!=null else ""
+- _clear(mixer_panel);_meter_controls.clear();_automation_mixer_controls.clear()
++ _clear(mixer_panel);_mixer_gestures.clear();_meter_controls.clear();_automation_mixer_controls.clear()
+  var entries:Array=session.document.tracks.filter(func(track:Dictionary):return not KiwiAudioAutomationLane.is_lane(track) or not KiwiAudioAutomationLane.binding_error(session.document,str(track.id)).is_empty());entries.append(session.document.master)
+  for index in entries.size():
+   var track:Dictionary=entries[index];var master:=index==entries.size()-1;var strip:=VBoxContainer.new();strip.custom_minimum_size.x=100;mixer_panel.add_child(strip)
+@@ -548,18 +643,7 @@
+   var slider:=VSlider.new();slider.min_value=-60;slider.max_value=12;slider.step=0.1;slider.value=float(track.get("volume_db",0));slider.editable=not locked;slider.custom_minimum_size=Vector2(40,100);slider.size_flags_horizontal=Control.SIZE_SHRINK_CENTER;strip.add_child(slider)
+   var mixer_id:="master" if master else str(track.id);slider.set_meta("audio_mixer_id",mixer_id)
+   slider.tooltip_text="Choose Automate, then Write/Touch/Latch to record this gain. Read follows the existing curve during playback."
+-  slider.drag_started.connect(func():
+-   if _automation_consumes(target):_automation_gesture_start()
+-   else:_finish_automation_pass("Mixer edit ended the pass");session.begin("Mix volume"))
+-  slider.value_changed.connect(func(value:float):
+-   if _automation_consumes(target):_automation_control_changed(value);return
+-   if not _mixer_target_editable(target):return
+-   if session._before!=null:track.volume_db=value;session.preview()
+-   else:session.action("Mix volume",func():track.volume_db=value)
+-   playback.synchronize())
+-  slider.drag_ended.connect(func(_changed:bool):
+-   if _automation_consumes(target):_automation_gesture_end()
+-   else:session.commit())
++  _bind_mixer_slider(slider,target,track)
+   _automation_mixer_controls.append({"control":slider,"target":target})
+   if focus_id==mixer_id:slider.grab_focus()
+   var gain:=_number(strip,"dB",float(track.get("volume_db",0)),-60,12,0.1,func(value:float):
+@@ -1181,7 +1265,7 @@
+  var actor:=session.document.actor_for_clip(_wave_clip_id);var clip:=session.document.clip_for_id(_wave_clip_id)
+  if actor==null or clip==null:return
+  # Keep the selection edit a separate undo transaction from a pending knob drag.
+- _edit_timer.stop();session.commit()
++ _finish_control_edits();session.commit()
+  var source_stream:=_workspace_source(actor.values.get(&"audio"))
+  if source_stream==null:notice("The selected audio source is missing.");return
+  var reason:=KiwiAudioRegionEdit.unsupported_reason(clip,actor,operation)
+@@ -1378,7 +1462,7 @@
+   return
+  var track:=session.document.track_for_id(session.selected_track)
+  if track.is_empty() or bool(track.get("locked",false)) or KiwiAudioAutomationLane.is_lane(track):notice("Select an unlocked audio or instrument track before recording.");return
+- _edit_timer.stop();session.commit()
++ _finish_control_edits();session.commit()
+  _record_generation+=1
+  var token:=_record_generation
+  _record_cancel_requested=false;_record_busy=true;_record_phase="countdown"
+@@ -1726,16 +1810,18 @@
+  if action!="preview":library.add_asset(str(data.path),str(data.path).get_file(),stream.get_length())
+ 
+ func undo()->void:
++ _interaction_epoch+=1;_controls_generation+=1;_discard_parameter_handle()
+  # Undo discards a pending pass first, without undoing an unrelated older edit.
+  var pending:=automation_recording.has_pending()
+  automation_recording.discard("Read: pending automation discarded by Undo." if pending else "Read: Undo requested.")
+  _automation_release_timer.stop();_automation_gesture_held=false
+- if pending:playback.stop(false);return
+- session.undo()
++ if pending:playback.stop(false);call_deferred("_refresh_all");return
++ session.undo();call_deferred("_refresh_all")
+ func redo()->void:
++ _interaction_epoch+=1;_controls_generation+=1;_discard_parameter_handle()
+  automation_recording.discard("Read: pending automation discarded before Redo.")
+  _automation_release_timer.stop();_automation_gesture_held=false
+- playback.stop(false);session.redo()
++ playback.stop(false);session.redo();call_deferred("_refresh_all")
+ func _register_commands()->void:
+  _commands={
+   "Play / Pause":toggle_playback,"Stop":stop,"Import Audio":import_audio,"Save Composition":save,"Export Audio":export_dialog,
+@@ -2110,26 +2196,49 @@
+  _automation_mode.item_selected.connect(func(index:int):
+   if recorder.recording or _record_busy:automation_recording.discard("Read: finish the audio take before recording automation.");return
+   _finish_automation_pass("Mode changed")
+-  _edit_timer.stop();session.commit();canvas.finish_automation_edit()
+-  call_deferred("_arm_automation_mode",str(KiwiAudioAutomationRecording.MODES[index]),session))
++  _finish_control_edits();session.commit();canvas.finish_automation_edit()
++  call_deferred("_arm_automation_mode",str(KiwiAudioAutomationRecording.MODES[index]),session,_interaction_epoch))
+  _button(row,"Target...",automation_record_target_dialog)
+  _automation_target_label.custom_minimum_size.x=180;row.add_child(_automation_target_label)
+  _automation_fader.custom_minimum_size=Vector2(180,24);_automation_fader.step=0.001;row.add_child(_automation_fader)
+- _automation_fader.drag_started.connect(_automation_gesture_start)
+- _automation_fader.drag_ended.connect(func(_changed:bool):_automation_gesture_end())
+- _automation_fader.value_changed.connect(_automation_control_changed)
++ _bind_automation_fader(_automation_fader)
+  _button(row,"Finish pass",func():_finish_automation_pass("Pass finished"))
+  _button(row,"Discard pass",func():automation_recording.discard("Read: pending automation discarded.");_refresh_automation_controls())
+  _automation_status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;parent.add_child(_automation_status)
+  _automation_status.add_theme_font_size_override("font_size",10)
+  _refresh_automation_controls()
+ 
+-func _arm_automation_mode(mode:String,owner_session:KiwiAudioEditSession)->void:
+- if session!=owner_session or recorder.recording or _record_busy:return
++func _bind_automation_fader(fader:Slider)->void:
++ var state:Dictionary={"held":false,"epoch":0,"blocked":false}
++ fader.drag_started.connect(func():
++  state.blocked=false;state.held=true;_automation_gesture_start();state.epoch=_interaction_epoch)
++ fader.value_changed.connect(func(value:float):
++  if state.blocked or (state.held and int(state.epoch)!=_interaction_epoch):return
++  if automation_recording.mode!="Read":_automation_control_changed(value))
++ var finish:=func(keep:bool):
++  var valid:bool=state.held and int(state.epoch)==_interaction_epoch
++  if state.held:state.blocked=true
++  state.held=false
++  if valid:
++   if keep:_automation_gesture_end()
++   else:
++    _interaction_epoch+=1;automation_recording.discard("Read: gesture cancelled.")
++ fader.drag_ended.connect(func(_changed:bool):finish.call(true);state.blocked=false)
++ fader.focus_exited.connect(func():finish.call(true))
++ fader.focus_entered.connect(func():
++  if not state.held:state.blocked=false)
++ fader.tree_exiting.connect(func():finish.call(true))
++ fader.gui_input.connect(func(event:InputEvent):
++  if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:finish.call(false);fader.accept_event())
++
++func _arm_automation_mode(mode:String,owner_session:KiwiAudioEditSession,epoch:int)->void:
++ if epoch!=_interaction_epoch or session!=owner_session or recorder.recording or _record_busy:return
+  automation_recording.set_mode(mode);_refresh_automation_controls()
+ 
+ func _automation_status_changed(message:String)->void:
+- if automation_recording.mode=="Read":_automation_gesture_held=false;_automation_release_timer.stop()
++ if automation_recording.mode=="Read":
++  if _automation_gesture_held:_interaction_epoch+=1
++  _automation_gesture_held=false;_automation_release_timer.stop()
+  _automation_status.text=message
+  if _automation_mode!=null:_automation_mode.select(KiwiAudioAutomationRecording.MODES.find(automation_recording.mode))
+  _automation_fader.editable=automation_recording.mode!="Read" and automation_recording.editable()
+@@ -2151,6 +2260,7 @@
+  return automation_recording.mode!="Read" and automation_recording.matches(target) and automation_recording.editable()
+ 
+ func _automation_gesture_start()->void:
++ _interaction_epoch+=1
+  _automation_release_timer.stop();_automation_gesture_held=true
+  automation_recording.touch(playback.position)
+ 
+@@ -2159,10 +2269,12 @@
+  if not _automation_gesture_held:_automation_release_timer.start()
+ 
+ func _automation_gesture_end()->void:
++ _interaction_epoch+=1
+  _automation_gesture_held=false;_automation_release_timer.stop()
+  automation_recording.release(playback.position)
+ 
+ func _finish_automation_pass(reason:String)->void:
++ _interaction_epoch+=1
+  _automation_release_timer.stop();_automation_gesture_held=false
+  automation_recording.finish(reason)
+  if _automation_mode!=null:_refresh_automation_controls()
+@@ -2173,7 +2285,7 @@
+ 
+ func _choose_automation_record_target(target:Dictionary,lane_id:String="")->void:
+  _finish_automation_pass("Target changed")
+- _edit_timer.stop();session.commit();canvas.finish_automation_edit()
++ _finish_control_edits();session.commit();canvas.finish_automation_edit()
+  automation_recording.choose(target,lane_id)
+  _refresh_automation_controls()
+ 
+@@ -2214,6 +2326,7 @@
+   entry.control.set_value_no_signal(value)
+ 
+ func _exit_tree()->void:
++ _finish_control_edits()
+  _finish_automation_pass("Workspace closed")
+ 
+ func _automation_lane_inspector(track:Dictionary)->void:
+@@ -2325,7 +2438,7 @@
+ func conductor_dialog()->void:
+  _finish_automation_pass("Conductor editor opened")
+  canvas.finish_automation_edit()
+- if _edit_timer.time_left>0:_edit_timer.stop();session.commit()
++ _commit_parameter_edit()
+  var dialog:=_window("Project conductor / grid",Vector2i(880,670));dialog.window.set_meta("audio_conductor_window",true)
+  var owner:=session
+  var editor:=KiwiAudioConductorControls.new();editor.size_flags_vertical=Control.SIZE_EXPAND_FILL;dialog.host.add_child(editor);editor.setup(session,playback.position,func():return session==owner and not dialog.window.is_queued_for_deletion())
+@@ -2336,7 +2449,7 @@
+ func retime_notes_dialog()->void:
+  _finish_automation_pass("Uniform retime editor opened")
+  canvas.finish_automation_edit()
+- if _edit_timer.time_left>0:_edit_timer.stop();session.commit()
++ _commit_parameter_edit()
+  var dialog:=_window("Uniformly retime note sources",Vector2i(650,380));dialog.window.set_meta("audio_conductor_window",true)
+  var owner:=session;var document:=session.document;var revision:=session.revision
+  _label(dialog.host,"This explicit retime scales editable note clip positions, durations and complete MIDI source tempo maps by the ratio of initial project BPM to target BPM. Project tempo points scale by the same ratio. It is one undo step.")

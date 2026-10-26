@@ -4,6 +4,7 @@ extends Node
 signal saved_projects_updated
 
 var _saved_projects: ProjectManagerSavedProjects
+var _saved_projects_path:=""
 
 
 #find the locally stored resource that contains all saved projects paths
@@ -15,14 +16,22 @@ func _ready() -> void:
 	else:
 		base_dir = OS.get_executable_path().get_base_dir()
 	
-	var saved_projects_path: String = base_dir + "_SavedProjects.tres"
-	_saved_projects = ResourceLoader.load(saved_projects_path)
+	var legacy_path:=base_dir + "_SavedProjects.tres"
+	_saved_projects_path=legacy_path if OS.has_feature("editor") else "user://saved_projects.tres"
+	if FileAccess.file_exists(_saved_projects_path):
+		_saved_projects=ResourceLoader.load(_saved_projects_path) as ProjectManagerSavedProjects
+	elif not OS.has_feature("editor") and FileAccess.file_exists(legacy_path):
+		# Migrate a legacy portable install without writing beside the executable.
+		var previous:=ResourceLoader.load(legacy_path) as ProjectManagerSavedProjects
+		if previous!=null:_saved_projects=previous.duplicate(true)
+	if _saved_projects==null:_saved_projects=ProjectManagerSavedProjects.new()
+	_saved_projects.take_over_path(_saved_projects_path)
 
 
 
 func add_project_to_listing(path: String) -> void:
 	_saved_projects.project_paths.append(path)
-	FileOperations.save_resource(_saved_projects)
+	_save_listing()
 	saved_projects_updated.emit()
 
 
@@ -52,7 +61,7 @@ func duplicate_project(path_to_duplicate: String, new_path: String, project_name
 func remove_project_from_listing(path: String) -> void:
 	if _saved_projects.project_paths.has(path):
 		_saved_projects.project_paths.erase(path)
-	FileOperations.save_resource(_saved_projects)
+	_save_listing()
 	saved_projects_updated.emit()
 
 
@@ -78,6 +87,10 @@ func rename_project(project_path: String, new_name: String) -> void:
 
 func get_saved_projects() -> ProjectManagerSavedProjects:
 	return _saved_projects
+
+func _save_listing()->void:
+	var error:=ResourceSaver.save(_saved_projects,_saved_projects_path)
+	if error!=OK:push_error("Project list could not be saved: "+error_string(error))
 
 
 

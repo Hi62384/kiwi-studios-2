@@ -1,5 +1,5 @@
 class_name ActorInspector
-extends ScrollContainer
+extends VBoxContainer
 ## Inspector fields are generated from the selected actor's definition.
 
 const IMAGE_FILE_EXTENSIONS := ["png", "jpg", "jpeg", "webp", "bmp", "svg", "tga", "hdr", "exr"]
@@ -20,6 +20,31 @@ var _animation_layout_signature: String = ""
 var property_batch := ActorPropertyBatch.new()
 var _inspecting_file := false
 var _file_selection := ""
+var content_scroll := ScrollContainer.new()
+var main_tabs := HBoxContainer.new()
+var section_scroll := ScrollContainer.new()
+var section_tabs := VBoxContainer.new()
+var identity_fields := VBoxContainer.new()
+var _sections: Dictionary = {}
+var _main_buttons: Dictionary = {}
+var _main_tab := "Properties"
+var _section := ""
+var _navigation_revision := 0
+var _empty_section: Label
+
+# Preserve the inspector's existing scrolling interface for scene integrations.
+var scroll_vertical: int:
+	get: return content_scroll.scroll_vertical
+	set(value): content_scroll.scroll_vertical = value
+
+func get_v_scroll_bar() -> VScrollBar: return content_scroll.get_v_scroll_bar()
+func get_h_scroll_bar() -> HScrollBar: return content_scroll.get_h_scroll_bar()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		# Some file validators use an inspector without mounting its UI.
+		for control in [fields, content_scroll, main_tabs, section_scroll, section_tabs, identity_fields]:
+			if is_instance_valid(control) and control.get_parent() == null: control.free()
 
 
 func setup(document: ActorTimeline, types: ActorRegistry, state: ActorInspectorState = null) -> void:
@@ -29,20 +54,173 @@ func setup(document: ActorTimeline, types: ActorRegistry, state: ActorInspectorS
 	property_batch.registry = registry
 	ui_state = state if state != null else ActorInspectorState.new()
 	custom_minimum_size.x = 220
+	clip_contents = true
+	add_theme_constant_override("separation", 6)
+	_build_navigation()
 	fields.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	fields.add_theme_constant_override("separation", 6)
-	add_child(fields)
+	content_scroll.add_child(fields)
 	model.changed.connect(refresh)
 	model.selection_requested.connect(func():
 		if not _inspecting_file: return
 		_inspecting_file = false
 		_actor = null
-		for child in fields.get_children():
-			fields.remove_child(child)
-			child.queue_free())
+		_clear_fields())
 	get_v_scroll_bar().value_changed.connect(_scroll_changed)
 	ui_state.changed.connect(func(): ui_state_changed.emit())
 	refresh()
+
+func _build_navigation() -> void:
+	main_tabs.name = "InspectorMainTabs"
+	main_tabs.add_theme_constant_override("separation", 3)
+	add_child(main_tabs)
+	var main_group := ButtonGroup.new()
+	for title: String in ["Actor", "Properties"]:
+		var button := Button.new()
+		button.name = "Inspector" + title + "Tab"
+		button.text = title
+		button.toggle_mode = true
+		button.button_group = main_group
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_style_navigation_button(button, false)
+		main_tabs.add_child(button)
+		_main_buttons[title] = button
+		button.pressed.connect(select_main_tab.bind(title))
+	identity_fields.name = "InspectorIdentity"
+	add_child(identity_fields)
+	var body := HBoxContainer.new()
+	body.name = "InspectorBody"
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 7)
+	add_child(body)
+	section_scroll.name = "InspectorSectionRail"
+	section_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	section_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	section_scroll.custom_minimum_size.x = 72
+	body.add_child(section_scroll)
+	section_tabs.name = "InspectorSectionTabs"
+	section_tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	section_tabs.add_theme_constant_override("separation", 3)
+	section_scroll.add_child(section_tabs)
+	content_scroll.name = "InspectorContentScroll"
+	content_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	body.add_child(content_scroll)
+	resized.connect(func(): section_scroll.custom_minimum_size.x = clampf(size.x * .24, 58.0, 104.0))
+
+func _style_navigation_button(button: Button, side: bool) -> void:
+	button.custom_minimum_size.y = 30
+	button.clip_text = true
+	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	button.add_theme_font_size_override("font_size", 13)
+	for variant: String in ["normal", "hover", "pressed", "hover_pressed"]:
+		var style := StyleBoxFlat.new()
+		var selected := variant in ["pressed", "hover_pressed"]
+		style.bg_color = Color("21433e") if selected else (Color("253743") if variant == "hover" else Color("17232d"))
+		style.border_color = Color("78ddc2") if selected else Color("304454")
+		if side: style.border_width_left = 3 if selected else 1
+		else: style.border_width_bottom = 2 if selected else 1
+		style.set_corner_radius_all(4)
+		style.content_margin_left = 7; style.content_margin_right = 7
+		style.content_margin_top = 5; style.content_margin_bottom = 5
+		button.add_theme_stylebox_override(variant, style)
+	button.add_theme_color_override("font_pressed_color", Color("a2f3dc"))
+
+func _clear_fields() -> void:
+	_navigation_revision += 1
+	_sections.clear()
+	for parent in [fields, section_tabs, identity_fields]:
+		for child in parent.get_children():
+			parent.remove_child(child)
+			child.queue_free()
+	_empty_section = null
+	main_tabs.visible = false
+	section_scroll.visible = false
+	identity_fields.visible = false
+
+func _section_page(title: String, main_tab: String) -> VBoxContainer:
+	var key := main_tab + "/" + title
+	if _sections.has(key): return _sections[key].content
+	var page := VBoxContainer.new()
+	page.name = "Section_" + title.replace(" ", "_")
+	page.visible = false
+	fields.add_child(page)
+	var heading := Label.new()
+	heading.text = title
+	heading.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	heading.modulate = Color("80dbc4")
+	page.add_child(heading)
+	var content := VBoxContainer.new()
+	content.name = "Content"
+	content.add_theme_constant_override("separation", 5)
+	page.add_child(content)
+	var button := Button.new()
+	button.name = "Category_" + title.replace(" ", "_")
+	button.text = title
+	button.tooltip_text = main_tab + " / " + title
+	button.toggle_mode = true
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.visible = false
+	_style_navigation_button(button, true)
+	section_tabs.add_child(button)
+	button.pressed.connect(select_section.bind(title))
+	_sections[key] = {"main": main_tab, "title": title, "page": page, "content": content, "button": button}
+	return content
+
+func _save_page_scroll() -> void:
+	if _actor != null and not _inspecting_file and not _restoring_scroll:
+		ui_state.set_page_scroll(_actor.id, _main_tab, _section, scroll_vertical)
+
+func select_main_tab(title: String) -> void:
+	if _actor == null or title not in ["Actor", "Properties"]: return
+	_save_page_scroll()
+	_main_tab = title
+	ui_state.set_main_tab(_actor.id, title)
+	_section = ui_state.section_for(_actor.id, title)
+	_apply_navigation()
+
+func select_section(title: String) -> void:
+	if _actor == null or not _sections.has(_main_tab + "/" + title): return
+	_save_page_scroll()
+	_section = title
+	ui_state.set_section(_actor.id, _main_tab, title)
+	_apply_navigation()
+
+func _apply_navigation() -> void:
+	_restoring_scroll = true
+	_navigation_revision += 1
+	main_tabs.show()
+	identity_fields.show()
+	var available: Array[String] = []
+	for page: Dictionary in _sections.values():
+		if page.main == _main_tab: available.append(page.title)
+	if not available.has(_section):
+		_section = "Transform" if _main_tab == "Actor" and available.has("Transform") else (available[0] if not available.is_empty() else "")
+	for title: String in _main_buttons: _main_buttons[title].set_pressed_no_signal(title == _main_tab)
+	for page: Dictionary in _sections.values():
+		var selected: bool = page.main == _main_tab and page.title == _section
+		page.page.visible = selected
+		page.button.visible = page.main == _main_tab
+		page.button.set_pressed_no_signal(selected)
+	section_scroll.visible = not available.is_empty()
+	if _empty_section == null:
+		_empty_section = Label.new()
+		_empty_section.text = "No additional properties."
+		_empty_section.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_empty_section.modulate = Color("819db4")
+		fields.add_child(_empty_section)
+	_empty_section.visible = available.is_empty()
+	if _actor != null:
+		ui_state.set_section(_actor.id, _main_tab, _section)
+		call_deferred("_restore_scroll", _actor.id, _navigation_revision)
+
+static func _property_main_tab(property: ActorProperty) -> String:
+	var explicit := str(property.options.get("inspector_tab", ""))
+	if explicit in ["Actor", "Properties"]: return explicit
+	if property.id in [&"position", &"rotation", &"scale"] or str(property.options.get("group", "")) in ["Transform", "Layout"]: return "Actor"
+	return "Properties"
 
 
 func _edit_property(actor: ActorData, _definition: ActorDefinition, key: StringName, value: Variant) -> void:
@@ -66,9 +244,7 @@ func _inspect_media(path: String) -> bool:
 	_file_selection = model.selected_id
 	_actor = null
 	_updaters.clear()
-	for child in fields.get_children():
-		fields.remove_child(child)
-		child.queue_free()
+	_clear_fields()
 	_label(path.get_file())
 	if extension in IMAGE_FILE_EXTENSIONS:
 		var edit_button := Button.new()
@@ -94,9 +270,7 @@ func inspect_file_resource(path: String) -> void:
 	_file_selection = model.selected_id
 	_actor = null
 	_updaters.clear()
-	for child in fields.get_children():
-		fields.remove_child(child)
-		child.queue_free()
+	_clear_fields()
 	_label("RESOURCE PROPERTIES")
 	var title := Label.new()
 	title.text = path.get_file()
@@ -127,6 +301,9 @@ func inspect_file_resource(path: String) -> void:
 
 func _add_file_object_value(object: ActorObjectData, definition: ActorObjectDefinition,
 		property: ActorProperty, parent: VBoxContainer, save_owner: ActorObjectData = null) -> void:
+	if property.options.get("natural_material", false):
+		_add_natural_material_editor(null, object, definition, property, parent, save_owner)
+		return
 	if property.options.get("system_font", false):
 		_add_label(parent, property.label)
 		var selector := _font_editor(parent, str(definition.value_for(object, property)), func(value: String):
@@ -364,10 +541,7 @@ func refresh() -> void:
 	# has been restored, otherwise merely selecting it overwrites its own state.
 	_restoring_scroll = _actor != null
 	_updaters.clear()
-	for child in fields.get_children():
-		fields.remove_child(child)
-		child.queue_free()
-	_label("ACTOR PROPERTIES")
+	_clear_fields()
 	if _actor == null:
 		_restoring_scroll = false
 		_label("Select an actor in the timeline.")
@@ -380,10 +554,10 @@ func refresh() -> void:
 		return
 	var identity := HBoxContainer.new()
 	identity.add_theme_constant_override("separation", 10)
-	fields.add_child(identity)
+	identity_fields.add_child(identity)
 	var icon := TextureRect.new()
 	icon.texture = definition.icon
-	icon.custom_minimum_size = Vector2(36, 36)
+	icon.custom_minimum_size = Vector2(24, 24)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	identity.add_child(icon)
@@ -392,14 +566,17 @@ func refresh() -> void:
 	identity.add_child(identity_text)
 	var actor_title := Label.new()
 	actor_title.text = actor.display_name
-	actor_title.add_theme_font_size_override("font_size", 17)
+	actor_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	actor_title.add_theme_font_size_override("font_size", 15)
 	identity_text.add_child(actor_title)
 	var actor_type := Label.new()
 	actor_type.text = definition.category + "  /  " + definition.display_name
+	actor_type.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	actor_type.modulate = Color("819db4")
+	actor_type.add_theme_font_size_override("font_size", 12)
 	identity_text.add_child(actor_type)
 	_updaters.append(func(): actor_title.text = actor.display_name)
-	var general := _category("General", actor)
+	var general := _category("General", actor, "Actor")
 	_add_label(general, "Name")
 	var name_input := LineEdit.new()
 	name_input.name = "ActorName"
@@ -419,18 +596,134 @@ func refresh() -> void:
 	general.add_child(reset_name)
 	reset_name.pressed.connect(func(): model.rename_actor(actor, definition.display_name))
 	_updaters.append(func(): reset_name.visible = actor.display_name != definition.display_name)
-	var current_group := ""
-	var group_container: VBoxContainer
+	if KiwiPhysicsSettings.compatible(actor):
+		KiwiPhysicsInspector.build(self,actor,_category("Physics",actor,"Actor"))
+	if actor.type_id==&"skeleton_rig": _add_skeleton_editor(actor)
 	for property in definition.properties:
 		if not _property_is_visible(property, actor):
 			continue
 		var property_group := str(property.options.get("group", "Properties"))
-		if property_group != current_group:
-			current_group = property_group
-			group_container = _category(current_group, actor)
+		var group_container := _category(property_group, actor, _property_main_tab(property))
 		_add_property(property, definition, group_container)
 	_prepare_buttons()
-	call_deferred("_restore_scroll", actor.id)
+	_main_tab = ui_state.main_tab_for(actor.id)
+	if not (ui_state.actor_states.get(actor.id, {}) as Dictionary).has("main_tab") and not _sections.values().any(func(page: Dictionary): return page.main == "Properties"):
+		_main_tab = "Actor"
+	_section = ui_state.section_for(actor.id, _main_tab)
+	_apply_navigation()
+
+
+func _add_transformation_editor(property: ActorProperty, definition: ActorDefinition, parent: VBoxContainer) -> void:
+	var actor := _actor
+	_add_label(parent, property.label)
+	var row := HBoxContainer.new()
+	parent.add_child(row)
+	var slot := ActorResourceSlot.new()
+	slot.name = "TransformationAsset"
+	slot.text = "Load asset…" if ActorTransformationStates.source_path(actor).is_empty() else ActorTransformationStates.source_path(actor).get_file()
+	slot.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	slot.tooltip_text = ActorTransformationStates.source_path(actor)
+	slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slot.accepts_file = _file_path_allowed.bind(property)
+	row.add_child(slot)
+	var assign := func(path: String):
+		_edit_property(actor, definition, property.id, path)
+		call_deferred("_rebuild_selected")
+	slot.file_dropped.connect(assign)
+	slot.pressed.connect(func():
+		var path := await ActorProjectFilePicker.pick(self, property, "Choose Transformation Image 2D")
+		if path == ActorProjectFilePicker.EMPTY_RESOURCE: assign.call("")
+		elif not path.is_empty(): assign.call(path))
+	var clear := Button.new()
+	clear.text = "×"; clear.tooltip_text = "Clear transformation asset"
+	clear.disabled = ActorTransformationStates.source_path(actor).is_empty()
+	row.add_child(clear)
+	clear.pressed.connect(func(): assign.call(""))
+	var asset := ActorTransformationStates.load_asset(actor)
+	if asset.document == null:
+		_add_label(parent, str(asset.error))
+		return
+	var document: KiwiTransformationImage2D = asset.document
+	var edit := Button.new()
+	edit.text = "Edit transformation ↗"
+	edit.name = "OpenTransformationWorkspace"
+	parent.add_child(edit)
+	edit.pressed.connect(func():
+		var tabs := get_tree().get_first_node_in_group("actor_scene_tabs")
+		if tabs != null: tabs.open_transformation(ActorTransformationStates.source_path(actor)))
+	for item in document.components:
+		var heading := HBoxContainer.new()
+		parent.add_child(heading)
+		var label := Label.new()
+		label.text = item.title + " · Current state"
+		label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		heading.add_child(label)
+		var state_property := ActorTransformationStates.property_for(item)
+		_add_keyframe_button(heading, actor, state_property, ActorTransformationStates.path_for(item.id), item.default_state_id)
+		var reset_state := Button.new()
+		reset_state.text = "↺"
+		reset_state.tooltip_text = "Use the default state, or the asset's animation. Scene keyframes still override it."
+		heading.add_child(reset_state)
+		reset_state.pressed.connect(func():
+			var states: Dictionary = actor.values.get(&"component_states", {}).duplicate()
+			states.erase(item.id)
+			model.edit_property(actor, definition, &"component_states", states))
+		var choose := OptionButton.new()
+		choose.name = "TransformationState_" + item.id
+		choose.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		choose.fit_to_longest_item = false
+		parent.add_child(choose)
+		for state in item.states:
+			choose.add_item(state.title)
+			choose.set_item_metadata(choose.item_count - 1, state.id)
+		choose.item_selected.connect(func(index: int):
+			if not _syncing: ActorTransformationStates.choose(model, actor, item, str(choose.get_item_metadata(index))))
+		var update := func():
+			var clip := model.clip_for_actor_id(actor.id)
+			var id := ActorTransformationStates.current(actor, item, clip.local_time(model.playhead_time) if clip != null else 0.0)
+			reset_state.visible = (actor.values.get(&"component_states", {}) as Dictionary).has(item.id)
+			for index in choose.item_count:
+				if str(choose.get_item_metadata(index)) == id: choose.select(index); break
+		update.call()
+		_updaters.append(update)
+
+func _add_skeleton_editor(actor: ActorData) -> void:
+	var bones: Array=actor.values.get(&"rig_bones",[])
+	var panel := _category("Bone Pose",actor)
+	if bones.is_empty():
+		_add_label(panel,"Import a rigged model to edit its bones.")
+		return
+	var selected := clampi(int(actor.get_meta("editor_selected_bone",0)),0,bones.size()-1)
+	var choose := OptionButton.new(); choose.name="RigBonePicker"; choose.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	for bone: Dictionary in bones: choose.add_item(str(bone.name))
+	choose.select(selected); panel.add_child(choose)
+	choose.item_selected.connect(func(index: int): actor.set_meta("editor_selected_bone",index); actor.set_meta("editor_bone_mode",true); call_deferred("_rebuild_selected"))
+	for channel: String in ["position","rotation","scale"]:
+		var heading := HBoxContainer.new(); panel.add_child(heading)
+		var label := Label.new(); label.text=channel.capitalize(); label.size_flags_horizontal=Control.SIZE_EXPAND_FILL; heading.add_child(label)
+		var property := ActorProperty.create(StringName("bone_"+channel),str(bones[selected].name)+" / "+channel.capitalize(),Vector3.ONE if channel=="scale" else Vector3.ZERO,true)
+		_add_keyframe_button(heading,actor,property,ActorSkeletonPose.path(selected,channel))
+		for axis in 3:
+			var row := HBoxContainer.new(); panel.add_child(row)
+			var axis_label := Label.new(); axis_label.text=["X","Y","Z"][axis]; axis_label.modulate=[Color("ee9e9e"),Color("9ed8b5"),Color("99bce8")][axis]; row.add_child(axis_label)
+			var number := DragNumber.new(); number.name="Bone_%s_%s"%[channel,axis]; number.size_flags_horizontal=Control.SIZE_EXPAND_FILL; number.step=.01; number.allow_greater=true; number.allow_lesser=true
+			number.set_value_no_signal(ActorSkeletonPose.value(actor,selected,channel)[axis]); row.add_child(number)
+			var state := {"before":{}}
+			var changed := func(value: float) -> Vector3:
+				var next := ActorSkeletonPose.value(actor,selected,channel); next[axis]=value; return next
+			number.interaction_started.connect(func(): state.before=ActorSkeletonPose.capture(model,actor))
+			number.preview_changed.connect(func(value: float): ActorSkeletonPose.preview(model,actor,selected,channel,changed.call(value)))
+			number.drag_committed.connect(func(value: float):
+				var next: Vector3=changed.call(value)
+				ActorSkeletonPose.commit(model,state.before if not state.before.is_empty() else ActorSkeletonPose.capture(model,actor),selected,{channel:next}); state.before={})
+			number.drag_cancelled.connect(func():
+				if not state.before.is_empty(): ActorSkeletonPose.restore(model,state.before); state.before={})
+			number.value_changed.connect(func(value: float):
+				if not _syncing: ActorSkeletonPose.commit(model,ActorSkeletonPose.capture(model,actor),selected,{channel:changed.call(value)}))
+			_updaters.append(func(): number.set_value_no_signal(ActorSkeletonPose.value(actor,selected,channel)[axis]))
+	var key := Button.new(); key.text="◆ Key selected bone pose · I"; key.name="KeyBonePose"; panel.add_child(key)
+	key.pressed.connect(func(): ActorSkeletonPose.key_pose(model,actor,selected))
 
 
 func _prepare_buttons() -> void:
@@ -441,6 +734,16 @@ func _prepare_buttons() -> void:
 		button.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		button.mouse_filter = Control.MOUSE_FILTER_STOP
 		button.custom_minimum_size.y = maxf(button.custom_minimum_size.y, 24.0)
+		button.clip_text = button.text.length() > 4
+		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS if button.clip_text else TextServer.OVERRUN_NO_TRIMMING
+		if button.text.length() <= 3:
+			button.add_theme_font_size_override("font_size", 12)
+			button.custom_minimum_size.x = maxf(button.custom_minimum_size.x, 24.0)
+			for variant: String in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+				var style := button.get_theme_stylebox(variant).duplicate() as StyleBox
+				style.content_margin_left = 4; style.content_margin_right = 4
+				button.add_theme_stylebox_override(variant, style)
+		if button is OptionButton: button.fit_to_longest_item = false
 
 
 func _font_editor(parent: Control, value: String, commit: Callable) -> Button:
@@ -491,8 +794,8 @@ func _add_label(parent: Control, text: String) -> void:
 	parent.add_child(label)
 
 
-func _category(text: String, actor: ActorData) -> VBoxContainer:
-	return _stateful_category(text, actor.id, fields)
+func _category(text: String, _actor_data: ActorData, main_tab: String = "Properties") -> VBoxContainer:
+	return _section_page(text, main_tab)
 
 
 func _stateful_category(text: String, state_id: String, parent: VBoxContainer,
@@ -525,18 +828,20 @@ func _stateful_category(text: String, state_id: String, parent: VBoxContainer,
 
 
 func _scroll_changed(value: float) -> void:
-	if not _restoring_scroll and _actor != null:
-		ui_state.set_scroll(_actor.id, value)
+	if not _restoring_scroll and _actor != null and not _inspecting_file:
+		ui_state.set_page_scroll(_actor.id, _main_tab, _section, value)
 
 
-func _restore_scroll(actor_id: String) -> void:
+func _restore_scroll(actor_id: String, revision: int = -1) -> void:
 	# The newly generated controls need a layout pass before ScrollContainer
 	# knows its range. Restoring sooner silently clamps a saved offset to zero.
 	await get_tree().process_frame
-	if _actor == null or _actor.id != actor_id:
+	if _actor == null or _actor.id != actor_id or (revision >= 0 and revision != _navigation_revision):
 		return
 	_restoring_scroll = true
-	scroll_vertical = int(ui_state.scroll_for(actor_id))
+	scroll_vertical = int(ui_state.page_scroll_for(actor_id, _main_tab, _section))
+	var page: Dictionary = _sections.get(_main_tab + "/" + _section, {})
+	if not page.is_empty(): section_scroll.ensure_control_visible(page.button)
 	_restoring_scroll = false
 
 
@@ -618,6 +923,17 @@ func _choice_editor(parent: Control, property: ActorProperty, selected: int) -> 
 
 
 func _add_property(property: ActorProperty, definition: ActorDefinition, parent: VBoxContainer) -> void:
+	if _actor.type_id==&"fluid" and property.id==&"fluid_preset":
+		var actor:=_actor
+		_add_label(parent,"Liquid preset")
+		var choice:=OptionButton.new(); choice.name="FluidPreset"; parent.add_child(choice)
+		for title: String in property.options.choices: choice.add_item(title)
+		choice.select(int(actor.values.get(&"fluid_preset",0)))
+		choice.item_selected.connect(func(index: int): KiwiFluidSettings.preset(model,actor,index); _queue_rebuild_selected())
+		return
+	if property.options.get("transformation_image", false):
+		_add_transformation_editor(property, definition, parent)
+		return
 	if property.options.get("actor_reference", false):
 		_add_actor_reference(property, definition, parent)
 		return
@@ -632,6 +948,8 @@ func _add_property(property: ActorProperty, definition: ActorDefinition, parent:
 	var label := Label.new()
 	label.text = property.label
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	label.tooltip_text = property.label
 	heading.add_child(label)
 	var reset := Button.new()
 	reset.name = str(key) + "_reset"
@@ -784,13 +1102,10 @@ func _add_object_reference(property: ActorProperty, actor_definition: ActorDefin
 		object_definition = base_definition
 	var creatable_definitions := registry.object_definitions_for(property.object_type)
 	var state_key := "Resource:" + str(property.id)
+	_add_label(parent, property.label)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	parent.add_child(row)
-	var label := Label.new()
-	label.text = property.label
-	label.custom_minimum_size.x = 72
-	row.add_child(label)
 	var slot := ActorResourceSlot.new()
 	slot.name = str(property.id) + "_resource"
 	slot.toggle_mode = true
@@ -821,6 +1136,9 @@ func _add_object_reference(property: ActorProperty, actor_definition: ActorDefin
 	menu.add_separator()
 	menu.add_item("Make Unique", 2)
 	menu.add_item("Save As…", 3)
+	menu.add_item("Copy to Super Clipboard", 6)
+	menu.add_item("Load from Super Clipboard…", 7)
+	menu.set_item_disabled(menu.get_item_index(6),object==null)
 	menu.add_separator()
 	menu.add_item("Clear", 4)
 	menu.set_item_disabled(menu.get_item_index(2), object == null)
@@ -925,6 +1243,11 @@ func _open_image_workspace(value: Variant) -> void:
 func _object_menu_action(id: int, actor: ActorData, actor_definition: ActorDefinition,
 		property: ActorProperty, object_definition: ActorObjectDefinition,
 		creatable_definitions: Array[ActorObjectDefinition]) -> void:
+	if id==7: _choose_object_resource(actor,actor_definition,property,object_definition,true); return
+	if id==6:
+		var object:=_resolve_object(actor.get_value(property.id) as ActorObjectReference)
+		if object!=null: KiwiSuperClipboardService.instance.quick_save(object,actor.display_name+" "+object_definition.display_name)
+		return
 	if id >= 100:
 		var index := id - 100
 		if index >= 0 and index < creatable_definitions.size():
@@ -952,9 +1275,9 @@ func _object_menu_action(id: int, actor: ActorData, actor_definition: ActorDefin
 
 
 func _choose_object_resource(actor: ActorData, actor_definition: ActorDefinition,
-		property: ActorProperty, object_definition: ActorObjectDefinition) -> void:
+		property: ActorProperty, object_definition: ActorObjectDefinition,from_clipboard: bool=false) -> void:
 	var path := await ActorProjectFilePicker.pick(self, _object_picker_property(property),
-		"Choose " + object_definition.display_name)
+		"Choose " + object_definition.display_name,from_clipboard)
 	if path==ActorProjectFilePicker.EMPTY_RESOURCE:
 		_edit_property(actor,actor_definition,property.id,null); _rebuild_selected(); return
 	if path.is_empty():
@@ -979,7 +1302,8 @@ func _file_path_allowed(path: String, property: ActorProperty) -> bool:
 		load_path = "res://" + normalized.substr(godot_root.length() + 1)
 	var resource := ResourceLoader.load(load_path, "", ResourceLoader.CACHE_MODE_IGNORE)
 	return (native_types.has("Mesh") and resource is Mesh) \
-		or (native_types.has("PackedScene") and resource is PackedScene)
+		or (native_types.has("PackedScene") and resource is PackedScene) \
+		or (native_types.has("KiwiTransformationImage2D") and resource is KiwiTransformationImage2D)
 
 
 func _add_actor_reference(property: ActorProperty, definition: ActorDefinition, parent: VBoxContainer) -> void:
@@ -1042,6 +1366,22 @@ func _add_file_resource_slot(parent: Control, property: ActorProperty,
 	parent.add_child(slot)
 	var edit_shader: Button
 	var edit_image: Button
+	if property.id==&"mesh_path":
+		var edit_model := Button.new(); edit_model.text="Model ↗"; edit_model.tooltip_text="Open an editable copy in the 3D Modeling Workspace"; parent.add_child(edit_model)
+		edit_model.pressed.connect(func():
+			var value: Variant=get_value.call()
+			var tabs := get_tree().get_first_node_in_group("actor_scene_tabs")
+			if tabs!=null and value is String and not value.is_empty(): tabs.open_model(value))
+		var unique_model := Button.new(); unique_model.text="Unique…"; unique_model.tooltip_text="Save an independent model asset for this actor only"; parent.add_child(unique_model)
+		unique_model.pressed.connect(func():
+			var value: Variant=get_value.call()
+			if not value is String or value.is_empty(): return
+			var document := KiwiModelImport.load_document(value)
+			if document.components.is_empty(): return
+			var result := await ActorProjectResourceSaveDialog.pick(self,"Make model unique",str(value).get_file().get_basename()+" unique","tres",false)
+			if not result.get("cancelled",true) and ResourceSaver.save(document,str(result.path))==OK:
+				set_value.call(str(result.path))
+				if LocalProjectFilesystem.node!=null: LocalProjectFilesystem.update_root_folder())
 	if _is_shader_property(property):
 		edit_shader = Button.new()
 		edit_shader.name = str(property.id) + "_open_workspace"
@@ -1065,6 +1405,7 @@ func _add_file_resource_slot(parent: Control, property: ActorProperty,
 	var menu := PopupMenu.new()
 	slot.add_child(menu)
 	var resource_type := _file_resource_type_name(property)
+	menu.add_item("Copy to Super Clipboard",6); menu.add_item("Load from Super Clipboard…",7)
 	menu.add_item("New " + resource_type, 0)
 	var is_audio := PackedStringArray(property.options.get("extensions", [])).has("mp3") or PackedStringArray(property.options.get("extensions", [])).has("mp4")
 	menu.set_item_disabled(menu.get_item_index(0), is_audio)
@@ -1082,6 +1423,7 @@ func _add_file_resource_slot(parent: Control, property: ActorProperty,
 		slot.tooltip_text = "Drop a compatible project file here" if empty else _file_resource_tooltip(value)
 		menu.set_item_disabled(menu.get_item_index(2), is_audio or empty or value is Resource)
 		menu.set_item_disabled(menu.get_item_index(3), empty)
+		menu.set_item_disabled(menu.get_item_index(6), empty)
 		menu.set_item_disabled(menu.get_item_index(4), empty)
 		if is_instance_valid(edit_shader): edit_shader.visible = not empty
 		if is_instance_valid(edit_image):
@@ -1184,6 +1526,7 @@ func _add_shader_texture_uniform(parent: VBoxContainer, property: ActorProperty,
 func _file_resource_menu_action(id: int, property: ActorProperty, get_value: Callable,
 		set_value: Callable, update_slot: Callable) -> void:
 	match id:
+		6: KiwiSuperClipboardService.instance.quick_save(get_value.call(),property.label)
 		5:
 			var noise_definition := registry.get_object_definition(&"noise_image")
 			if noise_definition != null: set_value.call(ActorObjectReference.from_object(noise_definition.create_object()))
@@ -1204,8 +1547,8 @@ func _file_resource_menu_action(id: int, property: ActorProperty, get_value: Cal
 				var texture := ImageTexture.create_from_image(image)
 				texture.resource_name = "Image"
 				set_value.call(texture)
-		1:
-			var chosen := await ActorProjectFilePicker.pick(self, property, "Choose " + property.label)
+		1,7:
+			var chosen := await ActorProjectFilePicker.pick(self, property, "Choose " + property.label,id==7)
 			if chosen==ActorProjectFilePicker.EMPTY_RESOURCE: set_value.call(null); return
 			if not chosen.is_empty():
 				set_value.call(chosen)
@@ -1297,7 +1640,7 @@ func _save_file_resource(property: ActorProperty, value: Variant, set_value: Cal
 	var formats := ActorMediaExport.formats(property, value)
 	if not formats.has(extension): extension = formats[0]
 	var result := await ActorProjectResourceSaveDialog.pick(self, "Save " + _file_resource_type_name(property),
-		suggested, extension, not extensions.has("mp4"), formats)
+		suggested, extension, not extensions.has("mp4"), formats,value)
 	if result.get("cancelled", true):
 		return
 	if result.get("embedded", false):
@@ -1421,7 +1764,12 @@ func _add_keyframe_button(parent: Control, actor: ActorData, property: ActorProp
 		if base == null:
 			base = fallback if fallback != null else property.create_default()
 		var value: Variant = ActorAnimation.sampled_value(actor, path, local_time.call(), base)
+		if actor.type_id == &"transform_image_2d" and path.size() == 2 and path[0] == "component_states":
+			var asset := ActorTransformationStates.load_asset(actor)
+			var item: KiwiTransformationComponent = asset.document.component(path[1]) if asset.document != null else null
+			if item != null: value = ActorTransformationStates.current(actor, item, local_time.call())
 		var track_label := " / ".join(path.slice(0, path.size() - 1)) + " / " + property.label if path.size() > 1 else str(property.options.get("group", "Properties")) + " / " + property.label
+		track_label = str(property.options.get("track_label", track_label))
 		model.add_keyframe(actor, path, track_label, value, property.options.has("choices"))
 		var track := actor.animation_track(path)
 		var panel := get_tree().get_first_node_in_group("actor_keyframe_editors") as ActorKeyframeEditor
@@ -1518,7 +1866,7 @@ func _save_object_resource(actor: ActorData, actor_definition: ActorDefinition,
 		property: ActorProperty, object_definition: ActorObjectDefinition, object: ActorObjectData) -> void:
 	var suggested := actor.display_name + " " + object_definition.display_name
 	var result := await ActorProjectResourceSaveDialog.pick(self, "Save " + object_definition.display_name, suggested,
-		"tres", true, ActorMediaExport.formats(property, object))
+		"tres", true, ActorMediaExport.formats(property, object),object)
 	if result.get("cancelled", true):
 		return
 	if result.get("embedded", false):
@@ -1601,6 +1949,7 @@ func _resource_box() -> StyleBoxFlat:
 
 
 func _property_is_visible(property: ActorProperty, owner: Object) -> bool:
+	if property.options.get("inspector_hidden", false): return false
 	var visible_when: Dictionary = property.options.get("visible_when", {})
 	if not visible_when.is_empty():
 		var dependency := StringName(visible_when.get("property", ""))
@@ -1631,6 +1980,13 @@ func _animated_layout_signature(actor: ActorData) -> String:
 	if clip == null:
 		return ""
 	var parts := PackedStringArray()
+	if KiwiPhysicsSettings.compatible(actor):
+		var config := KiwiPhysicsSettings.sample(actor,clip.local_time(model.playhead_time))
+		parts.append(var_to_str([config.enabled,config.type,config.mode,config.body_mode,config.shape,config.ragdoll,config.constraint,config.bones,config.pins,config.attachment,config.attachment_bone,config.end_actor,config.end_bone,config.rope_end,config.forces.size()]))
+	if actor.type_id == &"transform_image_2d":
+		var asset := ActorTransformationStates.load_asset(actor)
+		parts.append(ActorTransformationStates.source_path(actor))
+		parts.append(str(asset.document.get_instance_id()) if asset.document != null else str(asset.error))
 	for track in actor.animation_tracks:
 		var property: ActorProperty = null
 		if track.path.size() == 1:
@@ -1661,13 +2017,10 @@ func _add_nested_object_reference(actor: ActorData, owner: ActorObjectData,
 		object_definition = base_definition
 	var creatable_definitions := registry.object_definitions_for(property.object_type)
 	var state_key := "NestedResource:%s:%s" % [owner.type_id, property.id]
+	_add_label(parent, property.label)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	parent.add_child(row)
-	var label := Label.new()
-	label.text = property.label
-	label.custom_minimum_size.x = 72
-	row.add_child(label)
 	var slot := ActorResourceSlot.new()
 	slot.name = str(property.id) + "_resource"
 	slot.toggle_mode = true
@@ -1709,6 +2062,7 @@ func _add_nested_object_reference(actor: ActorData, owner: ActorObjectData,
 			menu.popup()
 			get_viewport().set_input_as_handled())
 	slot.file_dropped.connect(_assign_nested_object_resource_path.bind(actor, owner, owner_definition, property))
+	menu.add_item("Copy to Super Clipboard",6); menu.add_item("Load from Super Clipboard…",7); menu.set_item_disabled(menu.get_item_index(6),object==null)
 	menu.id_pressed.connect(_nested_object_menu_action.bind(actor, owner, owner_definition,
 		property, object_definition, creatable_definitions))
 	_updaters.append(func():
@@ -1740,6 +2094,10 @@ func _nested_object_menu_action(id: int, actor: ActorData, owner: ActorObjectDat
 		owner_definition: ActorObjectDefinition, property: ActorProperty,
 		object_definition: ActorObjectDefinition,
 		creatable_definitions: Array[ActorObjectDefinition]) -> void:
+	if id==6:
+		var object:=_resolve_object(owner.get_value(property.id) as ActorObjectReference)
+		if object!=null: KiwiSuperClipboardService.instance.quick_save(object,actor.display_name+" "+object_definition.display_name)
+		return
 	if id >= 100:
 		var index := id - 100
 		if index >= 0 and index < creatable_definitions.size():
@@ -1748,9 +2106,9 @@ func _nested_object_menu_action(id: int, actor: ActorData, owner: ActorObjectDat
 			_rebuild_selected()
 		return
 	match id:
-		1:
+		1,7:
 			var path := await ActorProjectFilePicker.pick(self, _object_picker_property(property),
-				"Choose " + object_definition.display_name)
+				"Choose " + object_definition.display_name,id==7)
 			if path==ActorProjectFilePicker.EMPTY_RESOURCE:
 				model.edit_object_property(actor,owner,owner_definition,property.id,null); _rebuild_selected(); return
 			if not path.is_empty():
@@ -1796,7 +2154,7 @@ func _save_nested_object_resource(actor: ActorData, owner: ActorObjectData,
 		object_definition: ActorObjectDefinition, object: ActorObjectData) -> void:
 	var result := await ActorProjectResourceSaveDialog.pick(self,
 		"Save " + object_definition.display_name,
-		actor.display_name + " " + object_definition.display_name, "tres", true, ActorMediaExport.formats(property, object))
+		actor.display_name + " " + object_definition.display_name, "tres", true, ActorMediaExport.formats(property, object),object)
 	if result.get("cancelled", true):
 		return
 	if result.get("embedded", false):
@@ -1912,8 +2270,44 @@ func _set_detached_object_property(object: ActorObjectData, key: StringName, val
 		ResourceSaver.save(object, object.resource_path)
 
 
+func _add_natural_material_editor(actor: ActorData, object: ActorObjectData,
+		definition: ActorObjectDefinition, property: ActorProperty, parent: VBoxContainer,
+		save_owner: ActorObjectData = null) -> void:
+	var editor = preload("res://Workspaces/SceneWorkspace/scripts/Timeline/actor_natural_material_editor.gd").new()
+	parent.add_child(editor)
+	var read := func() -> Dictionary: return definition.value_for(object, property).duplicate(true)
+	var write := func(value: Dictionary, mode: String, original: Dictionary):
+		if actor != null:
+			if mode == "preview":
+				model.preview_object_property(actor, object, definition, property.id, value)
+			else:
+				model.commit_object_property_preview(actor, object, definition, property.id, original, value)
+			return
+		var target := object if not object.resource_path.is_empty() else save_owner
+		var assign := func(settings: Dictionary):
+			object.set_value(property.id, settings.duplicate(true))
+			if target != null and not target.resource_path.is_empty():
+				ResourceSaver.save(target, target.resource_path)
+			model.changed.emit()
+		if mode == "preview":
+			# File-backed actor references reload their resource from disk, just as
+			# the other reusable-object inspector fields do. Preserve live feedback.
+			assign.call(value)
+		elif value != original:
+			model.history.create_action("Change Natural Material")
+			model.history.add_do_method(assign.bind(value.duplicate(true)))
+			model.history.add_undo_method(assign.bind(original.duplicate(true)))
+			model.history.commit_action()
+	var edit_context := "saved" if actor == null else ("linked" if not object.resource_path.is_empty() else "local")
+	editor.setup(read, write, edit_context)
+	_updaters.append(editor.sync_from_source)
+
+
 func _add_object_value(actor: ActorData, object: ActorObjectData,
 		definition: ActorObjectDefinition, property: ActorProperty, parent: VBoxContainer) -> void:
+	if property.options.get("natural_material", false):
+		_add_natural_material_editor(actor, object, definition, property, parent)
+		return
 	if property.options.get("system_font", false):
 		_add_label(parent, property.label)
 		var selector := _font_editor(parent, str(definition.value_for(object, property)), func(value: String): model.edit_object_property(actor, object, definition, property.id, value))

@@ -260,10 +260,12 @@ func run() -> void:
 	# Simulate a value still owned by a focused editor when Save is pressed.
 	# Save must flush the full linked snapshot even if no final UI signal fired.
 	shader_workspace.parameter_values[&"synced_gain"] = 0.72
+	print("EXPECTED_SHADER_COMPILER_ERROR_BEGIN")
 	shader_workspace.editor.code.text = "shader_type spatial;\nuniform float synced_gain"
 	shader_workspace.editor.code.text_changed.emit()
 	await process_frame
 	await process_frame
+	print("EXPECTED_SHADER_COMPILER_ERROR_END")
 	shader_workspace.editor.code.text = synchronized_code
 	shader_workspace.editor.code.text_changed.emit()
 	await process_frame

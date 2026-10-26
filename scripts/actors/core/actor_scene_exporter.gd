@@ -42,6 +42,9 @@ static func render(editor: ActorTimelineEditor, destination: String, width: int,
 		failure = await _wait_video_frames(editor, editor.canvas.playhead)
 		if not failure.is_empty(): break
 		editor._evaluate_runtimes()
+		while editor.physics.pending:
+			await editor.get_tree().process_frame
+			editor._evaluate_runtimes()
 		_render_camera_for_time(editor, viewport, free_camera, editor.canvas.playhead)
 		editor._update_camera_overlays()
 		for index in particle_states.size():
@@ -235,6 +238,7 @@ static func _audio_filter(actor: ActorData, clip: ActorClip, index: int, duratio
 		tempo *= 2.0
 	filters.append("atempo=%s" % tempo)
 	filters.append("volume=%s" % db_to_linear(float(actor.get_value(&"volume_db", 0.0))))
+	filters.append(KiwiAudioEffects.pan_filter(float(actor.get_value(&"pan",0.0))))
 	var fade_in := minf(duration, maxf(0.0, float(actor.get_value(&"fade_in", 0.0))))
 	var fade_out := minf(duration, maxf(0.0, float(actor.get_value(&"fade_out", 0.0))))
 	if fade_in > 0.0: filters.append("afade=t=in:st=0:d=%s" % fade_in)

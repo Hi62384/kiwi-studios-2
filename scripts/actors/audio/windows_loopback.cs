@@ -99,7 +99,7 @@ public static class KiwiLoopback {
             client.Initialize(0, 0x20000, 1000000, 0, format, IntPtr.Zero);
             Guid captureID = new Guid("C8ADBD64-E71E-48A0-A4DE-185C395CD317");
             object service; client.GetService(ref captureID, out service); capture = (Capture)service;
-            using (FileStream file = new FileStream(output, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite))
+            using (FileStream file = new FileStream(output, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.ReadWrite))
             using (BinaryWriter writer = new BinaryWriter(file)) {
                 Header(writer, rate, 0);
                 client.Start();
@@ -107,6 +107,8 @@ public static class KiwiLoopback {
                 File.WriteAllText(ready, "READY:" + rate);
                 var clock = System.Diagnostics.Stopwatch.StartNew();
                 long written = 0;
+                long checkpoint = 0;
+                const long maxFrames = (2L * 1024 * 1024 * 1024 - 44) / 4;
                 while (!File.Exists(stop)) {
                     uint packet; capture.GetNextPacketSize(out packet);
                     while (packet > 0) {
@@ -115,6 +117,7 @@ public static class KiwiLoopback {
                         try {
                             double timestamp = (flags & 4) == 0 ? counter / 10000000.0 - origin : clock.Elapsed.TotalSeconds - frames / (double)rate;
                             long packetStart = Math.Max(0, (long)(timestamp * rate));
+                            if (packetStart + frames > maxFrames) throw new IOException("System take reached the 2 GiB capture limit; checkpointed audio was retained.");
                             while (written < packetStart) { writer.Write((short)0); writer.Write((short)0); written++; }
                             byte[] buffer = new byte[frames * block];
                             if ((flags & 2) == 0) Marshal.Copy(pointer, buffer, 0, buffer.Length);
@@ -136,12 +139,17 @@ public static class KiwiLoopback {
                     }
                     // Some output devices stop issuing loopback packets during silence.
                     long silentTarget = Math.Max(0, (long)((clock.Elapsed.TotalSeconds - 0.1) * rate));
+                    if (silentTarget > maxFrames) break;
                     while (written < silentTarget) { writer.Write((short)0); writer.Write((short)0); written++; }
+                    if (clock.ElapsedMilliseconds >= checkpoint) {
+                        long end = file.Position; file.Position = 0; Header(writer, rate, written * 4);
+                        file.Position = end; checkpoint = clock.ElapsedMilliseconds + 1000;
+                    }
                     writer.Flush();
                     Thread.Sleep(10);
                 }
                 client.Stop();
-                long target = (long)(clock.Elapsed.TotalSeconds * rate);
+                long target = Math.Min(maxFrames, (long)(clock.Elapsed.TotalSeconds * rate));
                 while (written < target) { writer.Write((short)0); writer.Write((short)0); written++; }
                 file.Position = 0; Header(writer, rate, written * 4); writer.Flush();
             }

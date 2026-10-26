@@ -2,11 +2,14 @@ extends ActorRuntime
 ## Runtime implementation shared by the catalog's lightweight 3D actors.
 
 const ShaderTime = preload("res://scripts/actors/core/actor_shader_time.gd")
+const NaturalEngine = preload("res://scripts/materials/natural_material_engine.gd")
 
 var content: Node
 var parenting_anchor: Node3D
 var material: StandardMaterial3D
 var shader_material: ShaderMaterial
+var natural_material: ShaderMaterial
+var _natural_settings: Dictionary = {}
 var loaded_shader_path := ""
 var loaded_image_path := ""
 var loaded_model_path := ""
@@ -189,6 +192,9 @@ func evaluate_transform(values: Dictionary) -> void:
 		parenting_anchor.position = position
 		parenting_anchor.rotation_degrees = rotation
 		parenting_anchor.scale = actor_scale
+		if values.has(&"model_basis_residual"):
+			var exact: Basis=Basis.from_euler(spatial.rotation)*Basis.from_scale(actor_scale)*values[&"model_basis_residual"]
+			spatial.basis=exact; parenting_anchor.basis=exact
 
 
 func evaluate(_time: float, values: Dictionary) -> void:
@@ -477,8 +483,10 @@ func _apply_shape_properties(mesh: PrimitiveMesh, values: Dictionary) -> void:
 
 
 func _update_model(source: Variant) -> void:
-	var key := _resource_identity(source)
+	var component_id := str(actor.values.get(&"model_component_id",""))
+	var key := _resource_identity(source)+":"+component_id
 	if key == loaded_model_path:
+		_bind_model_skin()
 		return
 	loaded_model_path = key
 	for child in content.get_children():
@@ -489,8 +497,20 @@ func _update_model(source: Variant) -> void:
 	if resource == null and not load_path.is_empty() and ResourceLoader.exists(load_path):
 		resource = ResourceLoader.load(load_path, "", ResourceLoader.CACHE_MODE_IGNORE)
 	var instance: Node3D
-	if resource is PackedScene:
+	var item: KiwiModelComponent=resource.component(component_id) if resource is KiwiModelDocument else (actor.values.get(&"model_component_data") as KiwiModelComponent if str(source)==str(actor.values.get(&"model_component_source","")) else null)
+	if item!=null and resource is KiwiModelDocument and actor.values.has(&"model_rig_bind_signature"):
+		var source_rig: KiwiModelComponent=resource.component(item.skeleton_id)
+		if source_rig==null or KiwiRigMath.bind_signature(source_rig.bones)!=int(actor.values[&"model_rig_bind_signature"]): item=actor.values.get(&"model_component_data") as KiwiModelComponent
+	if item!=null or (resource is KiwiModelDocument and not component_id.is_empty() and str(source)==str(actor.values.get(&"model_component_source",""))):
+		if item!=null and item.mesh!=null:
+			var visual := _new_mesh_instance(); visual.mesh=item.skin_mesh if item.skin_mesh!=null else (item.binding.source_mesh if item.binding!=null else KiwiModelModifiers.evaluate(item).render_mesh(item.surface_materials))
+			visual.skin=item.skin
+			for i in mini(item.surface_materials.size(),visual.mesh.get_surface_count()): visual.set_surface_override_material(i,item.surface_materials[i])
+			visual.visible=not bool(actor.values.get(&"model_component_hidden",false)); instance=visual
+	elif resource is PackedScene:
 		instance = resource.instantiate() as Node3D
+	elif resource is KiwiModelDocument:
+		instance = resource.instantiate_model()
 	elif resource is Mesh:
 		var mesh_instance := _new_mesh_instance()
 		mesh_instance.mesh = resource
@@ -502,6 +522,42 @@ func _update_model(source: Variant) -> void:
 			instance = document.generate_scene(state)
 	if instance != null:
 		content.add_child(instance)
+		_bind_model_skin()
+
+
+func _bind_model_skin() -> void:
+	if actor.values.has(&"model_rigid_bone"): return
+	var id := str(actor.values.get(&"model_skeleton_actor",""))
+	if id.is_empty() or not is_inside_tree(): return
+	for rig in get_tree().get_nodes_in_group("actor_skeleton_rigs"):
+		if rig.actor.id!=id: continue
+		for node in content.get_children():
+			if node is MeshInstance3D:
+				node.skeleton=node.get_path_to(rig.skeleton)
+				if bool(actor.values.get(&"model_skin_in_rig_space",false)): node.global_transform=rig.skeleton.global_transform
+		return
+
+func apply_rig_attachment() -> void:
+	if not actor.values.has(&"model_rigid_bone"):
+		# Mesh actors can be evaluated before their sibling rig. Resolve its final
+		# transform again after all actors, without waiting for the next frame.
+		if bool(actor.values.get(&"model_skin_in_rig_space",false)): _bind_model_skin()
+		return
+	for rig in get_tree().get_nodes_in_group("actor_skeleton_rigs"):
+		if rig.actor.id!=str(actor.values.get(&"model_skeleton_actor","")): continue
+		var index := int(actor.values[&"model_rigid_bone"])
+		if index<0 or index>=rig.skeleton.get_bone_count(): return
+		var delta: Transform3D=rig.skeleton.global_transform*rig.skeleton.get_bone_global_pose(index)*actor.values[&"model_rigid_rest_inverse"]*rig.skeleton.global_transform.affine_inverse()
+		var moved: Transform3D=delta*(content as Node3D).global_transform
+		(content as Node3D).global_transform=moved; parenting_anchor.global_transform=moved; return
+
+
+func refresh_saved_model(path: String) -> void:
+	if actor==null or actor.type_id!=&"basic_mesh": return
+	var source := str(actor.values.get(&"mesh_path",""))
+	if ProjectSettings.globalize_path(source).replace("\\","/").simplify_path()==ProjectSettings.globalize_path(path).replace("\\","/").simplify_path():
+		loaded_model_path=""
+		_update_model(source)
 
 
 func _new_light(kind: int) -> Light3D:
@@ -644,6 +700,9 @@ func _restore_environment() -> void:
 func _apply_material_reference(value: Variant, albedo_texture: Texture2D, preserve_null: bool) -> void:
 	var reference := value as ActorObjectReference
 	var object := reference.resolve(_load_object_resource) if reference != null else null
+	if object != null and object.type_id == &"natural_material":
+		_apply_natural_material(object)
+		return
 	if object != null and object.type_id == &"shader_material":
 		_apply_shader_material(object)
 		return
@@ -654,6 +713,19 @@ func _apply_material_reference(value: Variant, albedo_texture: Texture2D, preser
 	_reset_standard_material(albedo_texture)
 	if object != null and object.type_id == &"material":
 		_apply_standard_material(object)
+
+
+func _apply_natural_material(object: ActorObjectData) -> void:
+	# This adapter owns no procedural code: painting and scene surfaces evaluate
+	# the same engine definition. Preserve the GPU material between frame updates.
+	var stored: Dictionary = object.get_value(&"material_settings", {})
+	if natural_material == null:
+		natural_material = NaturalEngine.create_spatial_material(stored)
+		_natural_settings = stored.duplicate(true)
+	elif stored != _natural_settings:
+		NaturalEngine.configure_spatial(natural_material, stored)
+		_natural_settings = stored.duplicate(true)
+	_assign_material_override(natural_material)
 
 
 func _ensure_standard_material() -> void:

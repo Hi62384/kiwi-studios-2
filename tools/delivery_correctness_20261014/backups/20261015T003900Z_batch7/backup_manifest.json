@@ -1,0 +1,20 @@
+[
+    {
+        "path":  "Workspaces/AudioWorkspace/audio_analysis.gd",
+        "base_sha256":  "f2cd58ddf6dc5764f6ccb4ef3ecac5f518ad0babd661c8b45791a4ed333609da",
+        "backup_sha256":  "f2cd58ddf6dc5764f6ccb4ef3ecac5f518ad0babd661c8b45791a4ed333609da",
+        "bytes":  16900
+    },
+    {
+        "path":  "Workspaces/AudioWorkspace/audio_edit_session.gd",
+        "base_sha256":  "d9983e8b44d5a7555edfb55e9fafc26e73d1baa795658dc8a35fe2fa4fcaea9c",
+        "backup_sha256":  "d9983e8b44d5a7555edfb55e9fafc26e73d1baa795658dc8a35fe2fa4fcaea9c",
+        "bytes":  44387
+    },
+    {
+        "path":  "Workspaces/AudioWorkspace/audio_workspace.gd",
+        "base_sha256":  "30dd32e5e28104f7910c432faa758f2b7092bc47ee89054feef50bbf97d3fcb2",
+        "backup_sha256":  "30dd32e5e28104f7910c432faa758f2b7092bc47ee89054feef50bbf97d3fcb2",
+        "bytes":  210234
+    }
+]

@@ -51,7 +51,9 @@ func run() -> void:
 	check(actor.get_value(&"position").is_equal_approx(Vector2(80, 40)), "Root viewport clicks reach 2D item and map through scaled TextureRect")
 	editor.model.undo()
 	check(actor.get_value(&"position") == Vector2.ZERO, "Direct viewport movement undoes")
-	check(gizmo.get_child_count() == 0, "No move/rotate/scale toolbar")
+	# The gizmo owns a SubViewport for selected-camera previews. That is not
+	# a move/rotate/scale toolbar; direct interaction must still need no controls.
+	check(gizmo.get_children().filter(func(child: Node) -> bool: return child is Control).is_empty(), "No move/rotate/scale toolbar")
 	var runtime := editor._runtime_for_clip(clip.id) as ActorUIRuntime
 	var corner := gizmo.corners(runtime)[2]
 	mouse(corner, true)

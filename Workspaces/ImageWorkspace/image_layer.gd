@@ -21,6 +21,7 @@ extends Resource
 @export var effects: Array[Dictionary] = []
 @export var properties: Dictionary = {}
 @export var warp: KiwiImageWarpData
+@export var live_paint: Array[KiwiLivePaintRegion] = []
 
 
 static func create(type: String, canvas_size: Vector2i) -> KiwiImageLayer:
@@ -141,6 +142,7 @@ func copy_layer() -> KiwiImageLayer:
 		copy.set(key,get(key))
 	copy.properties = properties.duplicate(true)
 	if warp!=null: copy.warp=warp.copy_warp()
+	for region in live_paint: copy.live_paint.append(region.copy_region())
 	if properties.get("texture_recipe") is KiwiImageTextureRecipe: copy.properties.texture_recipe=properties.texture_recipe.copy_recipe()
 	if properties.get("texture_material") is KiwiTextureMaterial: copy.properties.texture_material=properties.texture_material.copy_material()
 	if properties.get("text_settings") is ActorObjectData:
@@ -153,3 +155,31 @@ func copy_layer() -> KiwiImageLayer:
 		for channel in effect.get("curves",{}):
 			if effect.curves[channel] is Curve: effect.curves[channel]=effect.curves[channel].duplicate()
 	return copy
+
+
+func erase_live_paint(eraser: Image) -> void:
+	# Called within the ordinary eraser gesture transaction. Never mutate textures
+	# shared with a history snapshot, including raster segments produced by baking.
+	if eraser == null or eraser.is_empty(): return
+	for region in live_paint:
+		var source: Texture2D = region.coverage if region.is_live() else region.raster
+		if source == null: continue
+		var pixels := source.get_image()
+		if pixels == null or pixels.is_empty(): continue
+		pixels = pixels.duplicate()
+		pixels.convert(Image.FORMAT_RGBA8)
+		var mask_image := eraser
+		if mask_image.get_size() != pixels.get_size():
+			mask_image = mask_image.duplicate()
+			mask_image.resize(pixels.get_width(), pixels.get_height(), Image.INTERPOLATE_BILINEAR)
+		var bounds := mask_image.get_used_rect()
+		for y in range(bounds.position.y, bounds.end.y):
+			for x in range(bounds.position.x, bounds.end.x):
+				var strength := mask_image.get_pixel(x, y).a
+				if strength <= 0.0: continue
+				var color := pixels.get_pixel(x, y)
+				color.a *= 1.0 - strength
+				if color.a <= 0.0: color = Color(0, 0, 0, 0)
+				pixels.set_pixel(x, y, color)
+		if region.is_live(): region.coverage = ImageTexture.create_from_image(pixels)
+		else: region.raster = ImageTexture.create_from_image(pixels)

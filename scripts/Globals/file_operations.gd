@@ -383,6 +383,13 @@ static func get_file_thumbnail(file: String) -> Texture2D:
 	
 	if file.get_extension().to_lower() in ["tres", "res"]:
 		var resource := ResourceLoader.load(file, "", ResourceLoader.CACHE_MODE_IGNORE)
+		if resource is KiwiTransformationImage2D:
+			var preview: Texture2D=resource.thumbnail()
+			return preview if preview!=null else load("res://resources/Images/ActorIcons/Transformation2D.svg") as Texture2D
+		if resource is KiwiModelDocument:
+			var preview: Texture2D = resource.thumbnail()
+			return preview if preview!=null else load("res://resources/Images/ActorIcons/BasicMesh.svg") as Texture2D
+		if resource is KiwiRigPreset: return load("res://resources/Images/ActorIcons/SkeletonRig.svg") as Texture2D
 		if resource is KiwiImagePatternPreset: return resource.texture if resource.texture!=null else FILE_COLORED_TEXTURE
 		if resource is KiwiImageDocument:
 			if resource.preview==null: return load("res://resources/Images/ActorIcons/Image2D.svg") as Texture2D
@@ -408,7 +415,7 @@ static func get_file_thumbnail(file: String) -> Texture2D:
 		if resource is Texture2D: return resource
 		if editable != null and editable.type_id in [&"image", &"noise_image"]:
 			return ActorImageGenerator.texture_for_object(editable)
-		if editable != null and editable.type_id == &"material" and ThumbnailRenderer._instance != null:
+		if editable != null and editable.type_id == &"material" and is_instance_valid(ThumbnailRenderer._instance):
 			var preview_material := StandardMaterial3D.new()
 			var tint: Color = editable.get_value(&"tint", Color.WHITE)
 			tint.a *= editable.get_value(&"opacity", 1.0)
@@ -438,8 +445,8 @@ static func get_file_thumbnail(file: String) -> Texture2D:
 		return preview if preview != null else preload("res://resources/Images/ActorIcons/Video.svg")
 	elif file_type == FileType.MODEL: return CUBE_TEXTURE
 	elif file_type == FileType.MESH: return CUBE_TEXTURE
-	elif file_type == FileType.ENVIRONMENT: return await ThumbnailRenderer.render_environment(ResourceLoader.load(file))
-	elif file_type == FileType.MATERIAL3D: return await ThumbnailRenderer.render_material(ResourceLoader.load(file))
+	elif file_type == FileType.ENVIRONMENT: return await ThumbnailRenderer.render_environment(ResourceLoader.load(file)) if is_instance_valid(ThumbnailRenderer._instance) else FILE_COLORED_TEXTURE
+	elif file_type == FileType.MATERIAL3D: return await ThumbnailRenderer.render_material(ResourceLoader.load(file)) if is_instance_valid(ThumbnailRenderer._instance) else FILE_COLORED_TEXTURE
 	return FILE_COLORED_TEXTURE
 
 

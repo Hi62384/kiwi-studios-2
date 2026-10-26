@@ -1,0 +1,14 @@
+[
+    {
+        "path":  "Workspaces/AudioWorkspace/audio_edit_session.gd",
+        "base_sha256":  "df0ac20ad86f0bf9f01702fe91c8473c9b0c171f108415c0b27e760e5266329c",
+        "backup_sha256":  "df0ac20ad86f0bf9f01702fe91c8473c9b0c171f108415c0b27e760e5266329c",
+        "bytes":  35826
+    },
+    {
+        "path":  "Workspaces/AudioWorkspace/audio_workspace.gd",
+        "base_sha256":  "b2a407fb05aa7557a17e81b57e6e10192ab17685a576a8675730534f3bb2816f",
+        "backup_sha256":  "b2a407fb05aa7557a17e81b57e6e10192ab17685a576a8675730534f3bb2816f",
+        "bytes":  198011
+    }
+]

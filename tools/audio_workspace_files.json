@@ -1,0 +1,190 @@
+[
+  {
+    "path": "Workspaces/AudioWorkspace/audio_analysis.gd",
+    "sha256": "6f9b106da15aee6f33e5b870cfac5a302df2e7c3f5b16e67a2b414f21544d34e"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_automation_canvas.gd",
+    "sha256": "1e682e630d18c84c71276825beefc21c37413c302bb04a9f926d5173df8fa960"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_composer.gd",
+    "sha256": "56207a4d5ff4004cd1852c027eecbf9b9ad666db11e4681f39e03537d6726f7a"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_document.gd",
+    "sha256": "37a9c6ea2747dee2084b2902f01bd2d0f2b6d9c80bc37c5a993ca4a0eedcc495"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_edit_session.gd",
+    "sha256": "209743c98893ecaed4a05097ac8700127ea3c17a765d372e035c6b7331158b96"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_effects.gd",
+    "sha256": "91e04049bf470d1d73ba86c3019dff80ade2727b3ac5ebfd002e175a56ea0df1"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_impulse.gd",
+    "sha256": "df39ecf6338318649c9763fc7cee59b472d991de2a9adcc975c48970d28c09fd"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_instruments.gd",
+    "sha256": "8340ee7242babcf88fcb742f43b490cb84a5731ae70e9463bb147157b5019283"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_jobs.gd",
+    "sha256": "d2decb27d2804e92a0f755dddf8ad9a88915dde1a38ebc62c8ebdf56bc1d8093"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_library.gd",
+    "sha256": "87cea8da5a238dc348a462dc6301c55d85a0fde96c6c9d0dc920946f526cbf48"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_midi.gd",
+    "sha256": "5cfa8ed172b998097941b9ff007a020fbc1b3ed8415be6e903aed56e54285ab0"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_pattern_canvas.gd",
+    "sha256": "81214ed9b351f764d5361aa0dc5e623e636811b74bb528841df80f329e2acf72"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_playback.gd",
+    "sha256": "62ee5d3a8c022083aa138af043f8b26620703c219c1d777ce367e6f2e009f170"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_preset.gd",
+    "sha256": "44a5f6c1b63d388166c2f6593420edc455d533756ed038a11fbe653490265893"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_provider.gd",
+    "sha256": "3ee6dcc69dbe9bfc6e486a97cf8e520b1edb97fd8eeeb7c67eb648a3bf56ad3f"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_provider_service.gd",
+    "sha256": "6ea885ccad3c50ff186eeefe9596f3258fd5dd18212b1fab686c65b0609ace25"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_renderer.gd",
+    "sha256": "8d7854d56193e3bc4b5e9bff1770371e0e26151628699c4f9982eacf0a3f0e4d"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_source_cache.gd",
+    "sha256": "02e63ad480af501a97f7e5986e2170475fb08395d1de07231ce2cd86f4b017f6"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_synthesis.gd",
+    "sha256": "e9589c58aa0290f62914c02c78940fc73976585a6d5492e9a06f1f4310b6a4a8"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_templates.gd",
+    "sha256": "6d76752b0b3c4847e74564f0c65e3893b8ff30f9eeef262b9ea00dbd79ac3b28"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_timeline_canvas.gd",
+    "sha256": "e5bc4eb149005c7ab7859e0d8a0d4f352110fde58bd1a8e4bda4240128c1b8e0"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_waveform_canvas.gd",
+    "sha256": "9afe2b58948f17ffb63ee27762ee6e4c22cca93b05478d80b8a2c98c204a35d1"
+  },
+  {
+    "path": "Workspaces/AudioWorkspace/audio_workspace.gd",
+    "sha256": "0d09d0eacf2c1c5c66ce1450cb5e50b8e73cca66f96048b87c368e8b670522ad"
+  },
+  {
+    "path": "Workspaces/SceneWorkspace/scripts/Timeline/timeline_editor.gd",
+    "sha256": "426f9d079c824b1496906ac74ded9911049068bbc60b1b8b1c9af7eb419bd4b4"
+  },
+  {
+    "path": "docs/AUDIO_SYNTHESIS_MUSIC.md",
+    "sha256": "a8536964e51480162d6e8acc7f391f2bddd6efcf8a71c29549e2100f72e037f7"
+  },
+  {
+    "path": "docs/AUDIO_WORKSPACE.md",
+    "sha256": "4fde09b9a1d1ea77fe347f18bf53d19ae9f54a13e654cf69f4e2788b485aa9c3"
+  },
+  {
+    "path": "docs/audio_workspace_acceptance.md",
+    "sha256": "ec69668d451824ab735738a1b092f57349e61aceb5cecca5ba11c98bfcee2082"
+  },
+  {
+    "path": "scripts/Extra/scene_tabs.gd",
+    "sha256": "d97e2216a92b0a9cd9f5facbe09f62357c2e3bb354b79d80ae4950dc11e3f223"
+  },
+  {
+    "path": "scripts/actors/core/actor_audio.gd",
+    "sha256": "5dcb0d447a335efd933cf49dc21a77d735e17c72a4d31bf818f33828787d39a7"
+  },
+  {
+    "path": "scripts/actors/core/actor_audio_system.gd",
+    "sha256": "3ab86204357d7e48f227c3d3e0616ec5d0bc7a2e52f16f1972496f31804d699e"
+  },
+  {
+    "path": "scripts/actors/tests/audio_document_test.gd",
+    "sha256": "d47d5966b8f49d36f8e1288043b60e2e392ecf9a32371b698ed70451e20427e4"
+  },
+  {
+    "path": "scripts/actors/tests/audio_effect_automation_test.gd",
+    "sha256": "5b2becfee787445653c72f4a5c8980aa233fc90c285211dd75aaf1e2c433bd62"
+  },
+  {
+    "path": "scripts/actors/tests/audio_effect_boundaries_test.gd",
+    "sha256": "1143b41309abe0439634db3ac12b87c8b34ec3034db49c4d2070fa92cde1219d"
+  },
+  {
+    "path": "scripts/actors/tests/audio_examples_test.gd",
+    "sha256": "c4ad1ffe2d46bbabcc5f7031c2db5688dc8aa46fa1b4af7be87954acf424bebd"
+  },
+  {
+    "path": "scripts/actors/tests/audio_history_budget_test.gd",
+    "sha256": "ed5860dc8d854d4f69577a995c5cdbeca79516890c1fcd39d3f1874b15e753b4"
+  },
+  {
+    "path": "scripts/actors/tests/audio_impulse_test.gd",
+    "sha256": "b9a7e8f3c4b688fed002cc8ee990847cf6069a19f4dde4fc6caa50f60cfa47ee"
+  },
+  {
+    "path": "scripts/actors/tests/audio_loudness_test.gd",
+    "sha256": "4544712deea446665c5924cc20073111c60ba3c668bfdfa620c399ddf2438c7f"
+  },
+  {
+    "path": "scripts/actors/tests/audio_midi_test.gd",
+    "sha256": "082a5a22cb0d65985937bec790131ec42c82a3cf07a717163286c6392a441aa4"
+  },
+  {
+    "path": "scripts/actors/tests/audio_music_test.gd",
+    "sha256": "bd4e519d8c10809a6747018ca7e8b02775c684ad0814f4d44be279f33c00f51d"
+  },
+  {
+    "path": "scripts/actors/tests/audio_noise_profile_test.gd",
+    "sha256": "0a758a31f4253aff9937cffc7a01b42930d9b1cd10b958d250bd4a4f4b7f3fbb"
+  },
+  {
+    "path": "scripts/actors/tests/audio_pattern_geometry_test.gd",
+    "sha256": "a6f4c81337159f9c024627eba8551e959b525f21800a38d67436d40add94bdd1"
+  },
+  {
+    "path": "scripts/actors/tests/audio_pitch_automation_test.gd",
+    "sha256": "44c9373816b2323f3183c9c245b4d3528993966b4abaa1cd40dcf4dc9b6efc8f"
+  },
+  {
+    "path": "scripts/actors/tests/audio_synthesis_test.gd",
+    "sha256": "11369c44bb79ca86c607bb05d2b572b0665ef7434343008a6401c25e318dc6e7"
+  },
+  {
+    "path": "scripts/actors/tests/audio_wave_transform_test.gd",
+    "sha256": "69234ad9fb84c18442f14d2c84e24e8f95eae5fe1a71366effed4d9aca986d18"
+  },
+  {
+    "path": "scripts/actors/tests/audio_workspace_extended_test.gd",
+    "sha256": "ee607fb5d2292187a1a78e81256d343ae60867793b000b93c1db2ff20fd707be"
+  },
+  {
+    "path": "scripts/actors/tests/audio_workspace_modules_test.gd",
+    "sha256": "ead32975213660f4924c85de2a139471eb84f95224d78accb5fba19054869036"
+  },
+  {
+    "path": "scripts/actors/tests/audio_workspace_ui_test.gd",
+    "sha256": "1f47f41614783ef6c55332d860017b763e628bbde729d74277e24e1c7be1a84e"
+  }
+]

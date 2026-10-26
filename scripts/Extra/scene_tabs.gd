@@ -3,12 +3,20 @@ extends TabBar
 ## Keeps multiple editable ActorSceneData documents alive in one workspace.
 
 const ShaderWorkspaceScript = preload("res://Workspaces/ShaderWorkspace/shader_workspace.gd")
+const AudioWorkspaceScript = preload("res://Workspaces/AudioWorkspace/audio_workspace.gd")
 const ImageWorkspaceScript = preload("res://Workspaces/ImageWorkspace/image_workspace.gd")
+const ModelWorkspaceScript = preload("res://Workspaces/ModelWorkspace/model_workspace.gd")
+const TransformationWorkspaceScript = preload("res://Workspaces/TransformationWorkspace/transformation_workspace.gd")
 
 var timeline: ActorTimelineEditor
 var scene_workspace: Control
 var shader_workspace: Control
+var audio_workspace: Control
+var _audio_scene_id := ""
+const AUDIO_SCENE_UID_META := &"kiwi_audio_scene_uid"
 var image_workspace: Control
+var model_workspace: KiwiModelWorkspace
+var transformation_workspace: KiwiTransformationWorkspace
 var documents: Array[Dictionary] = []
 var _switching := false
 var _untitled_counter := 1
@@ -48,6 +56,23 @@ func _initialize_tabs() -> void:
 		scene_workspace.get_parent().add_child(image_workspace)
 		image_workspace.document_changed.connect(_active_image_changed)
 		image_workspace.image_saved.connect(_image_saved)
+		audio_workspace = AudioWorkspaceScript.new()
+		audio_workspace.name = "AudioWorkspace"
+		audio_workspace.visible = false
+		scene_workspace.get_parent().add_child(audio_workspace)
+		audio_workspace.document_changed.connect(_active_audio_changed)
+		audio_workspace.background_document_changed.connect(_background_audio_changed)
+		audio_workspace.audio_saved.connect(_audio_saved)
+		audio_workspace.use_in_scene.connect(_audio_to_scene)
+		model_workspace=ModelWorkspaceScript.new()
+		model_workspace.name="ModelWorkspace"; model_workspace.visible=false
+		scene_workspace.get_parent().add_child(model_workspace)
+		model_workspace.document_changed.connect(_active_model_changed)
+		model_workspace.model_saved.connect(_model_saved)
+		model_workspace.use_in_scene.connect(_model_to_scene)
+		transformation_workspace=TransformationWorkspaceScript.new(); transformation_workspace.name="TransformationWorkspace"; transformation_workspace.visible=false
+		scene_workspace.get_parent().add_child(transformation_workspace)
+		transformation_workspace.document_changed.connect(_active_transformation_changed); transformation_workspace.asset_saved.connect(_transformation_saved)
 	var file_system := get_node_or_null("../WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem")
 	if file_system != null and file_system.has_signal("file_resource_opened"):
 		file_system.connect("file_resource_opened", _filesystem_resource_opened)
@@ -88,6 +113,115 @@ func new_image() -> void:
 	var blank:=KiwiImageDocument.new()
 	blank.layers.append(KiwiImageLayer.create("basic",blank.canvas_size))
 	open_image(blank)
+
+
+func new_model() -> void:
+	open_model(KiwiModelDocument.new())
+
+func new_transformation() -> void: open_transformation(KiwiTransformationImage2D.blank())
+
+func open_transformation(value: Variant) -> bool:
+	if transformation_workspace==null: return false
+	var identity := ProjectSettings.globalize_path(str(value)).replace("\\","/").simplify_path() if value is String else "embedded:"+str(value.get_instance_id())
+	for i in documents.size():
+		if documents[i].get("type","")=="transformation" and documents[i].identity==identity: _capture_current(); _open_index(i); return true
+	var result := KiwiTransformationWorkspace.resolve(value)
+	if result.has("error"):
+		transformation_workspace.status.text=result.error
+		var popup := AcceptDialog.new(); popup.name="TransformationOpenError"; popup.title="Could not open Transformation Image"; popup.dialog_text=str(result.error); add_child(popup)
+		popup.confirmed.connect(popup.queue_free); popup.canceled.connect(popup.queue_free); popup.popup_centered(Vector2i(420,140)); return false
+	_capture_current(); var edit_session := KiwiTransformationSession.new(); edit_session.document=result.document.snapshot(); edit_session.dirty=not value is String
+	var ui: Dictionary=edit_session.document.workspace_state; edit_session.restore_view_state(ui)
+	var path := str(value) if value is String else ""; var title := path.get_file() if not path.is_empty() else "Untitled Transformation"
+	documents.append({"type":"transformation","source":value,"identity":identity,"path":path,"name":title,"state":{"session":edit_session,"path":path,"ui":ui},"dirty":edit_session.dirty})
+	_switching=true; add_tab(title,preload("res://resources/Images/ActorIcons/Transformation2D.svg"))
+	if tab_count>documents.size(): move_tab(tab_count-1,documents.size()-1)
+	_ensure_new_tab(); _switching=false; _open_index(documents.size()-1); return true
+
+func _active_transformation_changed() -> void:
+	if _switching or _active_index<0 or _active_index>=documents.size() or documents[_active_index].get("type","")!="transformation": return
+	documents[_active_index].dirty=transformation_workspace.session.dirty; _refresh_titles()
+
+func _transformation_saved(path: String, edit_session: KiwiTransformationSession) -> void:
+	ActorTransformationStates.invalidate(path)
+	if timeline != null: timeline.model.changed.emit()
+	for i in documents.size():
+		if documents[i].get("type","")!="transformation": continue
+		if documents[i].state.get("session")!=edit_session and not (i==_active_index and transformation_workspace.session==edit_session): continue
+		documents[i].source=path; documents[i].path=path; documents[i].identity=ProjectSettings.globalize_path(path).replace("\\","/").simplify_path(); documents[i].name=path.get_file(); documents[i].dirty=edit_session.dirty; documents[i].state.path=path; _refresh_titles(); return
+
+func _confirm_transformation_close(index: int) -> void:
+	var closing := documents[index]; var popup := ConfirmationDialog.new(); popup.title="Unsaved Transformation Image"; popup.dialog_text="Save changes to "+str(closing.name)+"?"; popup.ok_button_text="Save"; popup.cancel_button_text="Keep editing"; add_child(popup)
+	var discard := popup.add_button("Discard",false,"discard")
+	discard.pressed.connect(func(): popup.queue_free(); var at := documents.find(closing); if at>=0: close_scene(at,true))
+	popup.confirmed.connect(func():
+		popup.queue_free(); var at := documents.find(closing)
+		if at<0: return
+		_capture_current(); _open_index(at); var edit_session := transformation_workspace.session; await transformation_workspace.save(); at=documents.find(closing)
+		if at>=0 and not edit_session.dirty: close_scene(at,true))
+	popup.canceled.connect(popup.queue_free); popup.popup_centered(Vector2i(410,140))
+
+
+func open_model(value: Variant) -> bool:
+	if model_workspace==null: return false
+	var identity := ProjectSettings.globalize_path(str(value)).replace("\\","/").simplify_path() if value is String else "embedded:"+str(value.get_instance_id())
+	for index in documents.size():
+		if documents[index].get("type","")=="model" and documents[index].get("identity","")==identity:
+			_capture_current(); _open_index(index); return true
+	_capture_current()
+	var title := str(value).get_file() if value is String else "Untitled Model"
+	documents.append({"type":"model","source":value,"identity":identity,"path":"","name":title,"state":{},"dirty":false})
+	_switching=true; add_tab(title,preload("res://resources/Images/ActorIcons/BasicMesh.svg"))
+	if tab_count>documents.size(): move_tab(tab_count-1,documents.size()-1)
+	_ensure_new_tab(); _switching=false; _open_index(documents.size()-1)
+	return true
+
+
+func _active_model_changed() -> void:
+	if _switching or _active_index<0 or _active_index>=documents.size() or documents[_active_index].get("type","")!="model": return
+	documents[_active_index].dirty=model_workspace.session.dirty
+	_refresh_titles()
+
+
+func _model_saved(saved_path: String, saved_session: KiwiModelSession) -> void:
+	var index := -1
+	for i in documents.size():
+		if documents[i].get("type","")=="model" and (documents[i].get("state",{}).get("session")==saved_session or (i==_active_index and model_workspace.session==saved_session)): index=i; break
+	if index<0: return
+	var document := documents[index]
+	document.source=saved_path; document.path=saved_path; document.identity=ProjectSettings.globalize_path(saved_path).replace("\\","/").simplify_path(); document.name=saved_path.get_file(); document.dirty=false
+	document.state.path=saved_path; document.dirty=saved_session.dirty
+	documents[index]=document; _refresh_titles()
+	get_tree().call_group("actor_shader_runtimes","refresh_saved_model",saved_path)
+	if timeline!=null:
+		timeline.physics.invalidate_asset(saved_path)
+		timeline._evaluate_runtimes()
+
+
+func _model_to_scene(saved_path: String) -> void:
+	_capture_current()
+	for i in range(documents.size()-1,-1,-1):
+		if documents[i].get("type","")=="scene":
+			_open_index(i)
+			timeline.model.create_actor(timeline.registry.get_definition(&"basic_mesh"),timeline.canvas.playhead,{&"mesh_path":saved_path})
+			return
+	new_scene()
+	timeline.model.create_actor(timeline.registry.get_definition(&"basic_mesh"),timeline.canvas.playhead,{&"mesh_path":saved_path})
+
+
+func _confirm_model_close(index: int) -> void:
+	var closing := documents[index]
+	var dialog := ConfirmationDialog.new(); dialog.title="Unsaved model"; dialog.dialog_text="Save changes to "+str(documents[index].name)+"?"; dialog.ok_button_text="Save"; dialog.cancel_button_text="Keep editing"; add_child(dialog)
+	var discard := dialog.add_button("Discard",false,"discard")
+	discard.pressed.connect(func():
+		dialog.queue_free(); var current_index := documents.find(closing)
+		if current_index>=0: close_scene(current_index,true))
+	dialog.confirmed.connect(func():
+		dialog.queue_free(); _capture_current(); var current_index := documents.find(closing)
+		if current_index<0: return
+		_open_index(current_index); var closing_session := model_workspace.session; await model_workspace.save(); current_index=documents.find(closing)
+		if current_index>=0 and not closing_session.dirty: close_scene(current_index,true))
+	dialog.canceled.connect(dialog.queue_free); dialog.popup_centered(Vector2i(390,150))
 
 
 func open_image(source: Variant) -> bool:
@@ -241,9 +375,24 @@ func close_scene(index: int, discard_changes: bool = false) -> void:
 	if index < 0 or index >= documents.size():
 		return
 	_capture_current()
+	var closing_document := documents[index]
+	if str(closing_document.get("type", "")) == "audio" and audio_workspace != null:
+		var closing_session: Variant = closing_document.get("state", {}).get("session")
+		if closing_session != null and closing_session == audio_workspace._record_session:
+			await audio_workspace.finish_recording()
+			index = documents.find(closing_document)
+			if index < 0: return
+			closing_document.dirty = closing_session.dirty
 	if not discard_changes and str(documents[index].get("type", "")) == "image" and bool(documents[index].get("dirty", false)):
 		_confirm_image_close(index)
 		return
+	if not discard_changes and str(documents[index].get("type", "")) == "audio" and bool(documents[index].get("dirty", false)):
+		_confirm_audio_close(index)
+		return
+	if not discard_changes and str(documents[index].get("type", ""))=="model" and bool(documents[index].get("dirty",false)):
+		_confirm_model_close(index)
+		return
+	if not discard_changes and documents[index].get("type","")=="transformation" and documents[index].dirty: _confirm_transformation_close(index); return
 	var previous_active := _active_index
 	_switching = true
 	documents.remove_at(index)
@@ -260,6 +409,7 @@ func close_scene(index: int, discard_changes: bool = false) -> void:
 		current_tab = _active_index
 		_switching = false
 		_refresh_titles()
+	_release_document_history(closing_document)
 
 
 func _confirm_image_close(index: int) -> void:
@@ -295,13 +445,17 @@ func save_current(path: String = "") -> Error:
 		return ERR_FILE_BAD_PATH
 	var scene := timeline.capture_scene_data(true)
 	scene.resource_name = destination.get_file().get_basename()
+	scene.set_meta(AUDIO_SCENE_UID_META, str(document.get("persistent_id", "")))
 	var error := ResourceSaver.save(scene, destination)
 	if error != OK:
 		return error
+	var previous_path := str(document.path)
 	document.path = destination
+	document.persistent_saved = true
 	document.name = destination.get_file().get_basename()
 	document.dirty = false
 	documents[_active_index] = document
+	_relocate_audio_associations(str(document.get("persistent_id", "")), previous_path, destination)
 	_refresh_titles()
 	if LocalProjectFilesystem.node != null:
 		LocalProjectFilesystem.update_root_folder()
@@ -331,7 +485,21 @@ func _open_index(index: int) -> void:
 	_switching = true
 	current_tab = index
 	var document := documents[index]
-	if str(document.get("type", "scene")) == "shader":
+	if audio_workspace != null: audio_workspace.visible = false
+	if model_workspace != null: model_workspace.visible=false
+	if transformation_workspace!=null: transformation_workspace.visible=false
+	if document.get("type","")=="transformation":
+		if scene_workspace!=null: scene_workspace.visible=false
+		if shader_workspace!=null: shader_workspace.visible=false
+		if image_workspace!=null: image_workspace.visible=false
+		transformation_workspace.visible=true; transformation_workspace.open_source(document.source,document.state)
+	elif str(document.get("type", "scene"))=="model":
+		if scene_workspace!=null: scene_workspace.visible=false
+		if shader_workspace!=null: shader_workspace.visible=false
+		if image_workspace!=null: image_workspace.visible=false
+		model_workspace.visible=true
+		model_workspace.open_source(document.source,document.state)
+	elif str(document.get("type", "scene")) == "shader":
 		if scene_workspace != null: scene_workspace.visible = false
 		if image_workspace != null: image_workspace.visible = false
 		shader_workspace.visible = true
@@ -350,22 +518,55 @@ func _open_index(index: int) -> void:
 		if shader_workspace != null: shader_workspace.visible = false
 		image_workspace.visible = true
 		image_workspace.open_source(document.source, document.state)
+	elif str(document.get("type", "scene")) == "audio":
+		if scene_workspace != null: scene_workspace.visible = false
+		if shader_workspace != null: shader_workspace.visible = false
+		if image_workspace != null: image_workspace.visible = false
+		audio_workspace.visible = true
+		audio_workspace.open_source(document.source, document.state)
+		audio_workspace.set_scene_binding(not audio_workspace.session.document.scene_binding.is_empty())
+		audio_workspace.send_scene_button.tooltip_text = "Save the editable composition before sending, then save the destination scene. The Scene Edit Audio command can reopen the composition after restart. Moving either saved file requires relinking."
 	else:
 		if shader_workspace != null: shader_workspace.visible = false
 		if image_workspace != null: image_workspace.visible = false
 		if scene_workspace != null: scene_workspace.visible = true
-		timeline.restore_scene_data(document.scene)
+		_audio_scene_id = str(document.get("id", ""))
+		timeline.restore_scene_data(document.scene, true)
+		# restore_scene_data allocates a fresh standalone history. Tabs restore
+		# their retained history instead; release that otherwise orphaned object.
+		if timeline.model.history != document.history:
+			timeline.model.history.clear_history();timeline.model.history.free()
 		timeline.model.history = document.history
 	_active_index = index
 	_switching = false
 	_refresh_titles()
+
+func _release_document_history(document:Dictionary)->void:
+	var history:Variant=document.get("history")
+	if not is_instance_valid(history) or not history is UndoRedo:return
+	if is_instance_valid(timeline) and timeline.model.history==history:return
+	for other in documents:
+		if other.get("history")==history:return
+	history.clear_history();history.free()
+
+func _exit_tree()->void:
+	# The live timeline owns its current history; the tab bar owns retained
+	# inactive histories. UndoRedo is Object, not RefCounted.
+	var retained:=documents.duplicate();documents.clear()
+	for document in retained:_release_document_history(document)
 
 
 func _capture_current() -> void:
 	if _switching or timeline == null or _active_index < 0 or _active_index >= documents.size():
 		return
 	var document := documents[_active_index]
-	if str(document.get("type", "scene")) == "shader":
+	if document.get("type","")=="transformation":
+		document.state=transformation_workspace.capture_state(); document.path=transformation_workspace.path; document.dirty=transformation_workspace.session.dirty
+	elif str(document.get("type", "scene"))=="model":
+		document.state=model_workspace.capture_state()
+		document.path=model_workspace.path
+		document.dirty=model_workspace.session.dirty
+	elif str(document.get("type", "scene")) == "shader":
 		if shader_workspace != null:
 			document.state = shader_workspace.capture_state()
 			document.source = document.state.source
@@ -377,8 +578,15 @@ func _capture_current() -> void:
 			document.source = image_workspace.source
 			document.path = image_workspace.path
 			document.identity = _image_identity(document.source)
+	elif str(document.get("type", "scene")) == "audio":
+		if audio_workspace != null:
+			document.state = audio_workspace.capture_state()
+			document.source = audio_workspace.source
+			document.path = audio_workspace.path
+			document.identity = _audio_identity(document.source)
 	else:
 		document.scene = timeline.capture_scene_data(false)
+		document.scene.set_meta(AUDIO_SCENE_UID_META, str(document.get("persistent_id", "")))
 		document.history = timeline.model.history
 	documents[_active_index] = document
 
@@ -394,7 +602,11 @@ func _active_scene_changed() -> void:
 
 
 func _add_document(scene: ActorSceneData, path: String, title: String, history: UndoRedo) -> void:
-	documents.append({"type": "scene", "scene": scene, "path": path, "name": title, "history": history, "dirty": false})
+	var persistent_id := str(scene.get_meta(AUDIO_SCENE_UID_META, ""))
+	var persistent_saved := not path.is_empty() and not persistent_id.is_empty() and persistent_id.length() <= 128
+	if persistent_id.is_empty() or persistent_id.length() > 128: persistent_id = ActorData.new_id()
+	scene.set_meta(AUDIO_SCENE_UID_META, persistent_id)
+	documents.append({"id": ActorData.new_id(), "persistent_id": persistent_id, "persistent_saved": persistent_saved, "type": "scene", "scene": scene, "path": path, "name": title, "history": history, "dirty": false})
 	_switching = true
 	add_tab(title, preload("res://Workspaces/SceneWorkspace/Icon.png"))
 	if tab_count > documents.size():
@@ -406,7 +618,7 @@ func _add_document(scene: ActorSceneData, path: String, title: String, history: 
 func _ensure_new_tab() -> void:
 	if tab_count == documents.size():
 		add_tab("", preload("res://resources/Images/BasicImages/Plus.png"))
-	set_tab_tooltip(documents.size(), "Create a scene, shader, or image editor tab")
+	set_tab_tooltip(documents.size(), "Create a scene, model, shader, image, transformation image, or audio tab")
 
 
 func _blank_scene() -> ActorSceneData:
@@ -433,6 +645,9 @@ func _refresh_titles() -> void:
 
 
 func _filesystem_resource_opened(path: String) -> void:
+	if path.get_extension().to_lower() in AudioWorkspaceScript.AUDIO_EXTENSIONS:
+		open_audio(path)
+		return
 	if path.get_extension().to_lower() in ImageWorkspaceScript.IMAGE_EXTENSIONS:
 		open_image(path)
 		return
@@ -441,8 +656,14 @@ func _filesystem_resource_opened(path: String) -> void:
 	var resource := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
 	if resource is ActorSceneData:
 		open_scene(path)
+	elif resource is KiwiAudioDocument:
+		open_audio(path)
 	elif resource is KiwiImageDocument:
 		open_image(path)
+	elif resource is KiwiModelDocument:
+		open_model(path)
+	elif resource is KiwiTransformationImage2D:
+		open_transformation(path)
 
 
 func _show_new_tab_menu() -> void:
@@ -469,7 +690,15 @@ func _show_new_tab_menu() -> void:
 	var image_button := _new_tab_choice("▣  Image Editor", "Draw, crop, transform, and save project images")
 	column.add_child(image_button)
 	image_button.pressed.connect(func(): popup.queue_free(); new_image())
-	popup.popup_centered(Vector2i(360, 245))
+	var audio_button := _new_tab_choice("♫  Audio Workspace", "Edit waveforms, arrange music, record, mix, and export")
+	column.add_child(audio_button)
+	audio_button.pressed.connect(func(): popup.queue_free(); new_audio())
+	var model_button := _new_tab_choice("◇  3D Modeling", "Create and edit mesh geometry, components, and modifiers")
+	column.add_child(model_button)
+	model_button.pressed.connect(func(): popup.queue_free(); new_model())
+	var transformation_button := _new_tab_choice("◈  Transformation Image 2D", "Draw independent states, morph, and animate components")
+	column.add_child(transformation_button); transformation_button.pressed.connect(func(): popup.queue_free(); new_transformation())
+	popup.popup_centered(Vector2i(380, 450))
 
 
 func _new_tab_choice(label: String, description: String) -> Button:
@@ -573,3 +802,287 @@ func _tab_style(background: Color, border: Color) -> StyleBoxFlat:
 	style.content_margin_top = 5
 	style.content_margin_bottom = 5
 	return style
+
+
+func new_audio() -> void:
+	open_audio(KiwiAudioDocument.from_source(null))
+
+func open_audio(value: Variant, binding: Dictionary = {}) -> bool:
+	if audio_workspace == null or not (value is String or value is AudioStream or value is KiwiAudioDocument): return false
+	var origin := _audio_scene_id
+	if _active_index >= 0 and _active_index < documents.size():
+		var active := documents[_active_index]
+		if str(active.get("type", "scene")) == "scene": origin = str(active.get("id", ""))
+		elif str(active.get("type", "")) == "audio": origin = str(active.get("scene_id", origin))
+	if not binding.is_empty():
+		binding = binding.duplicate(true)
+		if str(binding.get("scene_id", "")).is_empty(): binding.scene_id = origin
+		origin = str(binding.get("scene_id", origin))
+	var identity := _audio_identity(value)
+	for index in documents.size():
+		if str(documents[index].get("type", "")) == "audio" and str(documents[index].get("identity", "")) == identity:
+			_capture_current()
+			if str(documents[index].get("id", "")).is_empty(): documents[index].id = ActorData.new_id()
+			if not binding.is_empty(): documents[index].binding = binding
+			if not origin.is_empty(): documents[index].scene_id = origin
+			_open_index(index)
+			if not binding.is_empty(): _set_audio_scene_association(str(documents[index].id), origin, str(binding.get("actor_id", "")))
+			return true
+	var path := str(value) if value is String else ""
+	var initial_state := {}
+	if value is KiwiAudioDocument or (value is String and path.get_extension().to_lower() in ["tres", "res"]):
+		var resolved := KiwiAudioWorkspace.resolve_document(value)
+		if not str(resolved.get("error", "")).is_empty():
+			audio_workspace.notice(str(resolved.error)); return false
+		var edit_session := KiwiAudioEditSession.new()
+		edit_session.open(resolved.document)
+		initial_state = {"session": edit_session, "path": path, "document_path": path}
+	_capture_current()
+	var title: String = path.get_file() if not path.is_empty() else (value.title if value is KiwiAudioDocument else "Untitled Audio")
+	documents.append({"id":ActorData.new_id(), "scene_id":origin, "type":"audio", "source":value, "identity":identity, "path":path, "name":title, "state":initial_state, "binding":binding, "dirty":false})
+	_switching = true
+	add_tab(title)
+	if tab_count > documents.size(): move_tab(tab_count - 1, documents.size() - 1)
+	_ensure_new_tab(); _switching = false; _open_index(documents.size() - 1)
+	if not binding.is_empty(): _set_audio_scene_association(str(documents[_active_index].id), origin, str(binding.get("actor_id", "")))
+	return true
+
+func _audio_identity(value: Variant) -> String:
+	if value is String: return _association_path(str(value))
+	if value is Object: return "embedded:" + str(value.get_instance_id())
+	return ""
+
+func _background_audio_changed(changed_session: KiwiAudioEditSession) -> void:
+	for document in documents:
+		if str(document.get("type", "")) == "audio" and document.get("state", {}).get("session") == changed_session:
+			document.dirty = changed_session.dirty
+	_refresh_titles()
+
+func _active_audio_changed() -> void:
+	if _switching or _active_index < 0 or _active_index >= documents.size(): return
+	var document := documents[_active_index]
+	if str(document.get("type", "")) != "audio": return
+	document.dirty = audio_workspace._dirty
+	audio_workspace.set_scene_binding(not audio_workspace.session.document.scene_binding.is_empty())
+	documents[_active_index] = document
+	_refresh_titles()
+
+func _audio_saved(value: Variant) -> void:
+	if _active_index < 0 or _active_index >= documents.size(): return
+	var document := documents[_active_index]
+	if str(document.get("type", "")) != "audio": return
+	document.source = value; document.path = str(value) if value is String else ""
+	document.identity = _audio_identity(value)
+	document.name = document.path.get_file() if not document.path.is_empty() else "Audio Composition"
+	document.dirty = false
+	documents[_active_index] = document
+	_refresh_titles()
+
+func _audio_document_index(id: String) -> int:
+	if id.is_empty(): return -1
+	for index in documents.size():
+		if str(documents[index].get("id", "")) == id: return index
+	return -1
+
+func _audio_scene_index_for_id(id: String) -> int:
+	var index := _audio_document_index(id)
+	return index if index >= 0 and str(documents[index].get("type", "scene")) == "scene" else -1
+
+func _confirm_audio_close(index: int) -> void:
+	if index < 0 or index >= documents.size(): return
+	if str(documents[index].get("id", "")).is_empty(): documents[index].id = ActorData.new_id()
+	var document_id := str(documents[index].id)
+	var dialog := ConfirmationDialog.new()
+	dialog.title = "Unsaved audio composition"
+	dialog.dialog_text = str(documents[index].name) + " has unsaved changes."
+	dialog.ok_button_text = "Save"
+	dialog.add_button("Discard", false, "discard")
+	add_child(dialog)
+	dialog.confirmed.connect(func():
+		var current := _audio_document_index(document_id)
+		if current < 0: dialog.queue_free(); return
+		_capture_current(); _open_index(current)
+		var saving_session: KiwiAudioEditSession = audio_workspace.session
+		await audio_workspace.save()
+		current = _audio_document_index(document_id)
+		if current >= 0 and saving_session != null and not saving_session.dirty: close_scene(current, true)
+		dialog.queue_free())
+	dialog.custom_action.connect(func(action: StringName):
+		var current := _audio_document_index(document_id)
+		if action == &"discard" and current >= 0: close_scene(current, true)
+		dialog.queue_free())
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.popup_centered(Vector2i(440, 150))
+
+func _audio_to_scene(stream: AudioStream, label: String) -> void:
+	if timeline == null or stream == null: return
+	if _active_index < 0 or _active_index >= documents.size() or str(documents[_active_index].get("type", "")) != "audio":
+		audio_workspace.notice("Return to the source audio document and send it to Scene again."); return
+	var source_document := documents[_active_index]
+	if str(source_document.get("id", "")).is_empty(): source_document.id = ActorData.new_id()
+	var source_id := str(source_document.id)
+	var association: Dictionary = audio_workspace.session.document.scene_binding
+	var scene_id := str(source_document.get("scene_id", ""))
+	var binding := {}
+	if not association.is_empty():
+		var destination := _scene_index_for_association(association)
+		if destination < 0:
+			var saved_path := str(association.get("scene_path", ""))
+			var detail := "Open the saved destination scene and send again to update its original actor." if not saved_path.is_empty() else "The original unsaved destination scene is no longer open."
+			_choose_audio_destination(stream, label, source_id, detail + (" Saved destination: " + saved_path if not saved_path.is_empty() else ""))
+			return
+		scene_id = str(documents[destination].id)
+		if not str(association.get("actor_id", "")).is_empty(): binding = {"actor_id": str(association.actor_id)}
+	if _audio_scene_index_for_id(scene_id) < 0:
+		_choose_audio_destination(stream, label, source_id, "The original destination scene is closed or was never selected. Choose where to add the rendered audio.")
+		return
+	_place_audio_in_scene(stream, label, source_id, scene_id, binding)
+
+func _choose_audio_destination(stream: AudioStream, label: String, source_id: String, reason: String) -> void:
+	var dialog := ConfirmationDialog.new()
+	dialog.title = "Choose audio destination"
+	dialog.ok_button_text = "Add rendered audio"
+	add_child(dialog)
+	var column := VBoxContainer.new(); dialog.add_child(column)
+	var detail := Label.new(); detail.text = reason + " A new audio actor will be created; no actor in another scene will be replaced."
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; detail.custom_minimum_size.x = 430; column.add_child(detail)
+	var choice := OptionButton.new(); column.add_child(choice)
+	choice.add_item("Create a new scene"); choice.set_item_metadata(0, "")
+	for document in documents:
+		if str(document.get("type", "scene")) != "scene": continue
+		var item := choice.item_count
+		choice.add_item(str(document.get("name", "Scene")) + " [" + str(document.get("id", "")).right(6) + "]")
+		choice.set_item_metadata(item, str(document.get("id", "")))
+	dialog.confirmed.connect(func():
+		var scene_id := str(choice.get_item_metadata(choice.selected))
+		if scene_id.is_empty():
+			new_scene()
+			if _active_index < 0 or _active_index >= documents.size(): dialog.queue_free(); return
+			scene_id = str(documents[_active_index].get("id", ""))
+		_place_audio_in_scene(stream, label, source_id, scene_id, {}, true)
+		dialog.queue_free())
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.popup_centered(Vector2i(500, 220))
+
+func _place_audio_in_scene(stream: AudioStream, label: String, source_id: String, scene_id: String, binding: Dictionary, _rebind: bool = false) -> void:
+	if _audio_document_index(source_id) < 0:
+		audio_workspace.notice("The source audio tab was closed. No scene actor was changed."); return
+	var index := _audio_scene_index_for_id(scene_id)
+	if index < 0:
+		audio_workspace.notice("The selected destination scene was closed. The rendered source has not replaced any actor. Send it again to choose a destination."); return
+	_capture_current(); _open_index(index)
+	if not binding.is_empty():
+		var actor: ActorData = timeline.model.actor_for_id(str(binding.get("actor_id", "")))
+		if actor == null or actor.type_id != &"audio":
+			_choose_audio_destination(stream, label, source_id, "The original audio actor no longer exists in its source scene."); return
+		var before: Dictionary = timeline.model.audio_snapshot(actor)
+		if before.is_empty() or not before.get("clip") is ActorClip:
+			audio_workspace.notice("The bound audio actor no longer has an editable clip. No source was replaced."); return
+		var after := before.duplicate(true)
+		after.values = actor.values.duplicate(true)
+		after.values[&"audio"] = stream
+		var editable_path := _audio_saved_document_path(source_id)
+		if not editable_path.is_empty(): after.values[&"audio_workspace_document"] = editable_path
+		else: after.values.erase(&"audio_workspace_document")
+		after.offset = 0.0
+		after.duration = stream.get_length() / maxf(0.05, before.clip.playback_speed)
+		timeline.model.history.create_action("Update from Audio Workspace")
+		timeline.model.history.add_do_method(timeline.model.restore_audio.bind(after))
+		timeline.model.history.add_undo_method(timeline.model.restore_audio.bind(before))
+		timeline.model.history.commit_action()
+		return
+	var definition := timeline.registry.get_definition(&"audio")
+	if definition == null:
+		audio_workspace.notice("The scene audio actor definition is unavailable."); return
+	var initial_values := {&"audio": stream}
+	var editable_path := _audio_saved_document_path(source_id)
+	if not editable_path.is_empty(): initial_values[&"audio_workspace_document"] = editable_path
+	var clip: ActorClip = timeline.model.create_actor(definition, timeline.canvas.playhead, initial_values)
+	if clip != null:
+		timeline.model.actor_for_id(clip.actor_id).display_name = label
+		timeline.model.changed.emit()
+		var source_index := _audio_document_index(source_id)
+		if source_index >= 0:
+			documents[source_index].scene_id = scene_id
+			_set_audio_scene_association(source_id, scene_id, clip.actor_id)
+
+# Associations persist only stable IDs and a path. A saved resource never causes
+# an implicit file open or an update to a merely similarly named actor/scene.
+static func _association_path(path: String) -> String:
+	if path.is_empty(): return ""
+	var normalized := ProjectSettings.globalize_path(path).replace("\\", "/").simplify_path()
+	return normalized.to_lower() if OS.get_name() == "Windows" else normalized
+
+func _audio_session_for_index(index: int) -> KiwiAudioEditSession:
+	if index < 0 or index >= documents.size() or str(documents[index].get("type", "")) != "audio": return null
+	if index == _active_index and audio_workspace != null: return audio_workspace.session
+	return documents[index].get("state", {}).get("session") as KiwiAudioEditSession
+
+func _scene_index_for_association(association: Dictionary) -> int:
+	var uid := str(association.get("scene_uid", ""))
+	if uid.is_empty(): return -1
+	var path := _association_path(str(association.get("scene_path", "")))
+	var found := -1
+	for index in documents.size():
+		var candidate := documents[index]
+		if str(candidate.get("type", "scene")) != "scene" or str(candidate.get("persistent_id", "")) != uid: continue
+		if not path.is_empty() and _association_path(str(candidate.get("path", ""))) != path: continue
+		if found >= 0: return -1 # Duplicated scene IDs must not pick an arbitrary tab.
+		found = index
+	return found
+
+func _set_audio_scene_association(source_id: String, scene_id: String, actor_id: String) -> void:
+	var source_index := _audio_document_index(source_id)
+	var scene_index := _audio_scene_index_for_id(scene_id)
+	var edit_session := _audio_session_for_index(source_index)
+	if scene_index < 0 or edit_session == null: return
+	var destination := documents[scene_index]
+	var association := {"version": 1, "scene_uid": str(destination.get("persistent_id", "")),
+		"scene_path": _stored_scene_path(str(destination.get("path", ""))), "actor_id": actor_id}
+	if str(association.scene_uid).is_empty(): return
+	if edit_session.document.scene_binding != association:
+		edit_session.action("Link audio to scene", func(): edit_session.document.scene_binding = association.duplicate(true))
+	documents[source_index].scene_id = scene_id
+	# A pre-existing scene without the identity metadata must be saved as well.
+	if not bool(destination.get("persistent_saved", false)): documents[scene_index].dirty = true
+	if source_index == _active_index: audio_workspace.set_scene_binding(true)
+	_refresh_titles()
+
+func _relocate_audio_associations(uid: String, previous_path: String, destination: String) -> void:
+	if uid.is_empty(): return
+	var old_path := _association_path(previous_path)
+	var new_path := _association_path(destination)
+	for index in documents.size():
+		var edit_session := _audio_session_for_index(index)
+		if edit_session == null: continue
+		var association := edit_session.document.scene_binding
+		if str(association.get("scene_uid", "")) != uid: continue
+		if _association_path(str(association.get("scene_path", ""))) != old_path: continue
+		if old_path == new_path: continue
+		var updated := association.duplicate(true)
+		updated.scene_path = _stored_scene_path(destination)
+		edit_session.action("Update linked scene path", func(): edit_session.document.scene_binding = updated.duplicate(true))
+		# Saving the scene does not silently overwrite any audio composition.
+		documents[index].dirty = true
+
+static func _stored_scene_path(path: String) -> String:
+	if path.is_empty(): return ""
+	return ProjectSettings.localize_path(ProjectSettings.globalize_path(path)).replace("\\", "/").simplify_path()
+
+func _audio_saved_document_path(source_id: String) -> String:
+	var index := _audio_document_index(source_id)
+	if index < 0: return ""
+	var path := str(audio_workspace.document_path) if index == _active_index else str(documents[index].get("state", {}).get("document_path", ""))
+	if path.get_extension().to_lower() not in ["tres", "res"] or not FileAccess.file_exists(path): return ""
+	return _stored_scene_path(path)
+
+func open_audio_actor(actor: ActorData) -> bool:
+	if actor == null or actor.type_id != &"audio": return false
+	# An explicit Scene > Edit Audio command may reopen its saved editable
+	# composition. Merely loading a scene never opens this referenced resource.
+	var path := str(actor.values.get(&"audio_workspace_document", ""))
+	if path.length() <= 4096 and path.get_extension().to_lower() in ["tres", "res"] and FileAccess.file_exists(path):
+		if open_audio(path, {"actor_id": actor.id}): return true
+	var opened := open_audio(actor.get_value(&"audio"), {"actor_id": actor.id})
+	if opened and not path.is_empty(): audio_workspace.notice("The linked editable composition could not be opened. The rendered audio was opened instead; its original source has not been changed.")
+	return opened

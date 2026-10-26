@@ -30,12 +30,12 @@ static func path_from_drag(data: Variant) -> String:
 	if data is String:
 		return _normalize_path(data)
 	if data is PackedStringArray or data is Array:
-		return _normalize_path(str(data[0])) if not data.is_empty() else ""
+		return _normalize_path(str(data[0])) if data.size()==1 else ""
 	if data is Dictionary:
 		for collection_key in [&"paths", &"files"]:
 			var paths: Variant = data.get(collection_key)
-			if (paths is PackedStringArray or paths is Array) and not paths.is_empty():
-				return _normalize_path(str(paths[0]))
+			if paths is PackedStringArray or paths is Array:
+				return _normalize_path(str(paths[0])) if paths.size()==1 else ""
 		for single_key in [&"path", &"file"]:
 			var path := str(data.get(single_key, ""))
 			if not path.is_empty():

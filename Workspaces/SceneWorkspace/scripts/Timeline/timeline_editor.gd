@@ -33,6 +33,7 @@ var hints := InteractionHints.new()
 var hint_label: Label
 var runtime_holder: Node3D
 var _runtimes: Dictionary = {}
+var physics := KiwiTimelinePhysics.new()
 var _particle_seek_states: Dictionary = {}
 var viewport_gizmo: ActorUIGizmo
 var inspector_ui_state := ActorInspectorState.new()
@@ -114,10 +115,14 @@ var _timing_drag_kind: String = ""
 
 
 func _exit_tree() -> void:
+	physics.dispose()
+	_flush_ui_state_save()
 	_pause_recording_scene(false)
 	if is_instance_valid(viewport_gizmo): viewport_gizmo.queue_free()
 	# Undo callables retain the model; release their references when closing the UI.
-	model.history.clear_history()
+	if is_instance_valid(model.history):
+		model.history.clear_history()
+		model.history.free()
 	if is_instance_valid(runtime_holder):
 		runtime_holder.queue_free()
 	_runtimes.clear()
@@ -582,6 +587,9 @@ func toggle_playback() -> void:
 	_evaluate_runtimes()
 
 func _process(delta: float) -> void:
+	if physics.pending and not exporting and not audio_recorder.recording and not screen_recorder.recording:
+		_evaluate_runtimes()
+		if physics.pending: return
 	if not playing or canvas == null: return
 	canvas.playhead += delta
 	if audio_recorder.recording or screen_recorder.recording:
@@ -920,6 +928,8 @@ func _capture_selected_snapshots() -> Array[Dictionary]:
 	return snapshots
 
 
+const MENU_EDIT_AUDIO := 90721
+
 func _show_context_menu(screen_position: Vector2, actor_clicked: bool = true,
 		timeline_time: float = -1.0, layer: int = -1, root_label: String = "", section_id: String = "") -> void:
 	_context_on_actor = actor_clicked
@@ -940,6 +950,8 @@ func _show_context_menu(screen_position: Vector2, actor_clicked: bool = true,
 		context_menu.set_item_tooltip(context_menu.get_item_index(MENU_FOCUS_ACTOR), "Return to the parent view" if model.selected_actor().id == model.focused_actor_id else "Show only %s and its descendants" % model.selected_actor().display_name)
 		context_menu.add_item("Duplicate", MENU_DUPLICATE)
 		context_menu.add_item("Copy", MENU_COPY)
+		if count == 1 and model.selected_actor().type_id == &"audio":
+			context_menu.add_item("Edit in Audio Workspace", MENU_EDIT_AUDIO)
 		context_menu.add_item("Set Start / End…", MENU_TIMING)
 		if not _actor_clipboard.is_empty():
 			var paste_label := "Paste as Child" if count == 1 else "Paste to Each as Child"
@@ -974,6 +986,10 @@ func _show_context_menu(screen_position: Vector2, actor_clicked: bool = true,
 
 func _context_action_selected(id: int) -> void:
 	match id:
+		MENU_EDIT_AUDIO:
+			var tabs := get_tree().get_first_node_in_group("actor_scene_tabs")
+			var actor := model.selected_actor()
+			if tabs != null and actor != null: tabs.open_audio_actor(actor)
 		MENU_DUPLICATE: duplicate_selected()
 		MENU_COPY: copy_selected()
 		MENU_PASTE: paste_copied(_context_on_actor, canvas.playhead, _context_layer)
@@ -1116,7 +1132,7 @@ func capture_scene_data(duplicate_resources: bool = true) -> ActorSceneData:
 	return scene
 
 
-func restore_scene_data(scene: ActorSceneData) -> void:
+func restore_scene_data(scene: ActorSceneData, retain_previous_history: bool = false) -> void:
 	if scene == null:
 		return
 	canvas.cancel_drag()
@@ -1137,6 +1153,9 @@ func restore_scene_data(scene: ActorSceneData) -> void:
 	model.overlay_path = scene.overlay_path.duplicate()
 	model.restore_navigation_state(scene.section_navigation)
 	_video_duration_override = maxf(0.01, scene.video_duration) if scene.video_duration_custom else -1.0
+	if not retain_previous_history and is_instance_valid(model.history):
+		model.history.clear_history()
+		model.history.free()
 	model.history = UndoRedo.new()
 	_timeline_section_states = scene.timeline_section_states.duplicate(true)
 	inspector_ui_state.restore_from(scene.inspector_state)
@@ -1211,6 +1230,7 @@ func refresh_saved_shader(source: Variant) -> void:
 
 
 func _recreate_runtimes() -> void:
+	physics.dispose()
 	if runtime_holder == null:
 		return
 	# Detach before queueing deletion so the failed runtime stops participating in
@@ -1228,6 +1248,7 @@ func _recreate_runtimes() -> void:
 
 
 func _on_model_changed() -> void:
+	physics.mark_dirty()
 	model.validate_focus()
 	_sync_runtimes()
 	_refresh()
@@ -1295,6 +1316,7 @@ func _evaluate_runtimes() -> void:
 		return
 	if audio_system != null and audio_system.output_bus != "Master": audio_system.set_output_bus("Master")
 	model.playhead_time = canvas.playhead
+	physics.restore_visuals()
 	var indices: Array[int] = []
 	for index in model.actors.size():
 		model.actors[index].animation_time = model.clips[index].local_time(canvas.playhead)
@@ -1308,7 +1330,22 @@ func _evaluate_runtimes() -> void:
 		var runtime := _runtime_for_clip(clip.id)
 		if runtime != null:
 			runtime.evaluate_clip(clip, canvas.playhead)
+	var rig_attachment_bases := {}
+	for index in indices:
+		var runtime := _runtime_for_clip(model.clips[index].id)
+		if runtime!=null and runtime.actor.values.has(&"model_rigid_bone"): rig_attachment_bases[runtime.actor.id]=runtime.remote_transform()
+		if runtime!=null and runtime.has_method("apply_rig_attachment"): runtime.apply_rig_attachment()
 	_apply_remote_transforms()
+	physics.evaluate(model,_runtimes,canvas.playhead)
+	for index in indices:
+		var runtime := _runtime_for_clip(model.clips[index].id)
+		if runtime==null or physics.prototypes.is_empty() or not runtime.has_method("apply_rig_attachment"): continue
+		# A rigid bone attachment is an absolute rest-to-pose delta, not something
+		# that can be applied twice to its already-transformed output.
+		if rig_attachment_bases.has(runtime.actor.id):
+			if physics.display_states.get(runtime.actor.id,{}).get("initialized",false): continue
+			runtime.apply_remote_transform(rig_attachment_bases[runtime.actor.id],true,true,true)
+		runtime.apply_rig_attachment()
 	if not exporting: _sync_particle_seeks()
 	if not exporting:
 		var editor_camera := get_node_or_null("../../../../World/SubViewport/Freecam/Head/Camera3D") as Camera3D
@@ -1387,14 +1424,26 @@ func _actor_depth(actor: ActorData) -> int:
 	return depth
 
 
+var _ui_state_save_timer: Timer
+var _ui_state_save_project: Project
+
+func _flush_ui_state_save() -> void:
+	if _ui_state_save_project != null and not _ui_state_save_project.resource_path.is_empty():
+		FileOperations.save_resource(_ui_state_save_project)
+	_ui_state_save_project = null
+
 func _schedule_ui_state_save() -> void:
 	if StaticData.loaded_project == null or StaticData.loaded_project.resource_path.is_empty():
 		return
-	_ui_save_revision += 1
-	var revision := _ui_save_revision
-	await get_tree().create_timer(0.35).timeout
-	if revision == _ui_save_revision and is_instance_valid(self):
-		FileOperations.save_resource(StaticData.loaded_project)
+	if _ui_state_save_project != null and _ui_state_save_project != StaticData.loaded_project:
+		_flush_ui_state_save()
+	_ui_state_save_project = StaticData.loaded_project
+	if not is_instance_valid(_ui_state_save_timer):
+		_ui_state_save_timer = Timer.new()
+		_ui_state_save_timer.one_shot = true
+		add_child(_ui_state_save_timer)
+		_ui_state_save_timer.timeout.connect(_flush_ui_state_save)
+	_ui_state_save_timer.start(0.35)
 
 
 func _input(event: InputEvent) -> void:

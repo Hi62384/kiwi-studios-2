@@ -99,6 +99,7 @@ static func _bake_confirmed(workspace: KiwiImageWorkspace,id: String) -> void:
 	var item:=workspace.document.layer_for_id(id)
 	if item==null or item.warp==null: return
 	var temporary:=KiwiImageDocument.new(); temporary.canvas_size=Vector2i(item.content_dimensions().ceil())
+	temporary.live_materials.assign(workspace.document.live_materials)
 	var copy:=item.copy_layer(); copy.parent_id=""; copy.position=Vector2.ZERO; copy.rotation=0; copy.dimensions=Vector2(temporary.canvas_size)
 	copy.opacity=1; copy.blend=0; copy.mask=null; copy.clip_to_below=false; copy.effects.clear()
 	for key in ["basis_x","basis_y","flip_x","flip_y","yaw_up_down","yaw_left_right","value_operations","value_basics"]: copy.properties.erase(key)
@@ -115,6 +116,7 @@ static func _bake_confirmed(workspace: KiwiImageWorkspace,id: String) -> void:
 		workspace.document.layers.assign(workspace.document.layers.filter(func(child: KiwiImageLayer): return not children.has(child.id)))
 		var old_transform:=item.local_transform(); var extent:=Vector2(temporary.canvas_size)
 		item.kind="basic"; item.texture=ImageTexture.create_from_image(image); item.paint_base=item.texture; item.warp=null
+		item.live_paint.clear()
 		item.dimensions=extent
 		item.position=old_transform.origin-extent*.5+old_transform.basis_xform(extent*.5)
 		for key in ["noise_image","noise_object","image_path"]: item.properties.erase(key))

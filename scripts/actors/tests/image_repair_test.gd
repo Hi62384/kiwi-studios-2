@@ -4,7 +4,11 @@ const Synthesis=preload("res://Workspaces/ImageWorkspace/image_texture_synthesis
 const Generator=preload("res://Workspaces/ImageWorkspace/image_procedural_texture.gd")
 const Alpha=preload("res://Workspaces/ImageWorkspace/pixel_selection_alpha.gd")
 var failures:=0
-func _initialize() -> void: run.call_deferred()
+func _initialize() -> void: execute.call_deferred()
+func execute() -> void:
+	await run()
+	for frame in 10: await process_frame
+	quit(failures)
 func check(ok: bool,message: String) -> void:
 	if not ok: failures+=1; push_error(message)
 func settings() -> Dictionary:
@@ -82,7 +86,7 @@ func run() -> void:
 	check(Alpha.blend(selected,stamp,1,true).get_pixel(16,16).a<.005,"Selection erasing removes coverage")
 	engine.free()
 	if DisplayServer.get_name()!="headless": await integration()
-	print("Texture / repair / fractional mask checks: %d failures" % failures); quit(failures)
+	print("Texture / repair / fractional mask checks: %d failures" % failures)
 
 func wait_repair(tool: RefCounted) -> void:
 	var timeout:=Time.get_ticks_msec()+20000
@@ -97,11 +101,20 @@ func integration() -> void:
 	for i in 4: await process_frame
 	var tool=studio.canvas.repair_tool; tool.mode="clone"; tool.main_mode="repair"; tool.repair_source="sample"; tool.repair_method="exact"
 	studio._refresh_context()
-	var mode_picker:=studio.find_child("RepairMode",true,false) as MenuButton
-	check(mode_picker!=null and mode_picker.get_popup().item_count==3,"Texture and repair expose only two main modes")
+	check(studio.find_child("RepairMode",true,false)==null and tool.main_mode=="repair","Repair remains a distinct tool without a duplicate texture painting mode")
+	for painting_tool in ["brush","fill"]:
+		studio._set_tool(painting_tool)
+		var selector:=studio.find_child("PaintingMode",true,false) as OptionButton
+		check(selector!=null and selector.item_count==2,"Brush and Bucket expose Color / Material modes")
+		if selector!=null: selector.item_selected.emit(1)
+		check(studio.canvas.painting_mode=="material","Material mode is available inside the ordinary painting tools")
+	studio._set_tool("repair")
+	var mode_picker:=studio.find_child("RepairOption",true,false) as MenuButton
+	check(mode_picker!=null,"Repair retains its styled source options")
 	var icon_signatures: Dictionary={}
-	for i in range(1,mode_picker.get_popup().item_count): icon_signatures[hash(mode_picker.get_popup().get_item_icon(i).get_image().get_data())]=true
-	check(icon_signatures.size()==2,"Both main modes have distinct icons")
+	if mode_picker!=null:
+		for i in range(1,mode_picker.get_popup().item_count): icon_signatures[hash(mode_picker.get_popup().get_item_icon(i).get_image().get_data())]=true
+	check(icon_signatures.size()==2,"Repair source options retain distinct icons")
 	var sample_button: Button
 	for node in studio.find_children("*","Button",true,false):
 		if node.text=="Sample source": sample_button=node
@@ -173,8 +186,8 @@ func integration() -> void:
 	studio._refresh_context()
 	for i in 5: await process_frame
 	root.get_texture().get_image().save_png("res://.godot/texture_repair_ui.png")
-	root.gui_embed_subwindows=true; mode_picker=studio.find_child("RepairMode",true,false) as MenuButton
-	mode_picker.get_popup().position=Vector2i(mode_picker.global_position+Vector2(0,mode_picker.size.y)); mode_picker.get_popup().popup()
+	root.gui_embed_subwindows=true; mode_picker=studio.find_child("RepairOption",true,false) as MenuButton
+	if mode_picker!=null: mode_picker.get_popup().position=Vector2i(mode_picker.global_position+Vector2(0,mode_picker.size.y)); mode_picker.get_popup().popup()
 	for i in 3: await process_frame
 	root.get_texture().get_image().save_png("res://.godot/repair_mode_menu_ui.png")
 	studio.queue_free()

@@ -25,6 +25,7 @@ var overlay_path := PackedStringArray()
 var property_batch_active := false
 var _audio_preview_before: Dictionary = {}
 
+
 func audio_snapshot(actor: ActorData) -> Dictionary:
 	var clip := clip_for_actor_id(actor.id)
 	return {"actor": actor, "values": actor.values.duplicate(true), "clip": clip, "duration": clip.duration,
@@ -890,16 +891,27 @@ func _apply_section_move(states: Dictionary, section_id: String, forward: bool) 
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
+	if what == NOTIFICATION_PREDELETE and is_instance_valid(history):
 		history.free()
 
 
 func create_actor(definition: ActorDefinition, time: float, initial_values: Dictionary = {}) -> ActorClip:
+	# Model files are editable node hierarchies, not one opaque mesh actor.
+	# This shared entry point covers timeline drops and Modeling → To Scene.
+	var model_source: Variant=initial_values.get(&"mesh_path","")
+	if definition.type_id==&"basic_mesh" and (model_source is Resource or (model_source is String and not model_source.is_empty())):
+		var path: String=model_source.resource_path if model_source is Resource else str(model_source)
+		var document := KiwiModelImport.load_document(model_source)
+		if not document.components.is_empty() and document.validate().is_empty():
+			return instantiate_model(document,path,time)
 	var actor := definition.create_actor(initial_values)
 	actor.section_id = selected_section_id
 	validate_focus()
 	actor.parent_id = focused_actor_id
 	var clip := ActorClip.create(actor, maxf(time, 0.0))
+	if actor.type_id == &"transform_image_2d":
+		var asset := ActorTransformationStates.load_asset(actor)
+		if asset.document != null: clip.duration = maxf(MIN_DURATION, asset.document.duration)
 	if actor.type_id in [&"video", &"video_2d"]:
 		var source := ActorVideo.info(str(actor.values.get(&"video", "")))
 		if source.is_empty(): return null
@@ -937,10 +949,18 @@ func create_actor(definition: ActorDefinition, time: float, initial_values: Dict
 	return clip
 
 
+func instantiate_model(document: KiwiModelDocument, source_path: String, start: float) -> ActorClip:
+	var registry := ActorRegistry.new(); BasicActors.register_all(registry)
+	var scene := document.actor_scene(registry,source_path)
+	if scene.actors.is_empty(): return null
+	validate_focus()
+	return instantiate_scene(scene,registry.get_definition(&"point_3d"),start,selected_layer,source_path.get_file().get_basename() if not source_path.is_empty() else "Model","Instantiate Model")
+
+
 ## Flatten an editable scene into this scene while preserving its actor ancestry,
 ## animation resources and clip offsets. One undo action owns the entire import.
 func instantiate_scene(scene: ActorSceneData, point_definition: ActorDefinition,
-		start: float, layer: int, name: String = "Scene") -> ActorClip:
+		start: float, layer: int, name: String = "Scene", action_label: String = "Instantiate Scene") -> ActorClip:
 	if scene == null or point_definition == null or point_definition.type_id != &"point_3d":
 		return null
 	var first := INF
@@ -994,9 +1014,11 @@ func instantiate_scene(scene: ActorSceneData, point_definition: ActorDefinition,
 		actor.section_id = selected_section_id
 		actor.parent_id = str(id_map.get(source_actor.parent_id,
 			section_parents.get(source_actor.section_id, root.id)))
-		for key in [&"linked_audio_actor", &"remote_actor"]:
+		for key in [&"linked_audio_actor", &"remote_actor", &"model_skeleton_actor"]:
 			if actor.values.has(key):
 				actor.values[key] = str(id_map.get(str(actor.values[key]), ""))
+		if actor.values.get(&"physics") is Dictionary: actor.values[&"physics"] = KiwiPhysicsSettings.remap(actor.values[&"physics"],id_map)
+		if actor.values.has(&"fluid_mesh_actor"): actor.values[&"fluid_mesh_actor"]=id_map.get(str(actor.values[&"fluid_mesh_actor"]),actor.values[&"fluid_mesh_actor"])
 		var clip := source_clip.duplicate(true) as ActorClip
 		clip.id = ActorData.new_id()
 		clip.actor_id = actor.id
@@ -1008,7 +1030,7 @@ func instantiate_scene(scene: ActorSceneData, point_definition: ActorDefinition,
 		ids.append(entry.clip.id)
 	var previous_selection := selected_ids.duplicate()
 	var root_selection: Array[String] = [root_clip.id]
-	history.create_action("Instantiate Scene")
+	history.create_action(action_label)
 	history.add_do_method(_insert_copies.bind(entries, root_selection))
 	history.add_undo_method(_remove_copies.bind(ids, previous_selection))
 	history.commit_action()
@@ -1271,11 +1293,18 @@ func paste_snapshots(snapshots: Array[Dictionary], time: float, preferred_layer:
 		for entry in group:
 			var actor: ActorData = entry.actor
 			var snapshot: Dictionary = entry.snapshot
+			if actor.values.get(&"physics") is Dictionary:
+				var physics_ids:={}
+				for source_id in actor_map: physics_ids[source_id]=(actor_map[source_id] as ActorData).id
+				actor.values[&"physics"]=KiwiPhysicsSettings.remap(actor.values[&"physics"],physics_ids)
+				if actor.values.has(&"fluid_mesh_actor"): actor.values[&"fluid_mesh_actor"]=physics_ids.get(str(actor.values[&"fluid_mesh_actor"]),actor.values[&"fluid_mesh_actor"])
 			if actor.type_id in [&"video", &"video_2d"]:
 				var source_audio := str(actor.values.get(&"linked_audio_actor", ""))
 				# A copy must never own the original video's audio child.
 				actor.values[&"linked_audio_actor"] = (actor_map[source_audio] as ActorData).id if actor_map.has(source_audio) else ""
 			var source_parent := str(snapshot.source_parent)
+			var source_skeleton := str(actor.values.get(&"model_skeleton_actor",""))
+			if actor_map.has(source_skeleton): actor.values[&"model_skeleton_actor"]=(actor_map[source_skeleton] as ActorData).id
 			if actor_map.has(source_parent):
 				actor.parent_id = (actor_map[source_parent] as ActorData).id
 			elif preserve_external_parents and actor_for_id(source_parent) != null:
@@ -1681,7 +1710,7 @@ func _apply_parent_state_silent(actor: ActorData, parent_id: String, transform_v
 
 func _transform_values(actor: ActorData) -> Dictionary:
 	var result: Dictionary = {}
-	for key: StringName in [&"position", &"rotation", &"scale"]:
+	for key: StringName in [&"position", &"rotation", &"scale", &"model_basis_residual"]:
 		if actor.values.has(key):
 			result[key] = ActorData.copy_value(actor.values[key])
 	return result
@@ -1693,7 +1722,7 @@ func _local_transform(actor: ActorData) -> Transform3D:
 	var degrees: Vector3 = actor.get_value(&"rotation", Vector3.ZERO)
 	var radians := Vector3(deg_to_rad(degrees.x), deg_to_rad(degrees.y), deg_to_rad(degrees.z))
 	var actor_scale: Vector3 = actor.get_value(&"scale", Vector3.ONE)
-	return Transform3D(Basis.from_euler(radians).scaled(actor_scale), position)
+	return Transform3D(Basis.from_euler(radians)*Basis.from_scale(actor_scale)*actor.values.get(&"model_basis_residual",Basis.IDENTITY), position)
 
 
 func world_transform_for(actor_id: String) -> Transform3D:
@@ -1735,6 +1764,8 @@ func _values_for_preserved_world(actor: ActorData, new_parent_id: String) -> Dic
 	if absf(parent_world.basis.determinant()) <= 0.000001:
 		return original
 	var local := parent_world.affine_inverse() * world
+	if actor.values.has(&"model_basis_residual"):
+		return KiwiModelDocument.transform_values(local)
 	var local_scale := local.basis.get_scale()
 	var rotation_basis := local.basis.orthonormalized()
 	var radians := rotation_basis.get_euler()

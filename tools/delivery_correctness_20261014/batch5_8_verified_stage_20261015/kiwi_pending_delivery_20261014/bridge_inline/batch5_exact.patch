@@ -1,0 +1,269 @@
+--- a/Workspaces/AudioWorkspace/audio_edit_session.gd
++++ b/Workspaces/AudioWorkspace/audio_edit_session.gd
+@@ -711,3 +711,132 @@
+ 	commit()
+ 	selection_changed.emit()
+ 	return ""
++
++# Active file references only: embedded edited PCM, original_audio provenance,
++# sampler maps and generated note sources are deliberately not rebound here.
++static func audio_source_key(value: Variant) -> String:
++	if not value is String or value.is_empty(): return ""
++	var key := ProjectSettings.globalize_path(value).replace("\\", "/").simplify_path()
++	return key.to_lower() if OS.get_name() == "Windows" else key
++
++func audio_source_clips(id: String) -> Array[String]:
++	var result: Array[String] = []
++	var actor := document.actor_for_clip(id)
++	if actor == null: return result
++	var key := audio_source_key(actor.values.get(&"audio"))
++	if key.is_empty(): return result
++	for clip in document.clips:
++		var other := document.actor_for_clip(clip.id)
++		if other != null and audio_source_key(other.values.get(&"audio")) == key: result.append(clip.id)
++	return result
++
++static func _relink_file_signature(path: String) -> Dictionary:
++	var file := FileAccess.open(path, FileAccess.READ)
++	if file == null: return {}
++	var result := {"bytes": file.get_length(), "modified": FileAccess.get_modified_time(path)}
++	file.close()
++	return result
++
++static func probe_audio_relink(path: String, job: RefCounted = null) -> Dictionary:
++	if path.is_empty() or path.get_extension().to_lower() not in ["wav", "mp3", "ogg", "flac"]:
++		return {"error": "Choose a supported WAV, MP3, Ogg or FLAC source."}
++	if job != null and job.is_cancelled(): return {"error": "Cancelled."}
++	var signature := _relink_file_signature(path)
++	if signature.is_empty() or int(signature.bytes) <= 0: return {"error": "The replacement source is missing, empty or unreadable."}
++	var result := {"error": "", "path": path, "signature": signature, "seconds": 0.0}
++	if job != null: job.update(0.1, "Checking replacement audio without changing the composition")
++	# Bounded PCM inspection permits long WAVs without loading the whole source.
++	if path.get_extension().to_lower() == "wav":
++		var info := KiwiAudioPCMFile.inspect(path)
++		if not str(info.get("error", "invalid")).is_empty(): return {"error": str(info.get("error", "Unsupported WAV replacement."))}
++		var file := FileAccess.open(path, FileAccess.READ)
++		if file == null: return {"error": "The replacement WAV could not be read."}
++		var first := KiwiAudioPCMFile.read_frames(file, info, 0, 1)
++		var last := KiwiAudioPCMFile.read_frames(file, info, int(info.frames) - 1, 1)
++		file.close()
++		if first.size() != 1 or last.size() != 1: return {"error": "The replacement WAV is incomplete."}
++		result.seconds = float(info.duration)
++	else:
++		if path.get_extension().to_lower() in ["mp3", "ogg"] and int(signature.bytes) > ActorAudio.MAX_NATIVE_WAV_BYTES:
++			return {"error": "Compressed replacement validation is limited to 64 MiB encoded files. Convert this source to PCM WAV before relinking."}
++		# Cached missing/duration results must not approve a newly replaced file.
++		ActorAudio.invalidate(path)
++		if ActorAudio.needs_file_preview(path): return {"error": "This compressed source exceeds the native validation limit. Convert it to PCM WAV before relinking; existing clips were preserved."}
++		var stream := ActorAudio.source(path, job)
++		if stream == null: return {"error": "The replacement cannot be decoded by the current audio backend."}
++		result.seconds = stream.get_length()
++		var decoder := stream.instantiate_playback()
++		if decoder == null: return {"error": "The replacement decoder could not be initialized."}
++		decoder.start(0.0)
++		var samples := decoder.mix_audio(1.0, 32)
++		decoder.stop()
++		if samples.is_empty(): return {"error": "The replacement decoder returned no audio frames."}
++		result.stream = stream # Validation handle only; never serialized into the document.
++	if not is_finite(float(result.seconds)) or float(result.seconds) <= 0.0: return {"error": "The replacement has no valid audio duration."}
++	if job != null and job.is_cancelled(): return {"error": "Cancelled."}
++	if signature != _relink_file_signature(path): return {"error": "The replacement file changed while being checked. Choose it again."}
++	return result
++
++func audio_relink_problem(ids: Array, expected_source: String, replacement: Dictionary) -> String:
++	if _before != null: return "Finish the current edit before relinking audio."
++	if ids.is_empty(): return "No clips were selected for relinking."
++	var key := audio_source_key(expected_source)
++	if key.is_empty(): return "Only existing file-backed clip references can be relinked."
++	if not str(replacement.get("error", "")).is_empty(): return str(replacement.error)
++	var path: Variant = replacement.get("path")
++	var seconds: Variant = replacement.get("seconds")
++	if not path is String or path.is_empty() or path.get_extension().to_lower() not in ["wav", "mp3", "ogg", "flac"] or not (seconds is float or seconds is int):
++		return "The replacement audio has not been validated."
++	if not is_finite(float(seconds)) or float(seconds) <= 0.0: return "The replacement has no valid duration."
++	var signature: Variant = replacement.get("signature")
++	if not signature is Dictionary or signature.is_empty() or signature != _relink_file_signature(path):
++		return "The replacement file is missing or changed. Choose it again."
++	if path.get_extension().to_lower() == "wav":
++		var info := KiwiAudioPCMFile.inspect(path)
++		if not str(info.get("error", "invalid")).is_empty() or absf(float(info.get("duration", 0.0)) - float(seconds)) > 0.000001:
++			return "The replacement WAV no longer matches its validation. Choose it again."
++	else:
++		var stream: Variant = replacement.get("stream")
++		if not stream is AudioStream or absf(stream.get_length() - float(seconds)) > 0.000001:
++			return "The replacement decoder is unavailable. Choose the source again."
++	var seen := {}
++	for value: Variant in ids:
++		if not value is String or value.is_empty() or seen.has(value): return "The relink selection contains an invalid or duplicate clip."
++		seen[value] = true
++		var clip := document.clip_for_id(value)
++		var actor := document.actor_for_clip(value)
++		var track := document.track_for_clip(value)
++		if clip == null or actor == null or track.is_empty(): return "A clip selected for relinking is missing. No clips were changed."
++		if not can_edit(value) or track.has("frozen_track") or track.has("frozen_source"): return "A selected clip is locked or frozen. No clips were changed."
++		if audio_source_key(actor.values.get(&"audio")) != key: return "A selected clip's source changed. Choose the replacement again."
++		if is_note_source(actor): return "Generated note sources cannot be relinked as audio. Restore their instrument samples or render them separately."
++		if not is_finite(clip.start_time) or clip.start_time < 0 or not is_finite(clip.source_offset) or clip.source_offset < 0 or not is_finite(clip.duration) or clip.duration <= 0 or not is_finite(clip.playback_speed) or clip.playback_speed < 0.05 or clip.playback_speed > 16:
++			return "A selected clip has invalid source geometry. No clips were changed."
++		if bool(actor.values.get(&"loop", false)):
++			var period := float(actor.values.get(&"source_duration", 0.0))
++			if not is_finite(period) or period <= 0.0 or absf(period - float(seconds)) > 0.000001:
++				return "A looped clip requires the original source duration to preserve its loop period. No clips were changed."
++		else:
++			var end := clip.source_offset + clip.duration * clip.playback_speed
++			if not is_finite(end) or end > float(seconds) + 0.000001:
++				return "The replacement is too short for an existing source window. No clips were changed."
++	return ""
++
++func relink_audio_sources(ids: Array, expected_source: String, replacement: Dictionary) -> String:
++	var problem := audio_relink_problem(ids, expected_source, replacement)
++	if not problem.is_empty(): return problem
++	var changes: Array[ActorData] = []
++	for id: String in ids:
++		var actor := document.actor_for_clip(id)
++		if actor.values.get(&"audio") != replacement.path or float(actor.values.get(&"source_duration", 0.0)) != float(replacement.seconds) or actor.values.has(&"transients") or actor.values.has(&"transients_source_identity"): changes.append(actor)
++	ActorAudio.invalidate(str(replacement.path))
++	if changes.is_empty(): return ""
++	# All references/windows were checked first. Never reconstruct a clip, reset
++	# an offset, change duration/speed, or overwrite original_audio provenance.
++	action("Relink audio sources", func():
++		for actor in changes:
++			actor.values[&"audio"] = replacement.path
++			actor.values[&"source_duration"] = float(replacement.seconds)
++			actor.values.erase(&"transients")
++			actor.values.erase(&"transients_source_identity"))
++	return ""
+--- a/Workspaces/AudioWorkspace/audio_workspace.gd
++++ b/Workspaces/AudioWorkspace/audio_workspace.gd
+@@ -71,6 +71,7 @@
+ var _generation: int = 0
+ var _preview_cache: Dictionary = {}
+ var _wave_clip_id := ""
++var _relink_generation := 0
+ var _wave_clipboard := PackedVector2Array()
+ var _wave_clipboard_rate: int = 44100
+ var _analysis_result: Dictionary = {}
+@@ -402,7 +403,7 @@
+  _finish_automation_pass("Composition changed")
+  canvas.finish_automation_edit()
+  for child in get_children():
+-  if child is Window and (child.has_meta("audio_lane_window") or child.has_meta("audio_conductor_window")):child.queue_free()
++  if child is Window and (child.has_meta("audio_lane_window") or child.has_meta("audio_conductor_window") or child.has_meta("audio_relink_window")):child.queue_free()
+  stop();jobs.cancel_all();_generation+=1;source=value
+  if state.get("session") is KiwiAudioEditSession:
+   session.changed.disconnect(_session_changed);session.selection_changed.disconnect(_selection_changed)
+@@ -436,7 +437,11 @@
+  session.document.workspace_state=ui
+  return {"session":session,"source":source,"path":path,"document_path":document_path,"ui":ui}
+ func _notification(what:int)->void:
+- if what==NOTIFICATION_VISIBILITY_CHANGED and is_inside_tree() and not is_visible_in_tree():stop()
++ if what==NOTIFICATION_VISIBILITY_CHANGED and is_inside_tree() and not is_visible_in_tree():
++  _relink_generation+=1;jobs.cancel_kind("relink_probe")
++  for child in get_children():
++   if child is Window and child.has_meta("audio_relink_window"):child.queue_free()
++  stop()
+ func toggle_playback()->void:
+  if _record_busy:_cancel_record_preparation();return
+  if recorder.recording:toggle_recording();return
+@@ -939,14 +944,86 @@
+  if tabs!=null and tabs.has_method("open_audio"):tabs.call("open_audio",chosen)
+  else:open_source(chosen)
+ func relink_source()->void:
+- var picker_session:=session;var picker_revision:=session.revision
+- var actor:=session.primary_actor();var clip:=session.primary_clip();if actor==null or clip==null:return
+- var chosen:=await ActorProjectFilePicker.pick(self,_audio_property(),"Relink source")
+- if session!=picker_session or session.revision!=picker_revision:notice("The composition changed while choosing a file. Repeat this action in the intended document.");return
++ if recorder.recording or _record_busy:notice("Finish or cancel the take before relinking audio.");return
++ if session._before!=null:notice("Finish the current edit before relinking audio.");return
++ var clip:=session.primary_clip();var actor:=session.primary_actor()
++ if clip==null or actor==null:return
++ var source_value:Variant=actor.values.get(&"audio")
++ if not source_value is String or source_value.is_empty():notice("Only file-backed audio clips can be relinked here. Embedded edits and sampler sources are preserved.");return
++ if KiwiAudioEditSession.is_note_source(actor):notice("Restore this pattern's instrument samples instead of replacing its generated audio.");return
++ if not session.can_edit(clip.id):notice("Unlock the clip before relinking its source.");return
++ _finish_automation_pass("Audio relink started")
++ _relink_generation+=1
++ var context:Dictionary={"owner":session,"document":session.document,"revision":session.revision,"focus_id":clip.id,"source":source_value,"token":_relink_generation}
++ var shared:=session.audio_source_clips(clip.id)
++ if shared.size()<=1:
++  _pick_audio_relink(context,[clip.id]);return
++ var dialog:=_window("Relink shared audio source",Vector2i(600,270));dialog.window.set_meta("audio_relink_window",true)
++ _label(dialog.host,"%d clips reference this source: %s"%[shared.size(),str(source_value).get_file()])
++ _label(dialog.host,"Choose the scope explicitly. Every source window is checked before any clip changes. Timeline positions, trims, speed, reverse/loop state, effects and automation stay intact. Locked or incompatible clips reject the whole chosen group.")
++ _button(dialog.host,"Relink this clip only",func():_pick_audio_relink(context,[str(context.focus_id)]);dialog.window.queue_free())
++ _button(dialog.host,"Relink all %d referencing clips"%shared.size(),func():_pick_audio_relink(context,shared);dialog.window.queue_free())
++ _button(dialog.host,"Cancel",dialog.window.queue_free)
++
++func _relink_context_current(context:Dictionary)->bool:
++ return is_inside_tree() and is_visible_in_tree() and not recorder.recording and not _record_busy and context.get("owner")==session and context.get("document")==session.document and int(context.get("revision",-1))==session.revision and int(context.get("token",-1))==_relink_generation and session._before==null and session.primary_clip()!=null and session.primary_clip().id==str(context.get("focus_id",""))
++
++func _pick_audio_relink(context:Dictionary,ids:Array)->void:
++ if not _relink_context_current(context):notice("The composition or selection changed. Start relinking again.");return
++ var chosen:=await ActorProjectFilePicker.pick(self,_audio_property(),"Choose replacement audio (preserve source windows)")
++ if not _relink_context_current(context):notice("The composition or selection changed while choosing a source. Start relinking again.");return
+  if chosen.is_empty() or chosen==ActorProjectFilePicker.EMPTY_RESOURCE:return
+- var seconds:=ActorAudio.file_duration(chosen)
+- if seconds<=0 or not is_finite(seconds):notice("The replacement audio duration could not be read.");return
+- session.action("Relink audio",func():actor.values[&"audio"]=chosen;actor.values[&"source_duration"]=seconds;clip.source_offset=0;clip.duration=seconds/clip.playback_speed)
++ var request:=context.duplicate();request.ids=ids.duplicate()
++ jobs.request("relink_probe",func(job:RefCounted):
++  var result:=KiwiAudioEditSession.probe_audio_relink(chosen,job)
++  return {"context":request,"replacement":result},int(request.token))
++ status.text="Checking replacement source; the composition is unchanged."
++
++func _review_audio_relink(data:Dictionary)->void:
++ if not str(data.get("error","")).is_empty():notice(str(data.error));return
++ var context:Dictionary=data.get("context",{})
++ if not _relink_context_current(context):return
++ var replacement:Dictionary=data.get("replacement",{})
++ var problem:=session.audio_relink_problem(context.get("ids",[]),str(context.get("source","")),replacement)
++ if not problem.is_empty():notice(problem);return
++ var dialog:=_window("Confirm audio relink",Vector2i(620,310));dialog.window.set_meta("audio_relink_window",true)
++ _label(dialog.host,"Replace %s with %s (%.6f seconds) in %d clip(s)."%[str(context.source).get_file(),str(replacement.path).get_file(),float(replacement.seconds),(context.ids as Array).size()])
++ _label(dialog.host,"The replacement fits every selected source window. Apply changes only the active file reference and source-duration metadata; clip geometry and processing stay unchanged. Original sources, embedded edits, sampler mappings and original_audio provenance are not copied or rewritten. Loop periods must match exactly. Changes form one Undo action. Reusing the same path also refreshes its cache and clears any stale transient analysis.")
++ _button(dialog.host,"Apply relink",func():
++  if _complete_audio_relink(data):dialog.window.queue_free())
++ _button(dialog.host,"Cancel",dialog.window.queue_free)
++
++func _complete_audio_relink(data:Dictionary)->bool:
++ if recorder.recording or _record_busy:notice("Finish or cancel the take before relinking audio.");return false
++ var context:Dictionary=data.get("context",{})
++ if not _relink_context_current(context):notice("The composition or selection changed. Start relinking again.");return false
++ if automation_recording.has_pending():notice("Finish or discard the pending automation pass before relinking.");return false
++ var ids:Array=context.get("ids",[])
++ var prior_revision:=session.revision
++ var replacement:Dictionary=data.get("replacement",{})
++ var problem:=session.audio_relink_problem(ids,str(context.get("source","")),replacement)
++ if not problem.is_empty():notice(problem);return false
++ # stop()/set_document() synchronize the OLD runtime model too. A source
++ # restored at the same path may have become too large for native decoding.
++ var previous_overrides:Dictionary=playback.system.clip_stream_overrides.duplicate()
++ ActorAudio.invalidate(str(replacement.path))
++ var key:=KiwiAudioEditSession.audio_source_key(replacement.path)
++ # Alias references have separate metadata-cache keys, even on Windows.
++ for actor in session.document.actors:
++  if KiwiAudioEditSession.audio_source_key(actor.values.get(&"audio"))==key:ActorAudio.invalidate(str(actor.values.audio))
++ if ActorAudio.needs_file_preview(replacement.path):
++  for i in mini(playback.model.actors.size(),playback.model.clips.size()):
++   if KiwiAudioEditSession.audio_source_key(playback.model.actors[i].values.get(&"audio"))==key:playback.system.clip_stream_overrides[playback.model.clips[i].id]=null
++ problem=session.relink_audio_sources(ids,str(context.get("source","")),replacement)
++ if not problem.is_empty():playback.system.clip_stream_overrides=previous_overrides;notice(problem);return false
++ _relink_generation+=1
++ _cancel_exact_playback();playback.stop(false)
++ _analysis_result={};cache.invalidate()
++ if session.revision==prior_revision:_refresh_all() # A same-path refresh emits no session.changed.
++ if ids.has(_wave_clip_id):_wave_clip_id="";waveform.open(null);waveform.selection=Vector2i.ZERO
++ status.text=("Relinked %d clip(s) without changing their windows or processing."%ids.size()) if session.revision!=prior_revision else "Source refreshed. No document changes or Undo action were needed."
++ return true
++
+ func save()->void:
+  var picker_session:=session
+  if document_path.is_empty():
+@@ -1641,6 +1718,7 @@
+ func _job_completed(kind:String,generation:int,result:Variant)->void:
+  if not result is Dictionary:return
+  var data:Dictionary=result
++ if kind=="relink_probe":_review_audio_relink(data);return
+  if kind=="timeline_midi":
+   if session!=data.get("owner_session") or session.revision!=int(data.get("revision",-1)):notice("The composition changed while mapping MIDI. Repeat this action in the intended document.");return
+   _save_midi_export(data.get("midi",{}),true);return

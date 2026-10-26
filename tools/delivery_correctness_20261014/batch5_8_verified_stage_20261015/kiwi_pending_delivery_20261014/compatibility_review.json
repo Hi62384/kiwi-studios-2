@@ -1,0 +1,132 @@
+{
+  "production_source_edits_during_consolidation": 0,
+  "original_packages_modified": false,
+  "full_hash_chain_states": 9,
+  "source_files_per_state": 76,
+  "pending_writes_by_batch": {
+    "4": 5,
+    "5": 2,
+    "6": 4,
+    "7": 3,
+    "8": 2
+  },
+  "pending_unique_targets": [
+    "Workspaces/AudioWorkspace/audio_analysis.gd",
+    "Workspaces/AudioWorkspace/audio_automation_canvas.gd",
+    "Workspaces/AudioWorkspace/audio_document.gd",
+    "Workspaces/AudioWorkspace/audio_edit_session.gd",
+    "Workspaces/AudioWorkspace/audio_file_preview.gd",
+    "Workspaces/AudioWorkspace/audio_pattern_canvas.gd",
+    "Workspaces/AudioWorkspace/audio_playback.gd",
+    "Workspaces/AudioWorkspace/audio_recording_prepare.gd",
+    "Workspaces/AudioWorkspace/audio_timeline_canvas.gd",
+    "Workspaces/AudioWorkspace/audio_workspace.gd"
+  ],
+  "compatibility_results": {
+    "batch1_conductor": 986,
+    "batch1_save_subset": 22,
+    "batch2_export": 100,
+    "batch3_edit_preservation": 250,
+    "batch4_canvas_gestures": 443,
+    "batch4_workspace_gestures": 40,
+    "batch5_media_relink": 184,
+    "batch6_stream_recording": 125,
+    "composed_cross_flow": 43,
+    "ledger_resume_guards": 15,
+    "batch7_final_source_dialogue": 613,
+    "inline_transfer_guards": 25
+  },
+  "final_batch7_suite_existing_receipt": {
+    "checks": 613,
+    "failures": 0,
+    "scope": "Original package remains unchanged; its613-assertion suite was additionally rerun against final batch8 source in this consolidation."
+  },
+  "all_consolidation_runs_passed": true,
+  "native_integration_run": false,
+  "interaction_findings": [
+    {
+      "area": "Batch4 gestures and batch7 cleanup",
+      "finding": "Pending gestures refuse cleanup; cancel changes revision; old plan cannot later apply. Historical canvas/slider ownership tests still pass."
+    },
+    {
+      "area": "Batch5 relink and batch7 cleanup",
+      "finding": "Relink invalidates old review; cleanup preserves new file/window metadata; resulting fragments remain eligible for atomic shared-source relink. Undo/Redo/save/reopen restore exact composed state."
+    },
+    {
+      "area": "Batch6 backing and batches5/7",
+      "finding": "Relink and cleanup change recording signature; read-only analysis leaves it unchanged. Historical actual reader/lease/cancellation/loop tests still pass against final source."
+    },
+    {
+      "area": "Batch1/2 export/save and batch3 edit replacement",
+      "finding": "Conductor/renderer source files and save/export/preview functions remain byte-identical after their intended batches. Final-source guard tests and existing render-in-place tests pass."
+    },
+    {
+      "area": "Batch7 review UI versus existing transport/automation",
+      "finding": "Selection, recording, active/pending automation and session changes already invalidate/refuse review. No newly demonstrated production interaction regression."
+    },
+    {
+      "area": "Batch8 recovery composed with batches4\u20137",
+      "finding": "Checkpointing preserves live revisions, Undo history and prepared recording signature. Restored relink/cleanup fragments retain exact source windows and metadata, reject an old review owner, and remain eligible for relink/new cleanup with independent Undo. No production interaction regression demonstrated."
+    }
+  ],
+  "harness_limits": "Historical fixture prefixes needed newer declarations/no-op review hooks and dependency stubs. These are test-only changes, disclosed in run_crossbatch.py and results. Cross-flow uses actual model/analysis/source/core methods and signature excerpt. No native project UI, devices, codec render, Scene integration or listening acceptance. New review fixture skips the inserted recovery tick while extracting the unchanged silence polling block, and provides a no-op recovery-close hook. Unchanged-function comparison excludes only trailing top-level comments. No production code was changed.",
+  "native_bridge_sequence": "Authorized sole bridge; use requested inline route where Windows xattrs block materialization; complete76 preflight, per-step backups, git apply --check/apply, complete76 postflight, bounded import/modules; stop on mismatch. Cloud verification is not native application.",
+  "batch8_existing_standalone_receipt": {
+    "checks": 242,
+    "failures": 0,
+    "scope": "Exact unchanged final batch8 source, fresh extracted ZIP rerun and exact Library roundtrip completed before ledger update."
+  },
+  "fresh_final_source_godot_assertions": 2806,
+  "original_to_batch8_reconstruction": {
+    "states": 9,
+    "source_files_per_state": 76,
+    "all_original_patch_steps": 8,
+    "fuzz": 0,
+    "pass": true
+  },
+  "standard_git_apply": {
+    "steps": [
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "check_exit_codes": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "apply_exit_codes": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "all76_postconditions_exact": true
+  },
+  "native_resume_permission": {
+    "reported_by": "parent",
+    "reported_user_message_minute_utc": "2026-10-14T23:46Z",
+    "content_summary": "User reported restart and explicitly authorized resuming.",
+    "independently_verified_native_application": false
+  },
+  "native_key_file_observation": {
+    "reported_by": "parent conveying sole bridge results",
+    "reported_utc": "2026-10-15T00:03Z",
+    "matches_state": "batch_3",
+    "files": {
+      "Workspaces/AudioWorkspace/audio_workspace.gd": "6a016054998c9bb2b220b66a69dfccc708843177848f3b5cfe3ef5a5acf3461a",
+      "Workspaces/AudioWorkspace/audio_document.gd": "35cd8906dd0fc4e3679a5071892161d3de1024d140173a467011574283b9ae99",
+      "Workspaces/AudioWorkspace/audio_edit_session.gd": "b8d9efc194826afb26b59127bed358348fbe4dc414ce077ebd11f6b771af96fd",
+      "Workspaces/AudioWorkspace/audio_conductor.gd": "1c95b65473b6b9cd8e9cb6c195ab0a07fda7694458fb266ae1932d7c9ba9fad9",
+      "Workspaces/AudioWorkspace/audio_renderer.gd": "40dbf1fc8bab6f1ddc34a04d9d3f1457b770c71621630764c0cca55a16ac4a4c",
+      "Workspaces/AudioWorkspace/audio_source_cache.gd": "13be57e05a8ba5ef6fd8cfb5b8b7a3776cdf59ad22950b5baeeac5ce696a3227"
+    },
+    "backups_reported_present": true,
+    "complete76_file_native_preflight_confirmed": false
+  }
+}

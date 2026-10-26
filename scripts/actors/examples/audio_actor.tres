@@ -59,6 +59,19 @@ options = {
 "suffix": " dB"
 }
 
+[sub_resource type="Resource" id="pan"]
+script = ExtResource("2")
+id = &"pan"
+label = "Pan"
+value_type = 3
+options = {
+"default": 0.0,
+"group": "Playback",
+"min": -1.0,
+"max": 1.0,
+"step": 0.01
+}
+
 [sub_resource type="Resource" id="muted"]
 script = ExtResource("2")
 id = &"muted"
@@ -106,5 +119,5 @@ display_name = "Audio"
 category = "Media"
 description = "Audio clip with source-bounded trimming, waveform and independent speed and pitch."
 icon = ExtResource("3")
-properties = Array[ExtResource("2")]([SubResource("source"), SubResource("speed"), SubResource("pitch"), SubResource("volume"), SubResource("muted"), SubResource("fade_in"), SubResource("fade_out")])
+properties = Array[ExtResource("2")]([SubResource("source"), SubResource("speed"), SubResource("pitch"), SubResource("volume"), SubResource("pan"), SubResource("muted"), SubResource("fade_in"), SubResource("fade_out")])
 runtime_scene = ExtResource("4")

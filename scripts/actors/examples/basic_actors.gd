@@ -5,4 +5,4 @@ extends RefCounted
 const CATALOG: ActorCatalog = preload("res://scripts/actors/examples/basic_actor_catalog.tres")
 
 static func register_all(registry: ActorRegistry) -> bool:
-	return CATALOG.register_into(registry)
+	return CATALOG.register_into(registry) and registry.register(KiwiFluidDefinition.create())

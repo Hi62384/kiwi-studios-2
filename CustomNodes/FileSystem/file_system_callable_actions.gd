@@ -6,6 +6,12 @@ const FileSystem = preload("uid://k2xqavmy8y6v")
 
 var _undo_redo: UndoRedo = UndoRedo.new()
 
+func _exit_tree() -> void:
+	# UndoRedo is not reference counted; release captured file actions and owner.
+	if is_instance_valid(_undo_redo):
+		_undo_redo.clear_history()
+		_undo_redo.free()
+
 
 
 func undo() -> void:

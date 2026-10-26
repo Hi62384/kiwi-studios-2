@@ -20,11 +20,13 @@ var allow_embedded: bool = true
 var _resolved: bool = false
 var _file_generation: int = 0
 var _thumbnail_cache: Dictionary = {}
+var clipboard_value: Variant
 
 
 static func pick(owner: Node, title_text: String, suggested_name: String,
-		file_extension: String = "tres", can_embed: bool = true, formats: PackedStringArray = PackedStringArray()) -> Dictionary:
+		file_extension: String = "tres", can_embed: bool = true, formats: PackedStringArray = PackedStringArray(), snapshot: Variant=null) -> Dictionary:
 	var dialog := ActorProjectResourceSaveDialog.new()
+	dialog.clipboard_value=snapshot
 	owner.add_child(dialog)
 	dialog._build(title_text, suggested_name, file_extension, can_embed, formats)
 	dialog.popup_centered(Vector2i(900, 620))
@@ -79,6 +81,18 @@ func _build(title_text: String, suggested_name: String, file_extension: String,
 	close.custom_minimum_size = Vector2(42, 38)
 	close.pressed.connect(func(): _resolve(""))
 	header.add_child(close)
+	if clipboard_value!=null and KiwiSuperClipboardService.instance!=null:
+		var clipboard_row:=HBoxContainer.new(); column.add_child(clipboard_row)
+		var clipboard:=Button.new(); clipboard.name="SaveToSuperClipboard"; clipboard.text="Save copy to Super Clipboard"; clipboard_row.add_child(clipboard)
+		var folder:=OptionButton.new(); folder.fit_to_longest_item=false; folder.size_flags_horizontal=Control.SIZE_EXPAND_FILL; clipboard_row.add_child(folder)
+		var library:=KiwiSuperClipboardService.instance
+		for id: String in library.store.data.folders:
+			if library.store.folder_valid(id): folder.add_item(str(library.store.data.folders[id].name)); folder.set_item_metadata(folder.item_count-1,id)
+		clipboard.pressed.connect(func():
+			var value: Variant=clipboard_value.call() if clipboard_value is Callable else clipboard_value
+			var id:=library.quick_save(value,filename.text if filename!=null else suggested_name,str(folder.get_selected_metadata()))
+			if not id.is_empty(): _resolve({"cancelled":true,"clipboard_saved":id,"embedded":false,"path":""})
+			else: status.text=library.store.error; status.add_theme_color_override("font_color",Color("ffab99")))
 	var browser_panel := PanelContainer.new()
 	browser_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	browser_panel.add_theme_stylebox_override("panel", _box(Color("17222e"), Color("314457"), 8, 1))

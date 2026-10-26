@@ -5,6 +5,12 @@ func check(ok: bool, message: String) -> void:
 		failures += 1
 		push_error(message)
 func _initialize() -> void: run.call_deferred()
+func media_preview(inspector: ActorInspector) -> ActorMediaPreview:
+	# Image inspection also exposes an Edit button. Locate the actual preview,
+	# preserving coverage without depending on unrelated toolbar child order.
+	for child in inspector.fields.get_children():
+		if child is ActorMediaPreview: return child
+	return null
 func run() -> void:
 	var editor := ActorTimelineEditor.new()
 	root.add_child(editor)
@@ -21,10 +27,10 @@ func run() -> void:
 	bitmap.fill(Color.TOMATO)
 	bitmap.save_png(png)
 	inspector.inspect_file_resource(png)
-	var preview := inspector.fields.get_child(1) as ActorMediaPreview
+	var preview := media_preview(inspector)
 	check(preview != null and preview.image.texture != null, "Image double-click inspection shows an image")
 	inspector.refresh()
-	check(inspector.fields.get_child(1) == preview, "File preview survives timeline refresh")
+	check(media_preview(inspector) == preview, "File preview survives timeline refresh")
 	var property := ActorProperty.create(&"image", "Image", "")
 	property.options.extensions = ["png", "webp"]
 	check(await ActorMediaExport.write_async(editor, png, copied, property), "Asynchronous same-format save succeeds")
@@ -38,13 +44,13 @@ func run() -> void:
 	audio.data = bytes
 	audio.save_to_wav(wav_path)
 	inspector.inspect_file_resource(wav_path)
-	preview = inspector.fields.get_child(1)
+	preview = media_preview(inspector)
 	check(preview.player.stream != null and preview.duration > 0, "Audio inspection exposes playable audio")
 	var log: Array = []
 	var encoder := ActorVideo.executable("ffmpeg")
 	check(OS.execute(encoder, PackedStringArray(["-nostdin", "-v", "error", "-n", "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=12", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000", "-t", "1", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", ProjectSettings.globalize_path(video_path)]), log, true) == 0, "Synthetic video fixture encodes")
 	inspector.inspect_file_resource(video_path)
-	preview = inspector.fields.get_child(1)
+	preview = media_preview(inspector)
 	var deadline := Time.get_ticks_msec() + 5000
 	while (preview.image.texture == null or preview.player.stream == null) and Time.get_ticks_msec() < deadline: await process_frame
 	check(preview.video and preview.image.texture != null, "Video inspection displays decoded frames")

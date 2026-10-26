@@ -1,0 +1,9 @@
+Verified batch 4 kiwi_gesture_safety_20261014.zip 5 targets
+Verified batch 5 kiwi_media_relink_20261014.zip 2 targets
+Verified batch 6 kiwi_recording_stream_20261014.zip 4 targets
+Verified batch 7 kiwi_dialogue_cleanup_20261014.zip 3 targets
+Verified batch 8 kiwi_recovery_checkpoints_20261014.zip 2 targets
+Verified full 76-file hash chain: original snapshot -> batches 1,2,3,4,5,6,7,8
+Exact target state: batch_8
+Remaining ordered batches: []
+Read-only check only. Resume is authorized, but application still requires the sole bridge and exact source verification.

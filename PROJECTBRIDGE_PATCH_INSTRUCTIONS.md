@@ -1,10 +1,11 @@
+<!-- ProjectBridge delivery-mode policy v2 -->
+> **SCOPE: ZIP PACKAGING FOR NORMAL READ-ONLY CHATGPT OR EXPLICIT ZIP REQUESTS.** > Normal ChatGPT reading GitHub without a writable checkout uses these instructions > for coding-change requests by default unless another delivery is requested. > Codex, IDE agents and other agents that can edit files directly should modify > the project normally and must **not** create a ProjectBridge patch ZIP unless > the user specifically asks for one. Merely reading this file does not select > ZIP-delivery mode for Codex. Older unconditional requirements below apply **only** > when ProjectBridge ZIP delivery is the chosen workflow.
+
 # ProjectBridge: Instructions for ChatGPT
 
 **Project:** kiwi-studios-2
 **GitHub reference:** https://github.com/Hi62384/kiwi-studios-2
 **Offline patch format:** `projectbridge.offline-patch.v1` (supported by ProjectBridge Offline Patcher v4)
-
-> **Required project workflow:** Before working on a request, read this file and the root `AGENTS.md` in their entirety. Inspect the requested project's actual source files on GitHub (or other user-provided baseline). Make the necessary edits and deliver one *small* `ProjectBridge_patch.zip`, not a copy of the whole project. Do not require the user to choose individual files. Do not push to GitHub unless they explicitly request a push.
 
 ## 1. Read the project first
 
@@ -97,8 +98,8 @@ python make_patch.py --before baseline --edits edited \
 
 Omit `--delete` if nothing is deleted. If the script is unavailable, use Python `zipfile`, `json` and `hashlib.sha256` to construct the exact same manifest. Verify all hashes, paths and ZIP members before delivering. If possible, run unit/build tests and validate the patch by applying it to a disposable checkout of the recorded baseline; never claim a test succeeded unless it was run.
 
-## 5. Delivery and future requests
+## 5. Delivery (only when offline ZIP delivery was requested)
 
-Return **one downloadable `ProjectBridge_patch.zip`**, a concise summary of changed paths and behavior, and honest test/verification status. The user adds the ZIP to ProjectBridge Offline Patcher, reviews it and clicks **Apply verified changes**. They should not need to manually copy files or run a second conflict utility. ProjectBridge preserves backups and offers Undo.
+When the user explicitly requests a ProjectBridge patch, return **one downloadable `ProjectBridge_patch.zip`**, a concise summary of changed paths and behavior, and honest test/verification status. The user adds the ZIP to ProjectBridge Offline Patcher, reviews it and clicks **Apply verified changes**. They should not need to manually copy files or run a second conflict utility. ProjectBridge preserves backups and offers Undo.
 
 > **Important for normal ChatGPT:** A repository file cannot force an ordinary ChatGPT conversation to fetch it automatically. In a new chat, the user should start with: **"Read my repository-root `AGENTS.md` and `PROJECTBRIDGE_PATCH_INSTRUCTIONS.md` in full before making changes. Return a ProjectBridge patch ZIP for: [request]."** If the files were generated locally, the user must commit and push them to GitHub before ChatGPT can read them from that repository.

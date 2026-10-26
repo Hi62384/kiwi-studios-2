@@ -30,6 +30,9 @@ func evaluate_transform(values: Dictionary) -> void:
 	parenting_anchor.position = position
 	parenting_anchor.rotation_degrees = rotation
 	parenting_anchor.scale = actor_scale
+	if values.has(&"model_basis_residual"):
+		var exact: Basis=Basis.from_euler(transform_node.rotation)*Basis.from_scale(actor_scale)*values[&"model_basis_residual"]
+		transform_node.basis=exact; parenting_anchor.basis=exact
 
 
 func evaluate(_local_time: float, _values: Dictionary) -> void:

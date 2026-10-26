@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="ActorObjectDefinition" format=3]
+
+[ext_resource type="Script" path="res://scripts/actors/core/actor_object_definition.gd" id="1_definition"]
+[ext_resource type="Script" path="res://scripts/actors/core/actor_property.gd" id="2_property"]
+
+[sub_resource type="Resource" id="settings"]
+script = ExtResource("2_property")
+id = &"material_settings"
+label = "Natural Material"
+value_type = 27
+options = {
+"default": {"version": 2, "material_id": "wood/oak"},
+"group": "Material",
+"natural_material": true,
+"no_keyframes": true
+}
+
+[resource]
+script = ExtResource("1_definition")
+type_id = &"natural_material"
+base_type = &"material"
+display_name = "Natural Material"
+schema_version = 2
+properties = Array[ExtResource("2_property")]([SubResource("settings")])

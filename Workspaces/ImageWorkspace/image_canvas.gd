@@ -48,6 +48,7 @@ func _prepare_source_color() -> void:
 		_value_mask=mask.get_image() if mask!=null else null
 
 func _source_color(point: Vector2) -> Color:
+	if _material_region!=null: return Color.WHITE
 	if _paint_layer==null: return color
 	if bool(_paint_layer.properties.get("values_selection_only",false)):
 		if _value_mask==null: return color
@@ -57,6 +58,18 @@ func _source_color(point: Vector2) -> Color:
 			p=Vector2i(local/_paint_layer.content_dimensions()*Vector2(_value_mask.get_size()))
 		if not Rect2i(Vector2i.ZERO,_value_mask.get_size()).has_point(p) or _value_mask.get_pixelv(p).a<=0: return color
 	return _value_inverse_color
+var painting_mode:="color"
+var material_strength:=1.0
+var _material_region: KiwiLivePaintRegion
+var _material_template_id:=""
+var _material_bake_after:=false
+var _material_previous_template:=""
+var _material_busy:=false
+var _material_flood_source: Image
+var _material_stroke_anchor:=Vector2.ZERO
+var _material_direction_set:=false
+var _material_stamps: RefCounted
+var _live_eraser: RefCounted
 var brush_size := 28.0
 var hardness := 0.8
 var brush_opacity := 1.0
@@ -416,6 +429,7 @@ func hit(point: Vector2) -> KiwiImageLayer:
 
 
 func _input_canvas(event: InputEvent) -> void:
+	if _material_busy: return
 	if document == null: return
 	if tool=="warp" and warp_tool.handle(event): accept_event(); return
 	if tool=="repair" and repair_tool.handle(event): accept_event(); return
@@ -830,6 +844,26 @@ func _finish(point: Vector2) -> void:
 		# Commit a fresh texture as well as the live GPU update. This keeps the
 		# final pixels authoritative on every renderer backend and in saved history.
 		_replace_paint_texture()
+		if _material_stamps!=null: _material_stamps.commit(_material_region)
+		if _material_region!=null and _material_bake_after:
+			_material_busy=true
+			var finishing_document:=document; var finishing_layer:=_paint_layer
+			repair_tool.workspace.renderer.sync(document)
+			await repair_tool.workspace.renderer.bake_live_material(_material_template_id)
+			if document!=finishing_document or _paint_layer!=finishing_layer:
+				_material_busy=false; _material_region=null; return
+			if document.live_material_for_id(_material_previous_template)!=null: document.active_live_material_id=_material_previous_template
+			_material_busy=false
+		elif (tool=="eraser" or _erase_modifier) and not _paint_layer.live_paint.is_empty() and _stroke_ink!=null and _live_eraser==null:
+			var erase_mask:=Image.create(_paint_image.get_width(),_paint_image.get_height(),false,Image.FORMAT_RGBA8)
+			erase_mask.blit_rect(_stroke_ink,Rect2i(Vector2i.ZERO,_stroke_ink.get_size()),_ink_origin)
+			var erase_bytes:=erase_mask.get_data(); var erase_frame:=document.world_transform(_paint_layer); var erase_scale:=_paint_layer.dimensions/Vector2(erase_mask.get_size())
+			for y in erase_mask.get_height():
+				for x in erase_mask.get_width():
+					var offset: int=(y*erase_mask.get_width()+x)*4+3
+					erase_bytes[offset]=roundi(erase_bytes[offset]*brush_opacity*(selection_coverage(erase_frame*Vector2(x,y)*erase_scale) if paint_selection_only else 1.0))
+			erase_mask.set_data(erase_mask.get_width(),erase_mask.get_height(),false,Image.FORMAT_RGBA8,erase_bytes)
+			_paint_layer.erase_live_paint(erase_mask)
 	if action in ["move","rotate","paint","vertex"] or action.begins_with("resize"):
 		if action=="move" and not _moved and not _pending_single.is_empty():
 			gesture_cancelled.emit(); selected.assign([_pending_single]); selection_changed.emit()
@@ -852,6 +886,7 @@ func _finish(point: Vector2) -> void:
 		var rect := Rect2(_start,point-_start).abs()
 		if rect.size.x>2 and rect.size.y>2: create_requested.emit(action,rect,PackedVector2Array())
 	if tool != "path": _points.clear()
+	_material_region=null; _material_template_id=""; _material_stamps=null; _live_eraser=null
 	_paint_image = null; _paint_data.clear(); _paint_layer = null; _stroke_base=null; _stroke_points.clear()
 	_corrector=null; _corrected_tail_bounds=Rect2i(); _ink_origin=Vector2i.ZERO
 	_erase_modifier=false
@@ -859,6 +894,7 @@ func _finish(point: Vector2) -> void:
 	_paint_created_layer=false
 	hint_changed.emit("")
 	if created_paint_layer: selection_changed.emit()
+	if painting_mode=="material": repair_tool.workspace._refresh_context()
 
 
 func cancel_gesture() -> void:
@@ -871,6 +907,7 @@ func cancel_gesture() -> void:
 	snap_guides_x.clear(); snap_guides_y.clear()
 	_polygon_index=-1
 	if not _drag.is_empty() and _drag not in ["pan","box","shape","crop","lasso_crop"]: gesture_cancelled.emit()
+	_material_region=null; _material_template_id=""; _material_stamps=null; _live_eraser=null
 	_drag=""; _points.clear(); _paint_image=null; _paint_data.clear(); _paint_layer=null; _stroke_base=null; _stroke_points.clear()
 	_corrector=null; _corrected_tail_bounds=Rect2i(); _ink_origin=Vector2i.ZERO
 	_erase_modifier=false
@@ -892,6 +929,8 @@ func finish_path() -> void:
 
 
 func _begin_paint(point: Vector2) -> void:
+	if _material_busy: return
+	_material_region=null; _material_template_id=""; _material_flood_source=null; _material_stamps=null; _live_eraser=null
 	if paint_selection_only and selection==null:
 		hint_changed.emit("Select pixels first, or turn off Selection only."); return
 	if paint_new_layer and tool=="brush" and brush_type!="soften" and not _erase_modifier:
@@ -904,13 +943,42 @@ func _begin_paint(point: Vector2) -> void:
 	if _paint_layer == null or not document.can_edit(_paint_layer): return
 	if _paint_layer.kind not in ["image","paint","basic"]:
 		hint_changed.emit("Preparing this layer for pixel editing…"); return
+	if _paint_layer.texture==null:
+		hint_changed.emit("This layer has no raster pixels to paint."); return
+	var material_paint:=painting_mode=="material" and tool in ["brush","fill"] and (tool=="fill" or brush_type!="soften") and not _erase_modifier
+	if tool=="fill" and (material_paint or not _paint_layer.live_paint.is_empty()):
+		if _paint_layer.live_paint.is_empty(): _material_flood_source=_paint_layer.texture.get_image().duplicate()
+		else:
+			var source_document:=document; var source_layer:=_paint_layer; var source_tool:=tool
+			_material_busy=true
+			_material_flood_source=await repair_tool.workspace.renderer.source_image(source_layer)
+			_material_busy=false
+			if document!=source_document or _paint_layer!=source_layer or tool!=source_tool or document.layer_for_id(source_layer.id)!=source_layer: return
+			if _material_flood_source==null: hint_changed.emit("Could not read this layer for Bucket fill."); return
 	if not _paint_created_layer: gesture_started.emit()
+	if material_paint:
+		_material_previous_template=document.active_live_material_id
+		var template=document.live_material_for_id(document.active_live_material_id) if document.live_edit_enabled else null
+		if template==null: template=document.create_live_material(repair_tool.material)
+		_material_template_id=template.id; _material_bake_after=not document.live_edit_enabled
+		var mapping:=document.world_transform(_paint_layer) if template.material.alignment=="canvas" else Transform2D.IDENTITY
+		if template.material.alignment=="stroke":
+			mapping=Transform2D(0.0,-(document.world_transform(_paint_layer).affine_inverse()*point))
+		_material_region=document.add_live_region(_paint_layer,template.id,null,mapping)
+		_material_stroke_anchor=point; _material_direction_set=false
+		_paint_layer.properties.erase("generated_stroke")
 	_paint_image=_paint_layer.texture.get_image() if _paint_layer.texture != null else null
+	if _material_region!=null: _paint_image=_material_region.coverage.get_image()
 	if _paint_image == null: gesture_cancelled.emit(); return
 	if _paint_layer.paint_base==null: _paint_layer.paint_base=_paint_layer.texture
 	_paint_image=_paint_image.duplicate()
 	_paint_image.convert(Image.FORMAT_RGBA8)
 	_paint_data=_paint_image.get_data()
+	if _material_region!=null and tool=="brush":
+		var material=document.live_material_for_id(_material_template_id).material
+		if material.application in ["stamp","scatter"]:
+			_material_stamps=preload("res://Workspaces/ImageWorkspace/image_material_stamps.gd").new()
+			_material_stamps.begin(self,material)
 	_replace_paint_texture()
 	_stroke_base=_paint_image.duplicate(); _stroke_points=PackedVector2Array([point])
 	_soften_source=null
@@ -920,7 +988,10 @@ func _begin_paint(point: Vector2) -> void:
 	_corrected_stamp_distance=0.0; _corrected_started=false
 	_corrected_all_bounds=Rect2i()
 	_drag="paint"
-	if tool == "fill": _flood(point); _finish(point)
+	if tool == "fill":
+		if _material_region!=null: _material_flood(point)
+		else: _flood(point)
+		_finish(point)
 	elif _active_mode!="freehand" and tool=="brush":
 		_start=point; _shape_end=point; _shape_control=point; _shape_control_end=point; _circle_profiles=Vector4(2,2,2,2); _drag="shape_stroke"
 	elif tool=="brush" and stroke_correct and correction_strength>0.0 and not _erase_modifier:
@@ -1018,6 +1089,7 @@ func _paint_pixel_allowed(point: Vector2) -> bool:
 
 
 func _set_erase_modifier(enabled: bool) -> void:
+	if _material_region!=null and _drag=="paint": return
 	if _erase_modifier==enabled: return
 	if _drag=="pixel_select" and _pixel_alpha_ink!=null and selection!=null:
 		_pixel_alpha_base=selection.duplicate(); _pixel_alpha_ink.fill(Color.TRANSPARENT)
@@ -1027,7 +1099,7 @@ func _set_erase_modifier(enabled: bool) -> void:
 		# Each modifier phase starts from the live pixels. A later drawing
 		# preview must not restore pixels erased earlier in the same gesture.
 		_paint_data=_paint_image.get_data(); _stroke_base=_paint_image.duplicate()
-		_soften_source=null
+		_soften_source=null; _live_eraser=null
 		_stroke_ink.fill(Color.TRANSPARENT); _stroke_dirty=Rect2i()
 		_corrected_tail_bounds=Rect2i(); _corrected_all_bounds=Rect2i()
 		_corrected_started=false; _corrected_stamp_distance=0.0
@@ -1043,7 +1115,7 @@ func _corrected_path_bounds(path: PackedVector2Array) -> Rect2i:
 	var ratio:=Vector2(_paint_image.get_size())/_paint_layer.dimensions
 	var bounds:=Rect2((inverse*path[0])*ratio,Vector2.ZERO)
 	for point in path: bounds=bounds.expand((inverse*point)*ratio)
-	var radius:=Vector2.ONE*brush_size*ratio*.5+Vector2.ONE*3
+	var radius: Vector2=Vector2.ONE*brush_size*ratio*.5*(_material_stamps.radius_factor() if _material_stamps!=null else 1.0)+Vector2.ONE*3
 	return Rect2i(Vector2i((bounds.position-radius).floor()),Vector2i((bounds.size+radius*2).ceil())).intersection(Rect2i(Vector2i.ZERO,_paint_image.get_size()))
 
 
@@ -1053,13 +1125,14 @@ func _paint_corrected_path(path: PackedVector2Array,commit: bool=false) -> void:
 	# This avoids hundreds of identical large-brush stamps along a short tail.
 	# Keep a continuous stamp phase across sealed patches, so event frequency
 	# and preview revisions do not alter the softness or thickness of a stroke.
-	var interval:=maxf(1.0,brush_size*.15)
+	var interval: float=_material_stamps.interval(self) if _material_stamps!=null else maxf(1.0,brush_size*.15)
 	var distance:=_corrected_stamp_distance
 	var stamped:=Vector2(INF,INF)
 	if not _corrected_started:
 		_paint_line(path[0],path[0],false); stamped=path[0]
 		if commit: _corrected_started=true
 	for index in range(1,path.size()):
+		if _material_stamps!=null: _material_stamps.direction=(document.world_transform(_paint_layer).affine_inverse().basis_xform(path[index]-path[index-1])).angle()
 		var length:=path[index-1].distance_to(path[index])
 		var travel:=interval-distance
 		while travel<=length and length>.00001:
@@ -1074,6 +1147,7 @@ func _flush_corrected_stroke() -> void:
 	if _corrector==null or _paint_layer==null or _paint_image==null: return
 	var patch:=_corrector.update()
 	if patch.is_empty(): return
+	if _material_stamps!=null: _material_stamps.restore_tail()
 	if patch.has("replace"):
 		var shape: PackedVector2Array=patch.replace
 		var area:=_corrected_path_bounds(shape)
@@ -1097,6 +1171,7 @@ func _flush_corrected_stroke() -> void:
 		# on a small tile, then composited once against the original stroke base.
 		# Old tail pixels disappear cleanly, including at self intersections.
 		var stable:=_stroke_ink
+		if _material_stamps!=null: _material_stamps.capture_tail(region)
 		_stroke_ink=stable.get_region(region); _ink_origin=region.position
 		_paint_corrected_path(tail)
 		_stroke_dirty=region
@@ -1108,10 +1183,20 @@ func _flush_corrected_stroke() -> void:
 
 
 func _paint_line(from: Vector2,to: Vector2,upload: bool=true) -> void:
+	if _material_stamps!=null:
+		_material_stamps.paint_line(self,from,to,upload); return
+	if _material_region!=null and not _material_direction_set and from.distance_squared_to(to)>1:
+		var template=document.live_material_for_id(_material_template_id)
+		if template!=null and template.material.alignment=="stroke":
+			var inverse:=document.world_transform(_paint_layer).affine_inverse()
+			var angle:=-((inverse*to)-(inverse*from)).angle()
+			_material_region.mapping=Transform2D(angle,-(inverse*_material_stroke_anchor).rotated(angle))
+		_material_direction_set=true
 	if _paint_image == null or _paint_layer == null: return
 	if _stroke_ink!=null:
 		_prepare_source_color()
 		var stamp_color:=color if bool(_paint_layer.properties.get("values_selection_only",false)) else _value_inverse_color
+		if _material_region!=null: stamp_color=Color.WHITE
 		if tool=="eraser" or _erase_modifier: stamp_color=Color.WHITE
 		elif tool=="brush" and brush_type=="soften": stamp_color=Color.WHITE
 		var inverse:=document.world_transform(_paint_layer).affine_inverse()
@@ -1164,7 +1249,7 @@ func _paint_line(from: Vector2,to: Vector2,upload: bool=true) -> void:
 
 func _upload_paint() -> void:
 	_paint_image.set_data(_paint_image.get_width(),_paint_image.get_height(),false,Image.FORMAT_RGBA8,_paint_data)
-	(_paint_layer.texture as ImageTexture).update(_paint_image)
+	_update_paint_texture()
 	queue_redraw()
 
 
@@ -1183,7 +1268,7 @@ func _upload_native_paint() -> void:
 				coverage=func(point: Vector2): return selection_coverage(frame*_paint_layer.project_point(point*scale))
 			var patch: Image=soften.composite(_stroke_base,_soften_source,ink,_stroke_dirty,soften_strength,brush_opacity,coverage,_soften_opaque)
 			_paint_image.blit_rect(patch,Rect2i(Vector2i.ZERO,patch.get_size()),_stroke_dirty.position)
-			_stroke_dirty=Rect2i(); (_paint_layer.texture as ImageTexture).update(_paint_image); queue_redraw(); return
+			_stroke_dirty=Rect2i(); _update_paint_texture(); queue_redraw(); return
 		if tool=="eraser" or _erase_modifier:
 			var bytes:=_stroke_base.get_region(_stroke_dirty).get_data(); var coverage_bytes:=ink.get_data()
 			var frame:=document.world_transform(_paint_layer); var ratio:=_paint_layer.dimensions/Vector2(_paint_image.get_size())
@@ -1193,10 +1278,15 @@ func _upload_native_paint() -> void:
 					var point:=frame*_paint_layer.project_point(Vector2(_stroke_dirty.position+Vector2i(x,y))*ratio)
 					var coverage:=coverage_bytes[offset]/255.0*brush_opacity*(selection_coverage(point) if paint_selection_only else 1.0)
 					bytes[offset]=roundi(bytes[offset]*(1-coverage))
+					coverage_bytes[offset]=roundi(coverage*255)
 			_paint_image.blit_rect(Image.create_from_data(_stroke_dirty.size.x,_stroke_dirty.size.y,false,Image.FORMAT_RGBA8,bytes),Rect2i(Vector2i.ZERO,_stroke_dirty.size),_stroke_dirty.position)
-			_stroke_dirty=Rect2i(); (_paint_layer.texture as ImageTexture).update(_paint_image); queue_redraw(); return
-		var masked_values:=bool(_paint_layer.properties.get("values_selection_only",false)) and not preload("res://Workspaces/ImageWorkspace/image_values.gd").operations(_paint_layer).is_empty()
-		var opacity:=clampf(brush_opacity*(color.a if masked_values else _value_inverse_color.a),0,1)
+			if not _paint_layer.live_paint.is_empty():
+				if _live_eraser==null:
+					_live_eraser=preload("res://Workspaces/ImageWorkspace/image_live_eraser.gd").new(); _live_eraser.begin(_paint_layer,_paint_image.get_size())
+				_live_eraser.apply(_stroke_dirty,Image.create_from_data(ink.get_width(),ink.get_height(),false,Image.FORMAT_RGBA8,coverage_bytes))
+			_stroke_dirty=Rect2i(); _update_paint_texture(); queue_redraw(); return
+		var masked_values:=_material_region==null and bool(_paint_layer.properties.get("values_selection_only",false)) and not preload("res://Workspaces/ImageWorkspace/image_values.gd").operations(_paint_layer).is_empty()
+		var opacity:=clampf(brush_opacity*(material_strength if _material_region!=null else (color.a if masked_values else _value_inverse_color.a)),0,1)
 		if opacity<1 and not paint_selection_only and not masked_values:
 			var bytes:=ink.get_data()
 			for offset in range(3,bytes.size(),4): bytes[offset]=roundi(bytes[offset]*opacity)
@@ -1226,12 +1316,22 @@ func _upload_native_paint() -> void:
 					for channel in 4: changed[offset+channel]=roundi(lerpf(original[offset+channel],changed[offset+channel],coverage))
 			_paint_image.blit_rect(Image.create_from_data(_stroke_dirty.size.x,_stroke_dirty.size.y,false,Image.FORMAT_RGBA8,changed),Rect2i(Vector2i.ZERO,_stroke_dirty.size),_stroke_dirty.position)
 		_stroke_dirty=Rect2i()
-	(_paint_layer.texture as ImageTexture).update(_paint_image)
+	_update_paint_texture()
 	queue_redraw()
 
 
 func _replace_paint_texture() -> void:
-	_paint_layer.texture=ImageTexture.create_from_image(_paint_image)
+	if _material_region!=null: _material_region.coverage=ImageTexture.create_from_image(_paint_image)
+	else: _paint_layer.texture=ImageTexture.create_from_image(_paint_image)
+
+func _update_paint_texture() -> void:
+	if _material_stamps!=null and _material_region!=null: _material_stamps.upload(_material_region)
+	if _material_region!=null:
+		if _material_region.coverage is ImageTexture: (_material_region.coverage as ImageTexture).update(_paint_image)
+		else: _material_region.coverage=ImageTexture.create_from_image(_paint_image)
+	elif _paint_layer.texture is ImageTexture: (_paint_layer.texture as ImageTexture).update(_paint_image)
+	else: _paint_layer.texture=ImageTexture.create_from_image(_paint_image)
+	if repair_tool!=null and is_instance_valid(repair_tool.workspace): repair_tool.workspace.renderer.invalidate_layer(_paint_layer.id)
 
 
 func _paint_curve(from: Vector2,control: Vector2,to: Vector2) -> void:
@@ -1263,22 +1363,24 @@ func _flood(point: Vector2) -> void:
 	# Empty paint layers are the overwhelmingly common full-canvas fill. Let the
 	# native Image implementation handle it in one call instead of visiting a
 	# million transparent pixels in script.
-	if not paint_selection_only and not bool(_paint_layer.properties.get("values_selection_only",false)) and _paint_image.get_used_rect().size==Vector2i.ZERO:
+	if _material_flood_source==null and not paint_selection_only and not bool(_paint_layer.properties.get("values_selection_only",false)) and _paint_image.get_used_rect().size==Vector2i.ZERO:
 		_paint_image.fill(Color.TRANSPARENT if _erase_modifier else _source_color(point)); _paint_data=_paint_image.get_data(); _upload_paint(); return
 	var width:=_paint_image.get_width(); var height:=_paint_image.get_height(); var start_offset:=(start.y*width+start.x)*4
-	var target:=PackedByteArray([_paint_data[start_offset],_paint_data[start_offset+1],_paint_data[start_offset+2],_paint_data[start_offset+3]])
+	var detection:=_material_flood_source.get_data() if _material_flood_source!=null else _paint_data.duplicate()
+	var target:=detection.slice(start_offset,start_offset+4)
 	var fill_color:=Color.TRANSPARENT if _erase_modifier else color
 	var replacement:=PackedByteArray([roundi(fill_color.r*255),roundi(fill_color.g*255),roundi(fill_color.b*255),roundi(fill_color.a*255)])
 	if target==replacement: return
 	var stack: Array[Vector2i] = [start]
 	var visited := PackedByteArray(); visited.resize(width*height)
+	var lower_erase: Image=Image.create(width,height,false,Image.FORMAT_RGBA8) if _erase_modifier and not _paint_layer.live_paint.is_empty() else null
 	var threshold_squared:=pow(canvas_threshold_bytes(fill_threshold),2)
 	var matches:=func(x: int,y: int) -> bool:
 		if x<0 or y<0 or x>=width or y>=height: return false
 		var pixel_index:=y*width+x
 		if visited[pixel_index]!=0: return false
 		var offset:=pixel_index*4; var difference:=0.0
-		for channel in 4: difference+=pow(float(_paint_data[offset+channel])-float(target[channel]),2)
+		for channel in 4: difference+=pow(float(detection[offset+channel])-float(target[channel]),2)
 		return difference<=threshold_squared and _paint_pixel_allowed(transform*(Vector2(x,y)/ratio))
 	while not stack.is_empty():
 		var p: Vector2i=stack.pop_back()
@@ -1291,12 +1393,14 @@ func _flood(point: Vector2) -> void:
 			var source:=Color.TRANSPARENT if _erase_modifier else _source_color(transform*(Vector2(x,p.y)/ratio))
 			var coverage:=selection_coverage(transform*(Vector2(x,p.y)/ratio)) if paint_selection_only else 1.0
 			for channel in 4: _paint_data[offset+channel]=roundi(lerpf(_paint_data[offset+channel],clampf(source[channel],0,1)*255,coverage))
+			if lower_erase!=null: lower_erase.set_pixel(x,p.y,Color(1,1,1,coverage))
 			var up: bool=p.y>0 and bool(matches.call(x,p.y-1))
 			if up and not span_up: stack.append(Vector2i(x,p.y-1))
 			span_up=up
 			var down: bool=p.y<height-1 and bool(matches.call(x,p.y+1))
 			if down and not span_down: stack.append(Vector2i(x,p.y+1))
 			span_down=down; x+=1
+	if lower_erase!=null: _paint_layer.erase_live_paint(lower_erase)
 	_upload_paint()
 
 
@@ -1667,3 +1771,49 @@ func _polygon_insert(at: Vector2) -> int:
 
 func _drop_data(at: Vector2,data: Variant) -> void:
 	files_dropped.emit(PackedStringArray(data.get("files",data.get("paths",[]))),to_document(at))
+
+func _material_flood(point: Vector2) -> void:
+	# Region detection reads the original composition; coverage writes never change it.
+	var source:=_material_flood_source
+	if source==null: return
+	source.convert(Image.FORMAT_RGBA8)
+	var width:=source.get_width(); var height:=source.get_height()
+	var frame:=document.world_transform(_paint_layer)
+	var ratio:=Vector2(source.get_size())/_paint_layer.dimensions
+	var start:=Vector2i(frame.affine_inverse()*point*ratio)
+	if not Rect2i(Vector2i.ZERO,source.get_size()).has_point(start): return
+	if not paint_selection_only and not source.get_used_rect().has_area():
+		var full:=Image.create(width,height,false,Image.FORMAT_RGBA8); full.fill(Color(1,1,1,brush_opacity*material_strength))
+		_paint_image.blend_rect(full,Rect2i(Vector2i.ZERO,full.get_size()),Vector2i.ZERO)
+		_paint_data=_paint_image.get_data(); _update_paint_texture(); return
+	var bytes:=source.get_data(); var seed_offset:=(start.y*width+start.x)*4
+	var target:=bytes.slice(seed_offset,seed_offset+4)
+	var visited:=PackedByteArray(); visited.resize(width*height)
+	var threshold_squared:=pow(canvas_threshold_bytes(fill_threshold),2)
+	var matches:=func(x: int,y: int) -> bool:
+		if x<0 or y<0 or x>=width or y>=height: return false
+		var index:=y*width+x
+		if visited[index]!=0: return false
+		var difference:=0.0
+		for channel in 4: difference+=pow(float(bytes[index*4+channel])-float(target[channel]),2)
+		return difference<=threshold_squared and _paint_pixel_allowed(frame*(Vector2(x,y)/ratio))
+	var stack: Array[Vector2i]=[start]
+	while not stack.is_empty():
+		var p: Vector2i=stack.pop_back()
+		if not matches.call(p.x,p.y): continue
+		var x:=p.x
+		while matches.call(x-1,p.y): x-=1
+		var span_up:=false; var span_down:=false
+		while x<width and matches.call(x,p.y):
+			var index:=p.y*width+x; visited[index]=1
+			var coverage:=brush_opacity*material_strength*(selection_coverage(frame*(Vector2(x,p.y)/ratio)) if paint_selection_only else 1.0)
+			var prior:=_paint_data[index*4+3]/255.0
+			for channel in 3: _paint_data[index*4+channel]=255
+			_paint_data[index*4+3]=roundi((coverage+prior*(1-coverage))*255)
+			var up: bool=p.y>0 and bool(matches.call(x,p.y-1))
+			if up and not span_up: stack.append(Vector2i(x,p.y-1))
+			span_up=up
+			var down: bool=p.y<height-1 and bool(matches.call(x,p.y+1))
+			if down and not span_down: stack.append(Vector2i(x,p.y+1))
+			span_down=down; x+=1
+	_upload_paint()

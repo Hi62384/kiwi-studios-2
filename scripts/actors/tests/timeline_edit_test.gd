@@ -81,15 +81,15 @@ func run() -> void:
 	var general_category := editor.inspector.find_child("Category_General", true, false) as Button
 	var transform_category := editor.inspector.find_child("Category_Transform", true, false) as Button
 	check(general_category != null and transform_category != null, "Inspector displays property categories")
-	check(transform_category.button_pressed and transform_category.get_node("../Content").visible, "Category starts expanded")
-	transform_category.button_pressed = false
-	check(not transform_category.get_node("../Content").visible, "Category collapses")
-	check(not editor.inspector_ui_state.category_expanded(actor.id, "Transform"), "Collapsed state saved by actor")
+	check(transform_category.button_pressed and editor.inspector._sections["Actor/Transform"].page.visible, "Shared transform section starts selected")
+	editor.inspector.select_section("General")
+	check(not editor.inspector._sections["Actor/Transform"].page.visible, "Selecting another section hides the old page")
+	check(editor.inspector_ui_state.section_for(actor.id, "Actor") == "General", "Selected section saved by actor")
 	editor.inspector._actor = null
 	editor.inspector.refresh()
 	transform_category = editor.inspector.find_child("Category_Transform", true, false) as Button
-	check(not transform_category.button_pressed and not transform_category.get_node("../Content").visible, "Collapsed state survives inspector rebuild")
-	transform_category.button_pressed = true
+	check(not transform_category.button_pressed and not editor.inspector._sections["Actor/Transform"].page.visible, "Section choice survives inspector rebuild")
+	editor.inspector.select_section("Transform")
 	var field := editor.inspector.find_child("position_0", true, false) as SpinBox
 	check(field != null, "Generated vector property field")
 	field.value = 7.5
@@ -187,7 +187,7 @@ func run() -> void:
 	check(ResourceSaver.save(editor.inspector_ui_state, state_path) == OK, "Save inspector UI state")
 	var loaded_state := ResourceLoader.load(state_path, "", ResourceLoader.CACHE_MODE_IGNORE) as ActorInspectorState
 	check(loaded_state != null and loaded_state.scroll_for(actor.id) == 73.0, "Reload actor scroll position")
-	check(loaded_state.category_expanded(actor.id, "Transform"), "Reload expanded categories")
+	check(loaded_state.section_for(actor.id, "Actor") == "Transform", "Reload selected inspector section")
 	check(not loaded_state.vector_linked(actor.id, &"position"), "Reload vector link state")
 	DirAccess.remove_absolute(state_path)
 	host.free()

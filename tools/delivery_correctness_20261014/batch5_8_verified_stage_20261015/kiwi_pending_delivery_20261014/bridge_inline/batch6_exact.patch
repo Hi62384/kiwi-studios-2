@@ -1,0 +1,567 @@
+--- a/Workspaces/AudioWorkspace/audio_file_preview.gd
++++ b/Workspaces/AudioWorkspace/audio_file_preview.gd
+@@ -141,13 +141,14 @@
+ var _generation := 0
+ var _skips := 0
+ var _last_error := ""
++var _held := false
+ 
+ func _ready() -> void: add_child(player)
+ 
+-func open_file(path: String, bus: String = "Master", prepared: Dictionary = {}, owned: bool = false) -> String:
++func open_file(path: String, bus: String = "Master", prepared: Dictionary = {}, owned: bool = false, retained_owner: RefCounted = null, auto_start: bool = true) -> String:
+ 	close_file()
+ 	_reap_readers()
+-	_last_error = ""
++	_last_error = ""; _held = not auto_start
+ 	if _readers.size() >= MAX_READERS:
+ 		return "Previous PCM readers are still closing. Wait for disk access to finish before opening another preview."
+ 	# Header inspection is bounded; all ongoing bulk reads and conversion are
+@@ -165,14 +166,16 @@
+ 	if thread.start(reader.run) != OK:
+ 		_reader = null; player.stream = null; info = {}; duration = 0.0
+ 		return "The PCM preview worker could not be started."
+-	_readers.append({"reader": reader, "thread": thread, "path": path, "owned": owned})
++	_readers.append({"reader": reader, "thread": thread, "path": path, "owned": owned, "owner": retained_owner})
+ 	active = true
+ 	seek_file(0.0)
+ 	return _last_error
+ 
+ func seek_file(seconds: float) -> void:
+ 	if not active or _reader == null: return
+-	player.stop(); player.stream_paused = true; player.play()
++	# play() creates fresh native playback. Pause it afterwards, before any
++	# real PCM is pushed; a pause set before play can be lost by the start.
++	player.stop(); player.play(); player.stream_paused = true
+ 	_playback = player.get_stream_playback() as AudioStreamGeneratorPlayback
+ 	if _playback == null: _fail("The native generator playback could not be initialized."); return
+ 	_capacity = _playback.get_frames_available()
+@@ -181,8 +184,27 @@
+ 	_primed_at = Time.get_ticks_msec()
+ 	_generation = _reader.seek_to(_origin, loop_enabled)
+ 
++# A prepared recording must fill its bounded buffer before opening devices,
++# but must not play through the countdown or asynchronous device startup.
++func prepared_token() -> Dictionary:
++	return {"reader": weakref(_reader), "generation": _generation} if _reader != null else {}
++
++func is_primed(token: Dictionary = {}) -> bool:
++	if not active or _reader == null or _playback == null or _priming: return false
++	if not token.is_empty() and (not token.get("reader") is WeakRef or token.reader.get_ref() != _reader or int(token.get("generation", -1)) != _generation): return false
++	return str(_reader.status().get("error", "")).is_empty()
++
++func start_primed(token: Dictionary = {}) -> String:
++	if not _held or not is_primed(token): return "The prepared PCM buffer is no longer ready. Prepare the take again."
++	_held = false; player.stream_paused = false
++	_skips = _playback.get_skips()
++	return ""
++
+ func position_seconds() -> float:
+ 	if not active or _playback == null: return 0.0
++	# Native resampling may prefetch a small block even while paused; that is
++	# not elapsed recording playback time. Held startup stays at its origin.
++	if _held: return float(_origin) / int(info.rate)
+ 	var queued := maxi(0, _capacity - _playback.get_frames_available())
+ 	var consumed := maxi(0, _pushed - queued) if not _priming else 0
+ 	var frame := _origin + consumed
+@@ -194,7 +216,7 @@
+ 	if not active or _reader == null or _playback == null: return
+ 	var state := _reader.status()
+ 	if not str(state.error).is_empty(): _fail(str(state.error)); return
+-	if not _priming:
++	if not _priming and not _held:
+ 		var skips := _playback.get_skips()
+ 		if skips > _skips and not _eof:
+ 			_fail("File preview underrun: disk/UI did not supply PCM in time. Stop other heavy work and prepare a shorter range.")
+@@ -207,12 +229,12 @@
+ 		if not loop_enabled: needed = mini(needed, int(info.frames) - _origin)
+ 		if _pushed >= needed or (_eof and _pushed > 0):
+ 			_priming = false
+-			player.stream_paused = false
++			player.stream_paused = _held
+ 			_skips = _playback.get_skips()
+ 		elif Time.get_ticks_msec() - _primed_at > 5000:
+ 			_fail("PCM preview could not prepare its bounded playback buffer within five seconds.")
+ 			return
+-	if active and (_eof or (_origin >= int(info.frames) and not loop_enabled)) and _capacity - _playback.get_frames_available() <= 0:
++	if active and not _held and (_eof or (_origin >= int(info.frames) and not loop_enabled)) and _capacity - _playback.get_frames_available() <= 0:
+ 		close_file(); finished.emit()
+ 
+ func _pump() -> void:
+--- a/Workspaces/AudioWorkspace/audio_playback.gd
++++ b/Workspaces/AudioWorkspace/audio_playback.gd
+@@ -30,6 +30,8 @@
+ var _exact_bus := ""
+ var file_preview := KiwiAudioFilePreview.new()
+ var _file_length := 0.0
++var _recording_file_token: Dictionary = {}
++var _recording_file_owner: WeakRef
+ 
+ func _ready() -> void:
+ 	add_child(system)
+@@ -160,6 +162,7 @@
+ 	playing=true;_last_beat="";synchronize();state_changed.emit()
+ 
+ func stop(reset: bool = true) -> void:
++	_recording_file_token = {}; _recording_file_owner = null
+ 	playing = false
+ 	file_preview.close_file()
+ 	exact_preview.stop()
+@@ -212,6 +215,30 @@
+ 	if not error.is_empty(): return error
+ 	exact_preview_active = true; exact_pending = false; playing = true
+ 	synchronize(); state_changed.emit()
++	return ""
++
++# Recording uses a lease instead of the rendered-preview deletion callback.
++# Prime while paused; changing the capture output bus later must not reopen it.
++func prepare_recording_file(path: String, start: float, info: Dictionary, owner: RefCounted) -> String:
++	stop(false)
++	_exact_start = start; position = start; _last_beat = ""
++	_file_length = float(info.get("duration", 0.0))
++	file_preview.loop_enabled = false
++	var error := file_preview.open_file(path, _exact_bus if not _exact_bus.is_empty() else _external_output, info, false, owner, false)
++	if not error.is_empty(): return error
++	exact_preview_active = true; exact_pending = false; playing = false
++	_recording_file_token = file_preview.prepared_token(); _recording_file_owner = weakref(owner)
++	synchronize(); state_changed.emit()
++	return ""
++
++func recording_file_ready(owner: RefCounted) -> bool:
++	return exact_preview_active and not playing and _recording_file_owner != null and _recording_file_owner.get_ref() == owner and not _recording_file_token.is_empty() and file_preview.is_primed(_recording_file_token)
++
++func start_recording_file(owner: RefCounted) -> String:
++	if not recording_file_ready(owner): return "The prepared recording playback changed or was cancelled."
++	var error := file_preview.start_primed(_recording_file_token)
++	if not error.is_empty(): return error
++	playing = true; state_changed.emit()
+ 	return ""
+ 
+ func _process(delta: float) -> void:
+--- a/Workspaces/AudioWorkspace/audio_recording_prepare.gd
++++ b/Workspaces/AudioWorkspace/audio_recording_prepare.gd
+@@ -2,8 +2,30 @@
+ extends RefCounted
+ ## Materialize the existing renderer before opening any recording device. This
+ ## is a preparation stage, not another mixer or a second capture implementation.
+-const MAX_PREPARED_BYTES := 64 * 1024 * 1024
++const MAX_PREPARED_FILE_BYTES := 512 * 1024 * 1024
+ const RATE := 44100
++
++# A returned backing owns only its private folder. Jobs may discard cancelled
++# results without emitting completed; reference lifetime still cleans them up.
++# File-preview readers retain this object until their handles have closed.
++class Backing extends RefCounted:
++ var path := ""
++ var info: Dictionary = {}
++ var _directory := ""
++ func _init(directory: String = "") -> void:
++  var root := ProjectSettings.globalize_path("user://audio_workspace/recording_previews").replace("\\", "/").simplify_path()
++  var normalized := directory.replace("\\", "/").simplify_path()
++  if not directory.is_empty() and normalized.get_base_dir() == root:
++   _directory = normalized; path = normalized.path_join("mix.wav")
++ func valid() -> bool:
++  if _directory.is_empty() or not str(info.get("error", "invalid")).is_empty(): return false
++  var current := KiwiAudioPCMFile.inspect(path)
++  return str(current.get("error", "invalid")).is_empty() and current == info
++ func _notification(what: int) -> void:
++  if what == NOTIFICATION_PREDELETE and not _directory.is_empty():
++   var remaining := KiwiAudioRenderer._remove_owned(_directory)
++   if not remaining.is_empty(): push_warning("Could not remove released recording backing: " + "; ".join(remaining))
++
+ 
+ static func signature(document: KiwiAudioDocument) -> String:
+  var parts:Array=[document.tempo,document.time_signature,document.tempo_points,document.meter_points,document.note_base_tempo,document.note_base_meter,document.master,document.tracks,document.loop_start,document.loop_end]
+@@ -40,7 +62,7 @@
+ static func prepare(document:KiwiAudioDocument,start:float,end:float=-1,job:RefCounted=null)->Dictionary:
+  if job!=null and job.is_cancelled():return {"error":"Cancelled."}
+  var seconds:=(end if end>start else document.duration())-start
+- if seconds<=0:return {"error":"There is no timeline audio after the recording start. Move the playhead or select a loop range."}
++ if not is_finite(seconds) or seconds<=0:return {"error":"There is no timeline audio after the recording start. Move the playhead or select a loop range."}
+  var estimated_tail:=0.0
+  if end<=start:
+   estimated_tail=KiwiAudioEffects.tail_seconds(document.master.get("effects",[]))
+@@ -49,31 +71,27 @@
+   var clip_tail:=0.0
+   for actor in document.actors:clip_tail=maxf(clip_tail,KiwiAudioEffects.tail_seconds(actor.values.get(&"effects",[])))
+   estimated_tail+=clip_tail
+- if (seconds+estimated_tail)*RATE*4>MAX_PREPARED_BYTES-4096:
+-  return {"error":"This processed recording range exceeds the 64 MiB prepared-audio limit (about six minutes). Use a shorter loop range or render a shorter section first."}
++ if not is_finite(estimated_tail) or (seconds+estimated_tail)*RATE*4>MAX_PREPARED_FILE_BYTES-4096:
++  return {"error":"This processed recording range exceeds the 512 MiB disk-backing limit (about 50 minutes at stereo 44.1 kHz). Use a shorter loop range."}
+  var directory:=ProjectSettings.globalize_path("user://audio_workspace/recording_previews/"+ActorData.new_id())
+  if DirAccess.make_dir_recursive_absolute(directory)!=OK:return {"error":"Could not create the private recording preparation folder."}
+- var destination:=directory.path_join("mix.wav")
++ var backing:=Backing.new(directory)
++ var destination:=backing.path
+  var options:Dictionary={"sample_rate":RATE,"bit_depth":16,"start":start,"include_tail":true}
+  if end>start:options.duration=end-start;options.include_tail=false
+  if job!=null:job.update(0,"Preparing processed timeline for recording")
+  var rendered:=KiwiAudioRenderer.render(document,destination,options,job)
+- var stream:AudioStreamWAV
+  var error:=str(rendered.get("error",""))
+  if job!=null and job.is_cancelled():error="Cancelled."
+  elif not bool(rendered.get("success",false)):
+   if error.is_empty():error="The processed timeline could not be prepared."
+  else:
+-  var file:=FileAccess.open(destination,FileAccess.READ)
+-  if file==null:error="The prepared recording audio could not be opened."
+-  else:
+-   var size:=file.get_length();file.close()
+-   if size>MAX_PREPARED_BYTES:error="Effect tails exceeded the 64 MiB prepared-audio limit. Use a shorter loop range."
+-   else:
+-    stream=AudioStreamWAV.load_from_file(destination)
+-    if stream==null or stream.get_length()<=0:error="The prepared recording audio is empty or unreadable."
+- # All success, error and cooperative-cancellation paths remove our own folder.
+- # The returned AudioStreamWAV owns its samples and does not reference this file.
+- KiwiAudioRenderer._remove_owned(directory)
++  backing.info=KiwiAudioPCMFile.inspect(destination)
++  if not str(backing.info.get("error","invalid")).is_empty():error=str(backing.info.get("error","The prepared recording audio is unreadable."))
++  elif int(backing.info.get("file_bytes",0))>MAX_PREPARED_FILE_BYTES:error="Effect tails exceeded the 512 MiB disk-backing limit. Use a shorter loop range."
++  elif not is_finite(float(backing.info.get("duration",0.0))) or float(backing.info.get("duration",0.0))<=0:error="The prepared recording audio is empty."
++ if not error.is_empty():return {"error":error}
+  if job!=null and job.is_cancelled():return {"error":"Cancelled."}
+- return {"error":error,"stream":stream,"start":start}
++ # No AudioStreamWAV load or PCM-size allocation. The lease survives the job,
++ # loop reuse and outstanding reader shutdown; the last holder removes it.
++ return {"error":"","backing":backing,"start":start}
+--- a/Workspaces/AudioWorkspace/audio_workspace.gd
++++ b/Workspaces/AudioWorkspace/audio_workspace.gd
+@@ -95,11 +95,14 @@
+ var _record_phase:="idle"
+ var _record_preferences:Dictionary={}
+ var _record_document:KiwiAudioDocument
++var _record_owner_document:KiwiAudioDocument
+ var _record_signature:=""
+ var _record_processed_capture:=false
+ var _record_previous_loop_enabled:=false
+ var _record_cycle_duration:=0.0
+-var _record_loop_preview:AudioStreamWAV
++var _record_loop_preview:KiwiAudioRecordingPrepare.Backing
++var _record_prepared:KiwiAudioRecordingPrepare.Backing
++var _record_failure:=""
+ var _record_loop_signature:=""
+ var _transport_token := 0
+ var _transport_requested := false
+@@ -108,7 +111,7 @@
+  _theme()
+  add_child(cache);add_child(jobs);add_child(playback);add_child(recorder);add_child(preview_player);add_child(asset_file_preview)
+  playback.preview_file_released.connect(_remove_preview_file)
+- playback.preview_failed.connect(func(message:String):_cancel_exact_playback();notice(message))
++ playback.preview_failed.connect(_preview_failed)
+  asset_file_preview.failed.connect(func(message:String):status.text=message)
+  asset_file_preview.player.volume_db=-6
+  preview_player.volume_db=-6
+@@ -267,7 +270,7 @@
+  play_button=_button(toolbar,"▶",toggle_playback,"Play / Pause (Space)");_button(toolbar,"■",stop,"Stop (Home)")
+  record_button=_button(toolbar,"● Record",toggle_recording,"Record selected sources (R)")
+  var options:=Button.new();options.set_script(load("res://scripts/Extra/editor_settings_button.gd"));options.text="▾";options.tooltip_text="Shared microphone, system and timeline recording settings";toolbar.add_child(options)
+- loop_button=CheckButton.new();loop_button.text="Loop";loop_button.toggled.connect(func(enabled:bool):session.action("Toggle loop",func():session.document.loop_enabled=enabled);playback.loop_enabled=enabled);toolbar.add_child(loop_button)
++ loop_button=CheckButton.new();loop_button.text="Loop";loop_button.toggled.connect(_toggle_loop_transport);toolbar.add_child(loop_button)
+  _button(toolbar,"↶",undo,"Undo");_button(toolbar,"↷",redo,"Redo")
+  var tempo_row:=HBoxContainer.new();toolbar.add_child(tempo_row);_label(tempo_row,"Grid BPM")
+  tempo_input=SpinBox.new();tempo_input.min_value=20;tempo_input.max_value=400;tempo_input.step=1;tempo_input.value=120;tempo_input.custom_minimum_size.x=72;tempo_row.add_child(tempo_input)
+@@ -348,7 +351,7 @@
+  if session._before!=null:return
+  if automation_recording.active:_finish_automation_pass("Document refresh ended the pass")
+  _syncing=true;tempo_input.set_value_no_signal(session.document.tempo);title_label.text=session.document.title+(" •" if session.dirty else "");_syncing=false
+- if not _record_processed_capture:
++ if not _record_processed_capture and _record_prepared==null:
+   playback.exact_required=_requires_exact_preview() or playback.exact_pending or playback.exact_preview_active
+   playback.set_document(session.document)
+  loop_button.set_pressed_no_signal(session.document.loop_enabled);snap_button.set_pressed_no_signal(canvas.snap)
+@@ -675,7 +678,9 @@
+  if recorder.recording:
+   _record_elapsed+=delta;status.text=("Recording prepared mix · %.1f s" if _record_processed_capture else "Recording take · %.1f s")%_record_elapsed
+   if not recorder.record_timeline:playback.position=_record_start+_record_elapsed;canvas.playhead=playback.position;canvas.queue_redraw()
+-  if _record_loop and _record_cycle_duration>0 and _record_elapsed>=_record_cycle_duration and not _record_busy:toggle_recording(true)
++  if _record_loop and _record_cycle_duration>0 and not _record_busy:
++   # A prepared pass ends when buffered audio drains, not on the UI clock.
++   if (not playback.playing) if _record_processed_capture else (_record_elapsed>=_record_cycle_duration):toggle_recording(true)
+ func _window(title:String,dimensions:Vector2i=Vector2i(520,400))->Dictionary:
+  var window:=Window.new();window.title=title;window.size=dimensions;window.min_size=Vector2i(360,180);add_child(window)
+  var margin:=MarginContainer.new();margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);for side in ["left","right","top","bottom"]:margin.add_theme_constant_override("margin_"+side,12)
+@@ -1509,6 +1514,7 @@
+  else:_label(dialog.host,"Add a group or destination track before creating a send.")
+  _label(dialog.host,"Post-fader sends are included in exact rendered preview and export. Native live monitoring uses the main output route.")
+ func loop_selection()->void:
++ if recorder.recording or _record_busy:notice("Stop the take before changing its transport loop.");return
+  var start:=canvas.time_selection.x;var end:=canvas.time_selection.y
+  if end<=start:
+   start=INF;end=0
+@@ -1525,9 +1531,9 @@
+  var dialog:=_window("Recording and takes",Vector2i(580,520))
+  _number(dialog.host,"Countdown (s)",_countdown,0,10,1,func(value:float):_countdown=int(value))
+  _number(dialog.host,"Latency (ms)",_latency_ms,-1000,1000,1,func(value:float):_latency_ms=value)
+- _check(dialog.host,"Loop recording into takes",_record_loop,func(value:bool):_record_loop=value)
++ _check(dialog.host,"Loop recording into takes",_record_loop,_set_record_loop)
+  _label(dialog.host,"Microphone, system/timeline source selection, input gain and mono/stereo use the shared recording dropdown. Monitoring is muted by default to prevent microphone feedback.")
+- _label(dialog.host,"Offline-processed timeline audio is prepared before opening capture devices (64 MiB prepared mix limit). Edits during preparation cancel startup; edits during processed capture affect the next take. Stop or press Record again to cancel preparation/countdown. Timeline-mix takes start muted so loop passes do not recapture the preceding mix; use Takes to preview or choose them. Device restarts between takes are not gapless.")
++ _label(dialog.host,"Offline-processed backing is streamed from a private PCM file (512 MiB disk limit) and buffered before opening capture devices. Captured takes still use memory; this does not make long device captures memory-bounded. Edits during preparation cancel startup; edits during processed capture affect the next take. Stop or press Record again to cancel preparation/countdown. Timeline-mix takes start muted so loop passes do not recapture the preceding mix; use Takes to preview or choose them. Device restarts between takes are not gapless.")
+  _button(dialog.host,"Show takes",func():dialog.window.queue_free();take_dialog())
+ func toggle_recording(restart_next:bool=false)->void:
+  _finish_automation_pass("Audio recording requested")
+@@ -1542,10 +1548,10 @@
+  _finish_control_edits();session.commit()
+  _record_generation+=1
+  var token:=_record_generation
+- _record_cancel_requested=false;_record_busy=true;_record_phase="countdown"
++ _record_cancel_requested=false;_record_failure="";_record_busy=true;_record_phase="countdown"
+  _record_session=session;_record_track=session.selected_track;_record_elapsed=0
+  _record_preferences=recorder.requested_preferences()
+- _record_document=session.document.snapshot()
++ _record_owner_document=session.document;_record_document=session.document.snapshot()
+  _record_signature=KiwiAudioRecordingPrepare.signature(session.document)
+  _record_start=playback.position
+  _record_cycle_duration=0.0
+@@ -1554,7 +1560,7 @@
+   _record_cycle_duration=session.document.loop_end-session.document.loop_start
+  _cancel_exact_playback();playback.stop(false);preview_player.stop()
+  if bool(_record_preferences.get("record_timeline",false)) and _requires_exact_preview():
+-  if _record_cycle_duration>0 and _record_loop_preview!=null and _record_loop_signature==_record_signature:
++  if _record_cycle_duration>0 and _record_loop_preview!=null and _record_loop_signature==_record_signature and _record_loop_preview.valid():
+    _begin_record_capture(token,_record_loop_preview);return
+   _record_loop_preview=null;_record_loop_signature=""
+   _record_phase="preparing";record_button.text="Cancel preparation";status.text="Preparing processed timeline before recording..."
+@@ -1564,48 +1570,85 @@
+   _record_loop_preview=null;_record_loop_signature=""
+   _begin_record_capture(token,null)
+ 
++func _record_request_owned(token:int)->bool:
++ return token==_record_generation and _record_session==session and _record_owner_document==session.document and not _record_cancel_requested and is_inside_tree() and is_visible_in_tree()
++
+ func _record_request_current(token:int)->bool:
+- return token==_record_generation and _record_session==session and not _record_cancel_requested and is_visible_in_tree() and KiwiAudioRecordingPrepare.signature(session.document)==_record_signature
++ return _record_request_owned(token) and KiwiAudioRecordingPrepare.signature(session.document)==_record_signature
+ 
+ func _abort_record_preparation(token:int,message:String="")->void:
+  if token!=_record_generation:return
++ if _record_prepared!=null:playback.stop(false)
++ _record_prepared=null
+  _record_loop_preview=null;_record_loop_signature=""
+- _record_busy=false;_record_phase="idle";_record_session=null;_record_document=null;_record_preferences={};_record_signature=""
++ _record_busy=false;_record_phase="idle";_record_session=null;_record_document=null;_record_owner_document=null;_record_preferences={};_record_signature=""
+  record_button.text="● Record"
++ if is_inside_tree():playback.exact_required=_requires_exact_preview();playback.set_document(session.document)
+  if not message.is_empty() and not _record_cancel_requested:notice(message)
+ 
+ func _cancel_record_preparation()->void:
+  _record_cancel_requested=true
++ if _record_prepared!=null:playback.stop(false)
++ _record_prepared=null
+  _record_loop_preview=null;_record_loop_signature=""
+- if _record_phase in ["preparing","countdown"]:
++ if _record_phase in ["preparing","priming","countdown"]:
+   jobs.cancel_kind("record_prepare")
+   _record_generation+=1
+-  _record_busy=false;_record_phase="idle";_record_session=null;_record_document=null;_record_preferences={};_record_signature=""
++  _record_busy=false;_record_phase="idle";_record_session=null;_record_document=null;_record_owner_document=null;_record_preferences={};_record_signature=""
+   record_button.text="● Record";status.text="Recording preparation cancelled."
++  if is_inside_tree():playback.exact_required=_requires_exact_preview();playback.set_document(session.document)
+  elif _record_phase=="starting":
+   # Keep startup owned/busy until the asynchronous device operation returns.
+   # A cancelled startup is stopped and discarded before accepting another take.
+   status.text="Cancelling recording device startup..."
+ 
+ func _record_preparation_finished(token:int,data:Dictionary)->void:
++ # A stale/discarded result releases its backing when the result goes away.
+  if token!=_record_generation or _record_phase!="preparing":return
+  if not _record_request_current(token):_abort_record_preparation(token,"The arrangement changed while preparing recording. Start the take again.");return
+- var error:=str(data.get("error",""));var stream:AudioStreamWAV=data.get("stream") as AudioStreamWAV
+- if not error.is_empty() or stream==null:
+-  _abort_record_preparation(token,error if not error.is_empty() else "No processed timeline audio was prepared.");return
+- if _record_cycle_duration>0:_record_loop_preview=stream;_record_loop_signature=_record_signature
++ var error:=str(data.get("error",""));var backing:=data.get("backing") as KiwiAudioRecordingPrepare.Backing
++ if not error.is_empty() or backing==null or not backing.valid():
++  _abort_record_preparation(token,error if not error.is_empty() else "No valid processed timeline backing was prepared.");return
++ if _record_cycle_duration>0:_record_loop_preview=backing;_record_loop_signature=_record_signature
++ _begin_record_capture(token,backing)
++
++func _begin_record_capture(token:int,prepared:KiwiAudioRecordingPrepare.Backing)->void:
++ if token!=_record_generation:return
++ _record_prepared=prepared
++ # A suspended coroutine must not retain the lease after its workspace is
++ # destroyed. Keep the strong owner in the workspace/reader, pass only its ID.
++ _begin_record_capture_owned(token,prepared.get_instance_id() if prepared!=null else 0)
++
++func _begin_record_capture_owned(token:int,prepared_id:int)->void:
++ if not _record_request_current(token):_abort_record_preparation(token);return
++ var preferences:=_record_preferences.duplicate(true)
++ if prepared_id!=0:
++  if (_record_prepared==null or _record_prepared.get_instance_id()!=prepared_id or not _record_prepared.valid()):_abort_record_preparation(token,"The prepared backing changed or disappeared. Prepare the take again.");return
++  _record_phase="priming";record_button.text="Cancel buffering"
++  playback.exact_required=true;playback.set_document(_record_document)
++  var prime_error:=playback.prepare_recording_file(_record_prepared.path,_record_start,_record_prepared.info,_record_prepared)
++  if not prime_error.is_empty():_abort_record_preparation(token,prime_error);return
++  var signature_check_at:=0
++  while not playback.recording_file_ready(_record_prepared):
++   var check_signature:=Time.get_ticks_msec()>=signature_check_at
++   if not _record_request_owned(token) or not playback.file_preview.active or (check_signature and not _record_request_current(token)):
++    _abort_record_preparation(token,"Recording preparation changed or stopped before the PCM buffer was ready.");return
++   if check_signature:signature_check_at=Time.get_ticks_msec()+250
++   await get_tree().process_frame
++ if not _record_request_current(token):_abort_record_preparation(token,"The arrangement changed before recording. Start the take again.");return
+  _record_phase="countdown"
+- _begin_record_capture(token,stream)
+-
+-func _begin_record_capture(token:int,prepared:AudioStreamWAV)->void:
+- if token!=_record_generation:return
+- _record_phase="countdown"
+- var preferences:=_record_preferences.duplicate(true)
+  for count in range(_countdown,0,-1):
+-  if not _record_request_current(token):_abort_record_preparation(token,"The arrangement changed before recording. Start the take again.");return
+-  record_button.text=str(count);await get_tree().create_timer(1).timeout
+- if not _record_request_current(token):_abort_record_preparation(token,"The arrangement changed before recording. Start the take again.");return
+- if bool(preferences.get("record_timeline",false)) and _requires_exact_preview() and prepared==null:
++  if not _record_request_current(token) or not _record_backing_ready(prepared_id):
++   _abort_record_preparation(token,"The arrangement or prepared playback changed before recording. Start the take again.");return
++  record_button.text=str(count)
++  var until:=Time.get_ticks_msec()+1000
++  # No detached countdown timer retains suspended state after tab teardown.
++  while Time.get_ticks_msec()<until:
++   if not _record_request_owned(token):_abort_record_preparation(token);return
++   await get_tree().process_frame
++ if not _record_request_current(token) or not _record_backing_ready(prepared_id):
++  _abort_record_preparation(token,"The arrangement or prepared playback changed before recording. Start the take again.");return
++ if bool(preferences.get("record_timeline",false)) and _requires_exact_preview() and prepared_id==0:
+   _abort_record_preparation(token,"The arrangement now needs processed playback. Start recording again to prepare it.");return
+  var target:=session.document.track_for_id(_record_track)
+  if target.is_empty() or bool(target.get("locked",false)):_abort_record_preparation(token,"The recording track was removed or locked.");return
+@@ -1615,33 +1658,42 @@
+  var error:String=await recorder.start()
+  recorder.preferences_override=previous_preferences
+  if not error.is_empty():_abort_record_preparation(token,error);return
+- if not _record_request_current(token):
++ if not _record_request_current(token) or (prepared_id!=0 and not recorder.record_timeline) or not _record_backing_ready(prepared_id):
+   if recorder.recording:await recorder.stop()
+-  _abort_record_preparation(token,"The arrangement changed during device startup. No take was saved.");return
++  _abort_record_preparation(token,"The arrangement or prepared playback changed during device startup. No take was saved.");return
+  _record_previous_loop_enabled=playback.loop_enabled;playback.loop_enabled=false
+- _record_processed_capture=prepared!=null and recorder.record_timeline
+- _record_elapsed=0;_record_busy=false;_record_phase="recording";record_button.text="■ Stop take"
++ _record_processed_capture=prepared_id!=0 and recorder.record_timeline
+  if recorder.record_timeline:
+-  playback.set_document(_record_document if _record_processed_capture else session.document)
++  if not _record_processed_capture:playback.set_document(session.document)
+   playback.set_output_bus(recorder.timeline_bus_name if not recorder.timeline_bus_name.is_empty() else "Master")
+   if _record_processed_capture:
+-   playback.exact_required=true;playback.play_exact(prepared,_record_start)
++   var start_error:=playback.start_recording_file(_record_prepared)
++   if not start_error.is_empty():
++    if recorder.recording:await recorder.stop()
++    playback.set_output_bus("Master");playback.loop_enabled=_record_previous_loop_enabled if _record_session==session else session.document.loop_enabled
++    _record_processed_capture=false;_abort_record_preparation(token,start_error);return
+   else:
+    playback.exact_required=false;playback.position=_record_start;playback.playing=true;playback.synchronize();playback.state_changed.emit()
+- status.text="Recording take"+(" · processed timeline" if _record_processed_capture else "")
++ _record_elapsed=0;_record_busy=false;_record_phase="recording";record_button.text="■ Stop take"
++ status.text="Recording take"+(" · streamed processed timeline" if _record_processed_capture else "")
++
++func _record_backing_ready(id:int)->bool:
++ if id==0:return _record_prepared==null
++ return _record_prepared!=null and _record_prepared.get_instance_id()==id and _record_prepared.valid() and playback.recording_file_ready(_record_prepared)
+ 
+ func _finish_recorded_take(restart_next:bool)->void:
+  _record_busy=true;_record_phase="stopping"
+  playback.stop(false)
+  var take_session:KiwiAudioEditSession=_record_session if _record_session!=null else session
+  var take_track:=_record_track;var take_start:=_record_start;var latency:=_latency_ms
+- var timeline_mix:=recorder.record_timeline;var processed:=_record_processed_capture
++ var timeline_mix:=recorder.record_timeline;var processed:=_record_processed_capture;var backing_failure:=_record_failure
+  var stream:AudioStreamWAV=await recorder.stop()
+- playback.set_output_bus("Master");playback.loop_enabled=_record_previous_loop_enabled
+- _record_processed_capture=false;_record_busy=false;_record_phase="idle";_record_session=null;_record_document=null;_record_preferences={};_record_signature=""
++ playback.set_output_bus("Master");playback.loop_enabled=_record_previous_loop_enabled if take_session==session else session.document.loop_enabled
++ _record_prepared=null
++ _record_processed_capture=false;_record_busy=false;_record_phase="idle";_record_session=null;_record_document=null;_record_owner_document=null;_record_preferences={};_record_signature=""
+  record_button.text="● Record"
+  if stream!=null and stream.get_length()>0:
+-  var label:="Take %d"%(take_session.document.takes.size()+1)
++  var label:="Take %d"%(take_session.document.takes.size()+1)+( " (partial)" if not backing_failure.is_empty() else "")
+   take_session.action("Record take",func():
+    var target:=take_session.document.track_for_id(take_track)
+    if target.is_empty() or bool(target.get("locked",false)):target=take_session.document.add_track("Recovered takes")
+@@ -1650,10 +1702,11 @@
+     # A printed timeline mix must not feed into the next loop recording pass.
+     # It stays available in Takes for preview/explicit selection and Undo.
+     var actor:=take_session.document.actor_for_clip(clip.id);actor.values[&"muted"]=timeline_mix
+-    take_session.document.takes.append({"id":ActorData.new_id(),"clip_id":clip.id,"track_id":str(target.id),"name":label,"status":"muted mix" if timeline_mix else "kept","timeline_mix":timeline_mix,"processed":processed,"timestamp":Time.get_unix_time_from_system()}))
++    take_session.document.takes.append({"id":ActorData.new_id(),"clip_id":clip.id,"track_id":str(target.id),"name":label,"status":"partial backing failure" if not backing_failure.is_empty() else ("muted mix" if timeline_mix else "kept"),"backing_error":backing_failure,"timeline_mix":timeline_mix,"processed":processed,"timestamp":Time.get_unix_time_from_system()}))
+   if take_session!=session:background_document_changed.emit(take_session)
+   status.text="Recorded "+label+(". Timeline mix is muted to avoid double playback; preview or choose it in Takes." if timeline_mix else ".")
+  else:notice("No audio was captured. Check the selected sources, device and microphone permissions.")
++ if not backing_failure.is_empty():notice("Prepared backing failed: "+backing_failure+" Any captured audio was kept as a partial take; automatic restart was cancelled.")
+  # Restore the current tab's live model after a frozen processed capture, even
+  # when the old recording tab was switched or closed during asynchronous stop.
+  playback.exact_required=_requires_exact_preview();playback.set_document(session.document)
+@@ -1663,7 +1716,9 @@
+  else:_record_loop_preview=null;_record_loop_signature=""
+ 
+ func _restart_record_loop(owner:WeakRef,generation:int)->void:
+- if owner.get_ref()!=session or generation!=_record_generation or _record_cancel_requested or not _record_loop or _record_phase!="idle" or not is_visible_in_tree():return
++ if owner.get_ref()!=session or generation!=_record_generation or _record_cancel_requested or not _record_loop or _record_phase!="idle" or not is_visible_in_tree():
++  if _record_phase=="idle":_record_loop_preview=null;_record_loop_signature=""
++  return
+  toggle_recording()
+ 
+ func finish_recording()->void:
+@@ -1888,6 +1943,7 @@
+  if action!="preview":library.add_asset(str(data.path),str(data.path).get_file(),stream.get_length())
+ 
+ func undo()->void:
++ if recorder.recording or _record_busy:notice("Stop or cancel the take before Undo.");return
+  _interaction_epoch+=1;_controls_generation+=1;_discard_parameter_handle()
+  # Undo discards a pending pass first, without undoing an unrelated older edit.
+  var pending:=automation_recording.has_pending()
+@@ -1896,6 +1952,7 @@
+  if pending:playback.stop(false);call_deferred("_refresh_all");return
+  session.undo();call_deferred("_refresh_all")
+ func redo()->void:
++ if recorder.recording or _record_busy:notice("Stop or cancel the take before Redo.");return
+  _interaction_epoch+=1;_controls_generation+=1;_discard_parameter_handle()
+  automation_recording.discard("Read: pending automation discarded before Redo.")
+  _automation_release_timer.stop();_automation_gesture_held=false
+@@ -2110,6 +2167,25 @@
+  _button(dialog.host,"Clear selected curve",editor.clear_points)
+  _button(dialog.host,"Show in timeline lane",func():_show_automation_editor_in_lane(editor);dialog.window.queue_free())
+ 
++func _toggle_loop_transport(enabled:bool)->void:
++ if recorder.recording or _record_busy:
++  loop_button.set_pressed_no_signal(session.document.loop_enabled);notice("Stop or cancel the take before changing its transport loop.");return
++ session.action("Toggle loop",func():session.document.loop_enabled=enabled);playback.loop_enabled=enabled
++
++func _set_record_loop(enabled:bool)->void:
++ if recorder.recording or _record_busy:notice("Stop or cancel the take before changing loop-recording mode.");return
++ _record_loop=enabled
++
++func _preview_failed(message:String)->void:
++ _cancel_exact_playback()
++ if _record_processed_capture and recorder.recording:
++  _record_failure=message;_record_cancel_requested=true
++  _record_loop_preview=null;_record_loop_signature=""
++  if not _record_busy:_finish_recorded_take(false)
++ elif _record_busy and _record_prepared!=null:
++  _record_failure=message;_cancel_record_preparation();notice("Prepared recording backing failed: "+message)
++ else:notice(message)
++
+ func _exact_requested(_seconds:float)->void:
+  if _record_processed_capture and recorder.recording:
+   status.text="Seek left the prepared recording range; stopping the take."
+@@ -2358,6 +2434,7 @@
+  if _automation_mode!=null:_refresh_automation_controls()
+ 
+ func _automation_seek(seconds:float,scrub:bool=false)->void:
++ if recorder.recording or _record_busy:notice("Stop or cancel the take before seeking.");return
+  _finish_automation_pass("Seek ended the pass")
+  playback.seek(seconds,scrub)
+ 
+@@ -2404,6 +2481,9 @@
+   entry.control.set_value_no_signal(value)
+ 
+ func _exit_tree()->void:
++ _record_cancel_requested=true;_record_generation+=1
++ _record_prepared=null;_record_loop_preview=null;_record_loop_signature=""
++ jobs.cancel_kind("record_prepare")
+  _finish_control_edits()
+  _finish_automation_pass("Workspace closed")
+ 

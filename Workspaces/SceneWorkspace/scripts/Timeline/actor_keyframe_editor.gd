@@ -175,6 +175,9 @@ func _build_details() -> void:
 	var primary: String = lanes.selected_keys.back() if not lanes.selected_keys.is_empty() else ""
 	var selected_track := model.track_for_key(_actor, primary) if _actor != null else null
 	var signature := (_actor.id if _actor != null else "") + "|" + primary + "|" + str(selected_track.component if selected_track != null else -1)
+	if _actor != null and _actor.type_id == &"transform_image_2d":
+		var asset := ActorTransformationStates.load_asset(_actor)
+		signature += "|" + (str(asset.document.get_instance_id()) if asset.document != null else str(asset.error))
 	if signature == _details_signature and details.get_child_count() > 0:
 		if not _editing:
 			for update in _detail_updaters:
@@ -230,15 +233,18 @@ func _build_details() -> void:
 				var current := model.keyframe_for_id(_actor, key.id)
 				if current != null: toggle.set_pressed_no_signal(current.value))
 		TYPE_STRING, TYPE_STRING_NAME:
-			var text := LineEdit.new()
-			text.custom_minimum_size.x = 180
-			text.text = str(key.value)
-			details.add_child(text)
-			text.text_submitted.connect(func(value: String):
-				_change_keys(key.id, {"value": StringName(value) if key.value is StringName else value}))
-			_detail_updaters.append(func():
-				var current := model.keyframe_for_id(_actor, key.id)
-				if current != null and not text.has_focus(): text.text = str(current.value))
+			if selected_track.is_state_track() and _actor.type_id == &"transform_image_2d":
+				_add_state_value(selected_track, key)
+			else:
+				var text := LineEdit.new()
+				text.custom_minimum_size.x = 180
+				text.text = str(key.value)
+				details.add_child(text)
+				text.text_submitted.connect(func(value: String):
+					_change_keys(key.id, {"value": StringName(value) if key.value is StringName else value}))
+				_detail_updaters.append(func():
+					var current := model.keyframe_for_id(_actor, key.id)
+					if current != null and not text.has_focus(): text.text = str(current.value))
 		TYPE_COLOR:
 			var color := LiveColorPickerButton.new()
 			color.color = key.value
@@ -261,6 +267,30 @@ func _build_details() -> void:
 	remove.pressed.connect(func(): model.delete_keyframes(_actor, lanes.selected_keys.duplicate()))
 	_layout_editor()
 	call_deferred("_layout_editor")
+
+func _add_state_value(track: ActorAnimationTrack, key: ActorKeyframe) -> void:
+	var asset := ActorTransformationStates.load_asset(_actor)
+	var item: KiwiTransformationComponent = asset.document.component(track.path[1]) if asset.document != null else null
+	var choose := OptionButton.new()
+	choose.name = "KeyframeTransformationState"
+	choose.custom_minimum_size.x = 150
+	choose.fit_to_longest_item = false
+	choose.tooltip_text = "State to morph into at this keyframe"
+	details.add_child(choose)
+	if item == null:
+		choose.add_item("Missing component"); choose.disabled = true
+		return
+	for state in item.states:
+		choose.add_item(state.title)
+		choose.set_item_metadata(choose.item_count - 1, state.id)
+	var update := func():
+		var current := model.keyframe_for_id(_actor, key.id)
+		if current == null: return
+		for index in choose.item_count:
+			if str(choose.get_item_metadata(index)) == str(current.value): choose.select(index); break
+	update.call()
+	_detail_updaters.append(update)
+	choose.item_selected.connect(func(index: int): _change_keys(key.id, {"value": str(choose.get_item_metadata(index))}))
 
 func _add_curve_button(key: ActorKeyframe) -> void:
 	var button := Button.new()
@@ -439,6 +469,11 @@ func _change_keys(primary_id: String, changes: Dictionary, preview: bool = false
 					var combined: Variant = key.value
 					combined[axis] = value[axis]
 					key.value = combined
+				elif track.is_state_track() and _actor.type_id == &"transform_image_2d":
+					var asset := ActorTransformationStates.load_asset(_actor)
+					var item: KiwiTransformationComponent = asset.document.component(track.path[1]) if asset.document != null else null
+					# Multi-key edits must not assign one component's IDs to another.
+					if item != null and item.state_for_id(str(value)) != null: key.value = str(value)
 				elif typeof(key.value) == typeof(value): key.value = ActorData.copy_value(value)
 				elif typeof(key.value) in [TYPE_INT, TYPE_FLOAT] and typeof(value) in [TYPE_INT, TYPE_FLOAT]:
 					key.value = int(round(value)) if key.value is int else float(value)

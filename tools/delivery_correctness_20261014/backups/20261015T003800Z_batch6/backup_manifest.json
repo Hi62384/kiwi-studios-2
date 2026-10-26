@@ -1,0 +1,26 @@
+[
+    {
+        "path":  "Workspaces/AudioWorkspace/audio_file_preview.gd",
+        "base_sha256":  "6486addf63a94bf7ec29c812c1604d13d5bd0034c490a941c9f49adeac766a07",
+        "backup_sha256":  "6486addf63a94bf7ec29c812c1604d13d5bd0034c490a941c9f49adeac766a07",
+        "bytes":  9232
+    },
+    {
+        "path":  "Workspaces/AudioWorkspace/audio_playback.gd",
+        "base_sha256":  "2c68d3c36d13d21642e05127ab007930a1ef995b0a8244248907f6ce063f0d96",
+        "backup_sha256":  "2c68d3c36d13d21642e05127ab007930a1ef995b0a8244248907f6ce063f0d96",
+        "bytes":  13559
+    },
+    {
+        "path":  "Workspaces/AudioWorkspace/audio_recording_prepare.gd",
+        "base_sha256":  "3f4871dbc7f9ae024be1b9ce6d74db64ab85339b39dbfc137b408144c0750aee",
+        "backup_sha256":  "3f4871dbc7f9ae024be1b9ce6d74db64ab85339b39dbfc137b408144c0750aee",
+        "bytes":  4979
+    },
+    {
+        "path":  "Workspaces/AudioWorkspace/audio_workspace.gd",
+        "base_sha256":  "27caaa5a4063711476d9889e5599af2c31e27df407705cc5e47c1e6d3ed12342",
+        "backup_sha256":  "27caaa5a4063711476d9889e5599af2c31e27df407705cc5e47c1e6d3ed12342",
+        "bytes":  204424
+    }
+]

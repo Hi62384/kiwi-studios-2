@@ -121,6 +121,10 @@ func preview_assets(at_position: Vector2, paths: PackedStringArray) -> bool:
 			actor.section_id = model.selected_section_id
 			actor.parent_id = model.focused_actor_id
 			var duration := ActorAudio.length(actor) if type in [&"audio", &"video", &"video_2d"] else 5.0
+			if type == &"transform_image_2d":
+				var asset := ActorTransformationStates.load_asset(actor)
+				if asset.document == null: return false
+				duration = asset.document.duration
 			if type == &"scene_instance":
 				actor.display_name = path.get_file().get_basename()
 				duration = ActorFileImport.scene_duration(ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as ActorSceneData)

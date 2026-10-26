@@ -79,6 +79,79 @@ SHADERS-------------------------
 -image editor workspace
 -audio editor workspace
 
+3D TOOLS-------------------------------------
+-click on actor in viewport to select it
+-3d tools to transform actors
+-3d tools unique to certain actors
+-adding keyframe easing curve points, changes the viewport time
+
+
+SUPER CLIPBOARD------------------------------
+-super clipboard
+
+
+TRANSFORMATION IMAGE 2D-----------------------
+-transformation image 2D workspace
+-layer morphing
+-transform image 2D actor
+
+
+3D MODELS-------------------------------------
+-3d modelling workspace
+-3d model rigged actors
+-3d model rig animation system
+-3d model rigging in 3d model workspace
+-defuault humanoid rig, and default humanoid rig animations
+
+
+
+COMMON ACTOR PROPERTIES AND ACTOR PROPERTY UI CHANGE
+-make each section in the actor property ui display on the side instead of having to scroll
+-2 top property sections: "Actor: and "Properties"
+-ability to make drawings on any actor type with good drawing tools, and option for transformation image
+-ability to deform any mesh based actor types mesh, with interpolation, geometry adding/removing, carving holes, crevices, boolean operations
+-physics option on any mesh based actor types (as well as option for no rendering, collision only)
+-new actor properties: remote position actor, remote rotation actor
+
+
+PHYSICS--------------------------------------
+-basic gravity/velocity physics
+-softbody physics
+-ragdoll/jiggle physics
+-cloth physics
+-rope physics
+-fluid physics (needs special fluid actor, cant be used on normal mesh based actor types)
+
+
+
+multiview 2d objects (M2DO)--------------
+-workspace to convert 2d image into 6 angle views
+-6 angle views to diagonal views (finalized M2DO)
+-M2DO rendering
+-M2DO actor
+-M2DO to 3d model
+-separation of detached component 3d models
+-texturing all surfaces of M2DO 3d model
+-M2DO 3d model actor
+-rigging for M2DO 3d model
+-using specalized actor mesh tools on M2DO 3d model actor
+-using physics on M2DO 3d model actor
+
+
+TRANSFORMATION IMAGE 3D-------------------
+-convert 2d transformation image to 3d model, with separate components as separate meshes
+-working with transformation image 3d, creating states and stuff
+-M2DO version of transformation image 3d
+-actor for transformation image 3d and M2DO version
+
+
+
+3D WORKSPACE-------------------
+-add meshes, and transform image 3ds to a mesh being made
+-for M2DO 3d, also allow adding M2DO 3d transform images, and other M2DO 3d models
+
+
+
 KIWISCRIPT----------------------
 -scripting workspace
 -able to create gdscript scripts in scripting workspace
@@ -91,18 +164,331 @@ KIWISCRIPT----------------------
 -make script do fancy computer things
 -documentation for kiwiscript
 
-3D TOOLS-------------------------------------
--click on actor in viewport to select it
--3d tools to transform actors
--3d tools unique to certain actors
 
 
-3D TOOL ACTORS-------------------------------
--deformation 2d object
--deformable actor 2d
+# KIWI STUDIOS 2 — STAGE 2 ROADMAP
+## ADVANCED ANIMATION, CGI, VFX & FILM PRODUCTION
 
--deformation 3d object
--deformable actor 3d
+### 1. TRADITIONAL 2D ANIMATION
+- Frame-by-frame 2D animation workspace
+- Raster and vector animation cels
+- Onion skinning
+- Animation exposure sheet / X-sheet
+- Drawing on ones, twos, threes, and custom timing
+- Key drawings and breakdown frames
+- Manual in-between drawing
+- Reusable and held drawings
+- Frame-by-frame animation on individual components
+- Hybrid frame-by-frame and Transformation Image animation
+- Animated linework and hand-drawn special effects
+- Smear frames and exaggerated cartoon drawings
+- Multiplane 2D animation with depth and parallax
+- Sprite-sheet animation import/export
 
-SUPER CLIPBOARD------------------------------
--super clipboard
+
+
+### 2. ADVANCED 2D CHARACTER ANIMATION
+- 2D skeletal puppet rigging
+- Attach drawing components to bones
+- 2D mesh deformation using skeletal weights
+- 2D inverse kinematics
+- Deformation cages and warp controllers
+- Reusable 2D character rigs
+- Independent facial and body animation
+- Switch between drawn poses and skeletal deformation
+- Combine 2D bones, frame-by-frame drawings, and Transformation Images
+- Animation retargeting between compatible 2D characters
+
+
+
+### 4. FACIAL ANIMATION & CHARACTER PERFORMANCE
+- Universal facial rig controls
+- Facial blend shapes and corrective poses
+- Expression libraries
+- Facial animation layers
+- Mouth visemes and phoneme mapping
+- Audio-driven automatic lip synchronization
+- Eye tracking, gaze targets, and blinking
+- Eyebrow and eyelid animation
+- Jaw, cheek, tongue, and lip controls
+- Facial animation for nonhuman creatures
+- Combined skeletal and Transformation Image facial animation
+- Facial performance retargeting
+
+
+
+
+
+### 9. REAL-WORLD 3D RECONSTRUCTION
+- Photogrammetry from multiple images
+- Video-based 3D reconstruction
+- Real-camera pose reconstruction
+- Depth-map-based reconstruction
+- Point-cloud import and editing
+- Depth-camera and LiDAR scan support
+- Point-cloud-to-mesh reconstruction
+- Gaussian splat scene support
+- Convert reconstructed scenes into editable geometry where possible
+- Texture projection from source footage
+- Real-environment HDRI capture and reconstruction
+- Automatic scene-scale and reference alignment
+- Reconstruction cleanup tools
+- Reconstructed environments usable with CGI physics and rendering
+
+### 10. ADVANCED PARTICLE & PROCEDURAL VFX
+- Universal procedural VFX actor
+- Particle emitter creation and editing
+- Particle forces, turbulence, and attraction
+- Particle collision and event handling
+- Particle trails and ribbons
+- Sparks, embers, dust, rain, snow, and debris
+- Procedural lightning
+- Energy beams and lasers
+- Explosions and shockwaves
+- Magic spells and energy effects
+- Portals and force fields
+- Particle-driven geometry
+- Particle instancing
+- Particle effects attached to geometry or skeletons
+- Event-driven effect spawning
+- Particle-to-mesh conversion
+- Reusable VFX graphs and effect assets
+- VFX interaction with physics and surface appearance
+- Procedural effects using Transformation Images
+
+### 11. VOLUMETRIC SIMULATION
+- Volumetric simulation actor
+- Smoke simulation
+- Fire and combustion simulation
+- Fuel, temperature, and density fields
+- Explosions and fireballs
+- Steam and hot gases
+- Dust clouds
+- Volumetric clouds
+- Wind-driven smoke and fire
+- Gas turbulence and vortex simulation
+- Simulation emission from animated geometry
+- Volumetric collision and obstacle interaction
+- Volumetric lighting and shadows
+- Volumetric rendering
+- Convert volumetric effects to cached animation
+- Stylized/M2DO-compatible volume rendering
+
+
+
+### 12. DESTRUCTION & FRACTURE PHYSICS
+- Destruction modifier system
+- Automatic mesh fracturing
+- Voronoi fracture generation
+- Artist-defined fracture patterns
+- Breakable connections and structural constraints
+- Impact-driven destruction
+- Progressive structural collapse
+- Fracture propagation
+- Glass shattering
+- Concrete and stone destruction
+- Wood splintering
+- Metal bending and tearing
+- Destructible architecture
+- Structural support and failure simulation
+- Fragments becoming independent rigid bodies
+- Procedural debris generation
+- Dust, sparks, and impact effects
+- Destruction connected to surface damage and texture changes
+- Timeline-controlled and bakeable destruction
+
+
+
+### 13. GRANULAR & ADVANCED MATERIAL PHYSICS
+- Granular material actor
+- Sand simulation
+- Gravel and rock-grain simulation
+- Snow simulation
+- Dirt and soil simulation
+- Powder simulation
+- Mud and wet-sand behavior
+- Cohesion and friction controls
+- Granular piling and avalanches
+- Digging and material displacement
+- Compression and material compaction
+- Material erosion and transport
+- Material mixing
+- Fluid-to-solid transitions
+- Solid-to-fluid transitions
+- Melting and freezing
+- Lava cooling and solidification
+- Breakable solidified material
+- Granular material cartoon rendering
+
+
+
+### 19. CROWD & AGENT SIMULATION
+- Crowd actor/system
+- Large groups of instanced characters
+- Agent locomotion and animation
+- Navigation meshes and pathfinding
+- Collision avoidance
+- Group movement behaviors
+- Procedural animation variation
+- Crowd formation controls
+- Crowd reactions to events
+- Fleeing, following, gathering, and fighting behaviors
+- Army and battlefield formations
+- Traffic simulation
+- Vehicle agent behaviors
+- Herding animals
+- Bird flocking
+- Fish schooling
+- Insect and drone swarms
+- Crowd-to-ragdoll transitions
+- Independent editing of selected crowd agents
+
+### 20. PROCEDURAL GEOMETRY & MOTION GRAPHICS
+- Procedural geometry graph
+- Reusable procedural modeling nodes
+- Procedural instancing and scattering
+- Geometry generation from curves
+- Geometry growth and construction animation
+- Procedural architecture
+- Parameter-driven mechanical structures
+- Advanced procedural transformations
+- Rule-based object generation
+- Procedural motion controllers
+- Shape and vector motion graphics
+- Animated logos
+- Animated titles and typography
+- Text-on-path animation
+- Data-driven animations
+- Abstract geometric animation
+- Procedural pattern animation
+- Animation generated from formulas and expressions
+- Procedural animation controlled by KiwiScript
+- Reusable graph assets
+
+
+
+### 22. PROFESSIONAL COLOR GRADING & VIDEO RESTORATION
+- Dedicated color grading tools/workspace
+- Color wheels and curves
+- Primary color correction
+- Secondary color correction
+- Hue/saturation qualification
+- Masked color adjustments
+- Tracked regional color grading
+- HDR color grading
+- LUT loading and creation
+- Shot color matching
+- Skin-tone correction
+- Video scopes
+- Waveform monitor
+- Vectorscope
+- RGB parade
+- Exposure and white-balance correction
+- Film grain and cinematic color effects
+- Footage denoising
+- Sharpening and detail recovery
+- Frame repair
+- Deflickering
+- Artifact removal
+- Color restoration
+
+
+
+### 24. STORYBOARDING, SHOTS & FILM PRODUCTION
+- Storyboard workspace
+- Animatic creation
+- Project → Episode/Film → Sequence → Shot structure
+- Shot creation and organization
+- Shot-specific scenes and cameras
+- Shot thumbnails
+- Camera-cut sequences
+- Shot duplication
+- Shot templates
+- Master film timeline
+- Reusable characters and environments across shots
+- Linked scene and shot assets
+- Nested scene compositions
+- Shot-level audio and effects
+- Shot versions and alternative takes
+- Live updates from source scenes to master timeline
+- Multi-shot rendering
+- Render-pass management per shot
+- Editable compositing per shot
+- Film and episode assembly
+- Shot transitions
+- Production timeline markers and timecode
+
+
+
+---
+
+
+
+POWDER PHYSICS----------------------------------
+-powder/granular actor with volume, mesh, and emitter creation
+-granular simulation (falling, piling, flowing, clumping, compression, wind, collisions, and interaction with fluids/other physics actors)
+-editable physical properties (grain size, density, friction, cohesion, flowability, etc.)
+-customizable materials, textures, and presets (sand, snow, dirt, gravel, dust, etc.)
+-surface deposition, displacement, erosion, and airborne powder effects
+
+
+
+DESTRUCTION PHYSICS------------------------------------
+-destructible mesh physics (fracturing, cracking, bending, tearing, carving, and deformation)
+-material-dependent damage (glass, metal, wood, stone, etc.) with editable strength and fracture behavior
+-structural destruction (breakable connections, supporting structures, progressive collapse)
+-physical debris/fragments interacting with other objects and generating appropriate VFX
+-editable/directable destruction with non-destructive setup and simulation baking
+
+
+
+HAIR AND FUR----------------------------------------
+-hair, fur, and feather generation on 3D surfaces
+-grooming tools (brush, comb, cut, grow, curl, clump, density/length painting, etc.)
+-editable strand properties, styles, materials, colors, and textures
+-hair/fur physics (gravity, wind, collisions, skeleton attachment, and animated movement)
+-realistic and stylized/M2DO rendering with animation and simulation baking
+
+
+
+VOLUMETRIC FOG--------------------------------------
+-global and local volumetric fog actors with editable shapes and density fields
+-editable appearance (color, density, opacity, scattering, noise, textures, etc.)
+-volumetric lighting, shadows, light shafts, and interaction with scene geometry
+-animated/simulated fog movement (wind, turbulence, expansion, emission, and interaction with obstacles)
+-realistic and stylized rendering, including clouds, mist, and atmospheric effects
+
+
+
+ENVIRONMNENT, WORLD, AND STRUCTURE CREATOR------------
+-environment creator workspace
+-terrain creation (procedural generation, sculpting, erosion, caves, mountains, rivers, oceans, biomes, and texturing)
+-procedural vegetation and natural objects (trees, plants, rocks, scattering, and environmental variation)
+-structure creation (buildings, rooms, walls, roofs, doors, windows, stairs, interiors, and reusable architectural components)
+-large-scale world generation (roads, cities, forests, environments, and procedural object placement)
+-environmental systems (weather, wind, atmosphere, sky, lighting, seasons, and animated environmental changes)
+-editable, reusable environments compatible with existing modeling, animation, physics, and destruction systems
+
+
+
+
+PARTICLES AND VFX-------------------------------------
+-universal particle/VFX actor with customizable emitters, particle properties, shapes, materials, and animation
+-particle simulation (gravity, forces, turbulence, collisions, trails, and interactions with other physics systems)
+-procedural VFX (fire, smoke, explosions, lightning, sparks, energy, portals, magic, weather, disintegration, etc.)
+-VFX graph for combining effects, generating secondary effects, and triggering effects from events
+-realistic and stylized/2D VFX rendering, with reusable presets and timeline baking
+
+
+
+
+
+MOTION TRACKING AND CGI-------------------------------
+-motion tracking on video (2D, planar, objects, faces/bodies, and 3D camera reconstruction)
+-real-world scene reconstruction (camera calibration, depth, geometry, projection, and environment alignment)
+-CGI integration into footage (tracked objects, lighting/shadow matching, reflections, motion blur, depth, and occlusion)
+-footage manipulation (rotoscoping, green-screen keying, masking, stabilization, object removal, and video repair)
+-advanced compositing (layers, nodes, render passes, color correction, CGI/VFX integration, and non-destructive editing)
+
+
+

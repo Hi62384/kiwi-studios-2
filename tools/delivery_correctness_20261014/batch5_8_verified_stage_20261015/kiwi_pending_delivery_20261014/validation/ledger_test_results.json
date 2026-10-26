@@ -1,0 +1,21 @@
+{
+  "pass": true,
+  "checks": 15,
+  "cases": [
+    "exact batch 3 resume point",
+    "batch 3 verification writes no source",
+    "exact batch 4 resume point",
+    "batch 4 verification writes no source",
+    "exact batch 5 resume point",
+    "batch 5 verification writes no source",
+    "exact batch 6 resume point",
+    "batch 6 verification writes no source",
+    "exact batch 7 resume point",
+    "batch 7 verification writes no source",
+    "exact batch 8 resume point",
+    "batch 8 verification writes no source",
+    "mixed partial-application state stops",
+    "missing dependency stops",
+    "original pre-batch3 source cannot skip applied-stage precondition"
+  ]
+}

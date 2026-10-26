@@ -1,6 +1,10 @@
 extends SceneTree
 var failures:=0
-func _initialize() -> void: run.call_deferred()
+func _initialize() -> void: execute.call_deferred()
+func execute() -> void:
+	await run()
+	for frame in 10: await process_frame
+	quit(failures)
 func check(ok: bool,message: String) -> void:
 	if not ok: failures+=1; push_error(message)
 func run() -> void:
@@ -27,10 +31,13 @@ func run() -> void:
 	studio._set_tool("values"); studio._open_stack_editor(true)
 	var editor:=studio.get_node("AdjustmentStackEditor"); editor.add_entry("lerp")
 	check(not editor.stack.find_children("*","ColorPickerButton",true,false).is_empty(),"Lerp exposes a target color picker")
-	editor.close_editor(); studio.queue_free()
+	editor.close_editor()
+	# Drain asynchronous selection captures before their viewport owners die.
+	for frame in 24: await RenderingServer.frame_post_draw
+	studio.color_picker.queue_free(); studio.queue_free()
 	for i in 5: await process_frame
 	await fractional()
-	print("Selection fill / color lerp checks: %d failures" % failures); quit(failures)
+	print("Selection fill / color lerp checks: %d failures" % failures)
 
 func fractional() -> void:
 	var studio:=KiwiImageWorkspace.new(); root.add_child(studio); studio.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -89,5 +96,8 @@ func fractional() -> void:
 	layer.effects=[{"type":"invert","enabled":true,"amount":1.0}]
 	studio.renderer.sync(studio.document); adjusted=await studio.renderer.flattened(); pixel=adjusted.get_pixel(16,16)
 	check(absf(pixel.r-.5)<.03 and absf(pixel.g-.5)<.03 and absf(pixel.b-.5)<.03,"Effects lerp their result by selection alpha")
-	studio.queue_free()
+	# Selection undo/redo can still have a source capture awaiting rendered frames.
+	for frame in 24: await RenderingServer.frame_post_draw
+	# Release the legacy unparented color-state control owned by this fixture.
+	studio.color_picker.queue_free(); studio.queue_free()
 	for i in 6: await process_frame

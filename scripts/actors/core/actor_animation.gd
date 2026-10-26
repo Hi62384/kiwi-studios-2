@@ -52,6 +52,7 @@ static func _set_path(container: Dictionary, path: PackedStringArray, value: Var
 		container[key] = ActorData.copy_value(value)
 		return
 	var child: Variant = container.get(key, container.get(str(key)))
+	if child == null and key == &"physics": child = {}
 	if child is ActorObjectReference:
 		var object := resolve_reference(child)
 		if object == null:

@@ -1,0 +1,38 @@
+{
+  "timestamp_utc": "2026-10-15T00:05:07.748962+00:00",
+  "stages": {
+    "import": {
+      "exit_code": 0,
+      "errors": 0,
+      "warnings": 0
+    },
+    "run": {
+      "exit_code": 0,
+      "errors": 0,
+      "warnings": 0
+    }
+  },
+  "seams": "Existing batch7 native UI/device/transport seams; newly added close-recovery hook is no-op because this fixture has no recovery window. Batch8 exact-handler/real-worker suite tests that workflow separately.",
+  "full_class_hashes": {
+    "Workspaces/AudioWorkspace/audio_document.gd": "75b98d8ecccb3775d8be786ec1ad5504b5623ad8eda659d4103c30df46caa30d",
+    "Workspaces/AudioWorkspace/audio_edit_session.gd": "d0451bbad067e76233c3482213a9936462b02cdbeeaf7274681d0f91892d84b9",
+    "Workspaces/AudioWorkspace/audio_conductor.gd": "1c95b65473b6b9cd8e9cb6c195ab0a07fda7694458fb266ae1932d7c9ba9fad9",
+    "Workspaces/AudioWorkspace/audio_tempo_map.gd": "ec25e892a6f1e6870d101cf893bd4cc8344928f45507f43b8fcbb8b3d9afa45b",
+    "Workspaces/AudioWorkspace/audio_pcm_file.gd": "68902ff97f8608015680c29298f50c3937d6c93fef2dfad27ce75162dbeeecc5",
+    "Workspaces/AudioWorkspace/audio_analysis.gd": "8d85fc9f55357714337e2c27ecc2c12fa83e97ccdd2076f02cc0a2d7a834cb12",
+    "Workspaces/AudioWorkspace/audio_source_cache.gd": "13be57e05a8ba5ef6fd8cfb5b8b7a3776cdf59ad22950b5baeeac5ce696a3227",
+    "Workspaces/AudioWorkspace/audio_region_edit.gd": "b9711c5bf8ae447ccb2388f22f17f37b8c94c50e2c957495ec84730009ad7cb0",
+    "Workspaces/AudioWorkspace/audio_jobs.gd": "250325cc0192b23ca06dd639765032d692865c323c33190b2ef57153cc23ad44",
+    "scripts/actors/core/actor_audio.gd": "f662ae1c5ee9358ec6cff79d6dcce5792c4120f6312afce2ecba8abfce3cc249",
+    "scripts/actors/core/actor_data.gd": "741585078f9229059d658cd0fcbd77a60fb9952cda4ca718ec09c1e63d77a2f6",
+    "scripts/actors/core/actor_clip.gd": "dba367eda75df9e6178ab72577738f4e572c3f71a9d2eb09d48a223cf0969707",
+    "scripts/actors/core/actor_animation.gd": "230be8adea83ecaa9b72a8ff49157227b2864550ca6f9107e94dd48690302e33",
+    "scripts/actors/core/actor_animation_track.gd": "6fba4af79f1516aa8885bdcecf06d6a485514885b51b23622369fa29734ecdbe",
+    "scripts/actors/core/actor_keyframe.gd": "322d04d3cc310941b59c64ba8884f65b1d0285dfef6cd3c3aef2c840cb63789e",
+    "scripts/actors/core/actor_object_data.gd": "eebd38ab1c5f9dcea836254689ef6bb5b8b28200849966ad477a92e986792bab",
+    "scripts/actors/core/actor_object_reference.gd": "3916fc31bcac494536cd64176ab1f6cc140ed498c4340efa8b5a3157f2883022"
+  },
+  "checks": 613,
+  "failures": 0,
+  "pass": true
+}

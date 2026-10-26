@@ -62,6 +62,15 @@ var _context_panel:=PanelContainer.new()
 var _tree_main_id: String=""
 var preset_context := HBoxContainer.new()
 var preset_panel := PanelContainer.new()
+var live_material_panel:=PanelContainer.new()
+var live_material_row:=HBoxContainer.new()
+var _preset_filter:="all"
+var _paint_tool_settings: Dictionary={}
+var _material_thumbnail_cache: Dictionary={}
+var _material_thumbnail_requests: Array=[]
+var _material_thumbnail_busy:=false
+var _material_swatch: Button
+
 var status := Label.new()
 var title_label := Label.new()
 var zoom_label: Button
@@ -347,7 +356,7 @@ func _build_ui() -> void:
 	header.add_child(mark)
 	_menu(header,"File",[
 		["Save   Ctrl+S",save],["Save image file",save_image],["Save image file as…   Ctrl+Shift+S",save_as],
-		["Save project",save_project],["Save project as…",save_project_as],["Export…",export_image],["Open image / document…",_choose_image]])
+		["Save project",save_project],["Save project as…",save_project_as],["Save to Super Clipboard",func(): _finish_pending(); KiwiSuperClipboardService.instance.quick_save(document.snapshot(),title_label.text)],["Export…",export_image],["Open image / document…",_choose_image]])
 	_menu(header,"Image",[["Resize / upscale image…",_image_size_dialog],["Scale image 2×",func(): _scale_image(Vector2i(document.canvas_size)*2,Image.INTERPOLATE_LANCZOS)],
 		["Scale image ½",func(): _scale_image(Vector2i(Vector2(document.canvas_size)*.5),Image.INTERPOLATE_LANCZOS)]])
 	title_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL; title_label.clip_text=true; header.add_child(title_label)
@@ -368,13 +377,18 @@ func _build_ui() -> void:
 	_toolbar_surface.custom_minimum_size.y=112; stage_column.add_child(_toolbar_surface)
 	# Root-level overlays span both columns and receive input before the sidebar.
 	add_child(_context_panel); add_child(preset_panel)
+	live_material_panel.add_theme_stylebox_override("panel",_box(Color("142c29"),Color("36675a"),6,4))
+	live_material_panel.add_child(live_material_row); live_material_panel.hide(); add_child(live_material_panel)
 	var stage:=HBoxContainer.new(); stage.size_flags_vertical=Control.SIZE_EXPAND_FILL; stage_column.add_child(stage)
 	var rail:=VBoxContainer.new(); rail.custom_minimum_size.x=42; rail.add_theme_constant_override("separation",3); stage.add_child(rail)
 	_tool_section(rail,"SELECT",[["move","Move · V"],["pixel_select","Pixel selection · M"]])
 	_tool_section(rail,"PAINT",[["brush","Draw · B"],["eraser","Erase · E"],["fill","Bucket · G"]])
-	_tool_section(rail,"DEFORM",[["warp","Warp & Liquify · W"],["repair","Texture & Repair"]])
+	_tool_section(rail,"DEFORM",[["warp","Warp & Liquify · W"],["repair","Repair"]])
 	_tool_section(rail,"ADJUST",[["values","Color adjustments"],["effects","Effects & Styles"]])
 	_effects_button=tool_buttons.effects
+	# This hidden picker stores brush color; the contextual picker is the UI.
+	# Give it Node ownership so repeated workspace creation does not leak it.
+	add_child(color_picker);color_picker.hide()
 	color_picker.color=Color("62d9bc")
 	color_picker.color_changed.connect(func(value: Color): canvas.color=value)
 	canvas.size_flags_horizontal=Control.SIZE_EXPAND_FILL; canvas.size_flags_vertical=Control.SIZE_EXPAND_FILL
@@ -436,9 +450,17 @@ func _process(_delta: float) -> void:
 	preset_panel.global_position=_toolbar_surface.global_position+Vector2(0,_context_panel.size.y+4)
 	preset_panel.size=Vector2(_main_split.size.x,preset_panel.get_combined_minimum_size().y)
 	_inspector_tool_spacer.custom_minimum_size.y=_context_panel.size.y+4+(preset_panel.size.y+4 if preset_panel.visible else 0)
+	live_material_panel.position=preset_panel.position+Vector2(0,preset_panel.size.y+4)
+	live_material_panel.size=Vector2(_main_split.size.x,live_material_panel.get_combined_minimum_size().y)
+	if live_material_panel.visible: _inspector_tool_spacer.custom_minimum_size.y+=live_material_panel.size.y+4
 	_toolbar_surface.custom_minimum_size.y=_inspector_tool_spacer.custom_minimum_size.y
+	var material_dock:=get_node_or_null("MaterialBrowser") as Control
+	if material_dock!=null:
+		material_dock.global_position.y=_toolbar_surface.global_position.y+_toolbar_surface.custom_minimum_size.y+4
+		material_dock.size.y=maxf(320,global_position.y+size.y-28-material_dock.global_position.y)
 	if canvas.tool=="path" and document.layer_for_id(canvas.path_layer_id)==null: _set_tool("move"); canvas.path_layer_id=""
 	if document!=null:
+		renderer.set_interactive_preview(not canvas._drag.is_empty() or _before!=null)
 		renderer.set_preview_camera(canvas.size,canvas.origin(),canvas.zoom)
 		canvas.preview_screen_space=true
 	zoom_label.text="%d%%" % roundi(canvas.zoom*100)
@@ -515,6 +537,10 @@ func open_source(value: Variant,state: Dictionary={}) -> void:
 	canvas.selection_alpha=float(ui.get("selection_alpha",1)); canvas.selection_falloff=float(ui.get("selection_falloff",0))
 	canvas.warp_tool.restore_settings(ui.get("warp_settings",{}))
 	canvas.repair_tool.restore_settings(ui.get("repair_settings",{}))
+	_paint_tool_settings=ui.get("paint_tool_settings",{}).duplicate(true)
+	canvas.painting_mode=str(ui.get("painting_mode","color")); canvas.material_strength=float(ui.get("material_strength",1.0))
+	if canvas.tool=="repair" and canvas.repair_tool.main_mode=="texture": canvas.tool="brush"; canvas.painting_mode="material"
+	canvas.repair_tool.main_mode="repair"
 	canvas.sync_pixel_selection()
 	_main_split.split_offset=int(ui.get("main_split",1000)); _side_split.split_offset=int(ui.get("side_split",280))
 	renderer._topology="_unbuilt_"; renderer.sync(document); canvas.preview=renderer.texture()
@@ -540,7 +566,7 @@ func _ui_state() -> Dictionary:
 		"paint_selection_only":canvas.paint_selection_only,"pixel_match_all":canvas.pixel_match_all,
 		"edge_magnet":canvas.edge_magnet,"edge_threshold":canvas.edge_threshold,"object_threshold":canvas.object_threshold,
 		"warp_settings":canvas.warp_tool.settings(),
-		"repair_settings":canvas.repair_tool.settings(),
+		"repair_settings":canvas.repair_tool.settings(),"painting_mode":canvas.painting_mode,"material_strength":canvas.material_strength,"paint_tool_settings":_paint_tool_settings.duplicate(true),
 		"selection_alpha":canvas.selection_alpha,"selection_falloff":canvas.selection_falloff,
 		"main_split":_main_split.split_offset,"side_split":_side_split.split_offset,
 		"macros":_macros.duplicate(true),"variants":_variants.duplicate(),"recent_assets":_recent_assets.duplicate(),"custom_shortcuts":_custom_shortcuts.duplicate()}
@@ -762,6 +788,16 @@ func _create_at(kind: String,bounds: Rect2,points: PackedVector2Array) -> void:
 
 
 func _set_tool(id: String) -> void:
+	if canvas._material_busy: return
+	if id!=canvas.tool:
+		if canvas.tool in ["brush","fill"]:
+			_paint_tool_settings[canvas.tool]={"mode":canvas.painting_mode,"color":canvas.color,"material":canvas.repair_tool.material.copy_material(),"strength":canvas.material_strength}
+		if id in ["brush","fill"] and _paint_tool_settings.has(id):
+			var remembered: Dictionary=_paint_tool_settings[id]
+			canvas.painting_mode=remembered.mode; canvas.color=remembered.color; color_picker.color=canvas.color; canvas.material_strength=remembered.strength
+			canvas.repair_tool.material=remembered.material.copy_material()
+			var template=document.live_material_for_id(document.active_live_material_id) if document!=null and document.live_edit_enabled else null
+			if canvas.painting_mode=="material" and template!=null: canvas.repair_tool.material=template.material.copy_material()
 	if canvas.repair_tool.active:
 		canvas.repair_tool.finish()
 		while canvas.repair_tool.active: await get_tree().process_frame
@@ -787,7 +823,7 @@ func _tool_hint() -> String:
 	if canvas.tool=="warp":
 		if canvas.warp_tool.mode=="mesh": return "Drag points to deform · Shift+wheel: radius · Shift-click: select mesh points · Esc: cancel"
 		return "Drag to deform · Shift+wheel: size · Shift-click: select mesh points · Ctrl-click pin: lock · Right-click pin: delete · Esc: cancel"
-	if canvas.tool=="repair": return "Drag: repair or paint texture · Alt-click / drag: sample · Shift+wheel: size · Space: pan · Esc: cancel"
+	if canvas.tool=="repair": return "Drag: repair pixels · Alt-click / drag: sample · Shift+wheel: size · Space: pan · Esc: cancel"
 	if canvas.tool=="pixel_select" and canvas.pixel_mode in ["crop","lasso_crop"]:
 		return "Drag a crop region · Release applies · Right-click / Esc cancels"
 	if canvas.tool=="pixel_select" and canvas.pixel_box_select and canvas.pixel_mode in ["brush","erase"]:
@@ -821,6 +857,9 @@ func _tool_section(rail: Node,caption: String,entries: Array) -> void:
 		button.custom_minimum_size=Vector2(34,33); button.toggle_mode=true; tool_buttons[id]=button
 
 func _refresh_context() -> void:
+	if canvas.tool in ["brush","fill"] and canvas.painting_mode=="color":
+		var material_editor:=get_node_or_null("MaterialBrowser")
+		if material_editor!=null: material_editor.close()
 	_clear(context)
 	_context_host=context
 	if canvas.tool in ["pixel_select","repair"]:
@@ -838,6 +877,7 @@ func _refresh_context() -> void:
 		row.size_flags_horizontal=Control.SIZE_EXPAND_FILL; row.add_theme_constant_override("separation",5)
 		scroll.add_child(row); _context_host=row
 	_clear(preset_context); preset_panel.visible=false
+	_clear(live_material_row); live_material_panel.hide()
 	_context_fields.clear()
 	var tool_icon:=TextureRect.new(); tool_icon.texture=_icon("lasso" if canvas.tool=="lasso_crop" else ("mask" if canvas.tool=="pixel_select" else canvas.tool)); tool_icon.custom_minimum_size=Vector2(22,22); tool_icon.expand_mode=TextureRect.EXPAND_IGNORE_SIZE; tool_icon.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED; tool_icon.size_flags_vertical=Control.SIZE_SHRINK_CENTER; _context_host.add_child(tool_icon)
 	var label:=Label.new(); label.text=canvas.tool.replace("_"," ").capitalize()
@@ -929,20 +969,26 @@ func _refresh_context() -> void:
 		if canvas.tool=="brush":
 			if canvas.brush_type!="soften":
 				var paint_group:=_toolbar_group("PAINT","layers")
-				_context_color("Color",paint_group)
+				_painting_mode_controls(paint_group)
 				_toolbar_toggle(paint_group,"plus",canvas.paint_new_layer,"Draw each stroke on a new layer",func(value: bool): canvas.paint_new_layer=value)
 			var correction_group:=_toolbar_group("STROKE","effects")
 			# Prioritize correction beside the tool title, before groups that can wrap.
 			_context_host.move_child(correction_group.get_parent().get_parent(),2)
 			preload("res://Workspaces/ImageWorkspace/image_warp_picker.gd").build(self,correction_group,"BrushType","BRUSH TYPE",["normal","stroke_correct","soften"],["Normal","Stroke Correct","Soften"],canvas.brush_type,func(index: int):
 				_finish_pending(); canvas.cancel_gesture(); canvas.brush_type=["normal","stroke_correct","soften"][index]; _refresh_context(); status.text=_tool_hint(); _persist_paint_presets())
+			var details:=Button.new(); details.name="StrokeSettings"; details.text="Settings"; details.tooltip_text="Stroke correction strength and scale" if canvas.brush_type!="soften" else "Soften strength"
+			details.visible=canvas.brush_type!="normal"; correction_group.add_child(details)
+			var popup:=PopupPanel.new(); popup.name="StrokeSettingsPopup"; details.add_child(popup)
+			popup.add_theme_stylebox_override("panel",_box(Color("152631"),Color("4a756f"),8,12))
+			var detail_group:=HBoxContainer.new(); detail_group.add_theme_constant_override("separation",8); popup.add_child(detail_group)
+			details.pressed.connect(func(): popup.popup(Rect2i(Vector2i(details.get_screen_position()+Vector2(0,details.size.y+4)),Vector2i(380,52))))
 			var strength:=HSlider.new(); strength.min_value=0; strength.max_value=100; strength.step=1
 			strength.name="SoftenStrength" if canvas.brush_type=="soften" else "CorrectionStrength"
 			strength.value=(canvas.soften_strength if canvas.brush_type=="soften" else canvas.correction_strength)*100; strength.custom_minimum_size=Vector2(85,28)
 			strength.tooltip_text="Soften strength" if canvas.brush_type=="soften" else "Correction strength"
-			var strength_caption:=Label.new(); strength_caption.text="Strength"; strength_caption.add_theme_font_size_override("font_size",11); strength_caption.visible=canvas.brush_type!="normal"; correction_group.add_child(strength_caption)
-			strength.size_flags_vertical=Control.SIZE_SHRINK_CENTER; correction_group.add_child(strength)
-			var strength_label:=Label.new(); strength_label.text="%d%%" % strength.value; strength_label.custom_minimum_size.x=34; correction_group.add_child(strength_label)
+			var strength_caption:=Label.new(); strength_caption.text="Strength"; strength_caption.add_theme_font_size_override("font_size",11); strength_caption.visible=canvas.brush_type!="normal"; detail_group.add_child(strength_caption)
+			strength.size_flags_vertical=Control.SIZE_SHRINK_CENTER; detail_group.add_child(strength)
+			var strength_label:=Label.new(); strength_label.text="%d%%" % strength.value; strength_label.custom_minimum_size.x=34; detail_group.add_child(strength_label)
 			strength.visible=canvas.brush_type!="normal"; strength_label.visible=canvas.brush_type!="normal"
 			strength.drag_started.connect(func(): strength.set_meta("dragging",true))
 			strength.value_changed.connect(func(value: float):
@@ -952,25 +998,27 @@ func _refresh_context() -> void:
 				if not bool(strength.get_meta("dragging",false)): _persist_paint_presets())
 			strength.drag_ended.connect(func(_changed: bool):
 				strength.set_meta("dragging",false); _persist_paint_presets())
-			var scale_label:=Label.new(); scale_label.text="Scale"; correction_group.add_child(scale_label)
+			var scale_label:=Label.new(); scale_label.text="Scale"; detail_group.add_child(scale_label)
 			var scale:=DragNumber.new(); scale.name="CorrectionScale"; scale.min_value=.1; scale.max_value=16; scale.step=.01
 			scale.value=canvas.correction_scale; scale.suffix="×"; scale.custom_minimum_size=Vector2(72,28)
 			scale.tooltip_text="Smooth broader shapes at larger scales · Gap closing stays within 16 image pixels · Alt+wheel"
-			correction_group.add_child(scale); _context_fields.correction_scale=scale
+			detail_group.add_child(scale); _context_fields.correction_scale=scale
 			scale.visible=canvas.stroke_correct; scale_label.visible=canvas.stroke_correct
 			scale.value_changed.connect(func(value: float): canvas.correction_scale=value; _persist_paint_presets())
 			scale.preview_changed.connect(func(value: float): canvas.correction_scale=value)
 			scale.drag_committed.connect(func(value: float): canvas.correction_scale=value; _persist_paint_presets())
 			scale.drag_cancelled.connect(func(): canvas.correction_scale=scale.value)
 		_paint_preset_controls(canvas.tool)
+		_live_material_controls()
 	elif canvas.tool=="fill":
 		_paint_selection_toggle()
-		_context_color("Color",_toolbar_group("FILL COLOR","fill"))
+		_painting_mode_controls(_toolbar_group("FILL","fill"))
 		var threshold_group:=_toolbar_group("COLOR TOLERANCE","hardness")
 		var threshold:=HSlider.new(); threshold.min_value=0; threshold.max_value=1; threshold.step=.01; threshold.value=canvas.fill_threshold; threshold.size_flags_vertical=Control.SIZE_SHRINK_CENTER
 		threshold.custom_minimum_size=Vector2(180,32); threshold.tooltip_text="How different neighboring colors may be and still get filled"; threshold_group.add_child(threshold)
 		threshold.value_changed.connect(func(value: float): canvas.fill_threshold=value)
 		_paint_preset_controls("fill")
+		_live_material_controls()
 	elif canvas.tool in ["crop","lasso_crop"]:
 		var scope:=CheckButton.new(); scope.text="Crop entire image"; scope.button_pressed=_crop_canvas; context.add_child(scope)
 		scope.toggled.connect(func(value: bool): _crop_canvas=value; _refresh_context())
@@ -1127,6 +1175,10 @@ func _load_paint_presets(path: String=PAINT_PRESETS_PATH) -> void:
 					if stored.has(key) and stored[key] is Array: _paint_presets[key]=stored[key]
 	if (_paint_presets.brush as Array).is_empty():
 		_paint_presets.brush=[_preset("Hard round",28,1,1,Color("62d9bc")),_preset("Soft round",54,.5,.12,Color("62d9bc")),_preset("Pencil",3,1,1,Color("d7e8ef"))]
+		for material_id in ["wood/oak","fabric/denim","stone/marble"]:
+			var material:=preload("res://Workspaces/ImageWorkspace/texture_material_library.gd").create(material_id)
+			var preset:=_preset(material.label,48,1,.8,Color.WHITE); preset.painting_mode="material"; preset.material=material; preset.material_strength=1.0
+			_paint_presets.brush.append(preset)
 	if (_paint_presets.eraser as Array).is_empty():
 		_paint_presets.eraser=[_preset("Hard eraser",32,1,1,Color.WHITE),_preset("Soft eraser",70,.55,.08,Color.WHITE)]
 	if (_paint_presets.fill as Array).is_empty():
@@ -1140,6 +1192,10 @@ func _preset(label: String,size: float,opacity: float,hardness_value: float,pres
 func _paint_preset_controls(kind: String) -> void:
 	preset_panel.visible=true
 	var caption:=Label.new(); caption.text=kind.capitalize()+" presets"; caption.custom_minimum_size.x=95; caption.add_theme_color_override("font_color",Color("7fcfbe")); preset_context.add_child(caption)
+	var filter:=OptionButton.new(); filter.name="PaintPresetFilter"
+	for caption_text in ["All","Color","Material"]: filter.add_item(caption_text)
+	filter.select(maxi(0,["all","color","material"].find(_preset_filter))); preset_context.add_child(filter)
+	filter.item_selected.connect(func(index: int): _preset_filter=["all","color","material"][index]; _refresh_context())
 	_button(preset_context,"Save",func(): _save_paint_preset(kind,false),"Update the selected preset, or create one")
 	_button(preset_context,"Save +",func(): _save_paint_preset(kind,true),"Save these settings as a new preset")
 	var scroll:=ScrollContainer.new(); scroll.custom_minimum_size=Vector2(220,34); scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL
@@ -1149,24 +1205,24 @@ func _paint_preset_controls(kind: String) -> void:
 	for value: Variant in _paint_presets.get(kind,[]):
 		if not value is Dictionary: continue
 		var preset: Dictionary=value
+		if _preset_filter!="all" and str(preset.get("painting_mode","color"))!=_preset_filter: continue
 		var button:=PresetButton.new(); button.studio=self; button.kind=kind; button.preset_id=str(preset.get("id",""))
-		button.text=str(preset_index) if preset_index<10 else ""
+		button.text=("*" if preset.get("favorite",false) else "")+(str(preset_index) if preset_index<10 else "")
 		button.icon=_paint_preset_icon(preset,kind); button.expand_icon=true; button.custom_minimum_size=Vector2(64,32)
-		button.tooltip_text=str(preset.get("name","Preset"))+" · Drag to reorder · Right-click to delete"
+		button.tooltip_text=("Favorite / " if preset.get("favorite",false) else "")+str(preset.get("name","Preset"))+" · Drag to reorder · Right-click for Rename / Duplicate / Favorite / Delete"
 		if preset_index<10: button.tooltip_text+=" · Key "+str(preset_index)
 		preset_index+=1
 		if str(_active_preset.get(kind,""))==str(preset.get("id","")):
 			button.add_theme_stylebox_override("normal",_box(Color("245d54"),Color("79e5ce"),6,2))
 		row.add_child(button); button.pressed.connect(func(): _apply_paint_preset(kind,preset))
+		if preset.get("material") is KiwiTextureMaterial: _material_icon_for(button,preset.material)
 		button.gui_input.connect(func(event: InputEvent):
 			if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_RIGHT and event.pressed:
-				var menu:=PopupMenu.new(); add_child(menu); menu.add_item("Delete preset")
-				menu.id_pressed.connect(func(_id: int): _delete_paint_preset(kind,str(preset.get("id",""))); menu.queue_free())
-				menu.popup_hide.connect(func(): if is_instance_valid(menu): menu.queue_free())
-				menu.position=Vector2i(get_global_mouse_position()); menu.popup())
+				_paint_preset_menu(kind,preset))
 
 
 func _paint_preset_icon(preset: Dictionary,kind: String) -> Texture2D:
+	if preset.get("material") is KiwiTextureMaterial: return null
 	var bitmap:=Image.create(64,40,false,Image.FORMAT_RGBA8); bitmap.fill(Color("15212d"))
 	var preset_color: Color=preset.get("color",Color.WHITE)
 	if kind=="fill":
@@ -1183,10 +1239,21 @@ func _paint_preset_icon(preset: Dictionary,kind: String) -> Texture2D:
 
 
 func _apply_paint_preset(kind: String,preset: Dictionary) -> void:
+	if canvas._material_busy: return
 	canvas.cancel_gesture()
 	canvas.brush_size=float(preset.get("size",canvas.brush_size)); canvas.brush_opacity=float(preset.get("opacity",canvas.brush_opacity))
 	canvas.hardness=float(preset.get("hardness",canvas.hardness)); canvas.fill_threshold=float(preset.get("threshold",canvas.fill_threshold))
 	canvas.color=preset.get("color",canvas.color); color_picker.color=canvas.color
+	canvas.painting_mode=str(preset.get("painting_mode","color"))
+	canvas.material_strength=float(preset.get("material_strength",1.0))
+	canvas.paint_selection_only=bool(preset.get("selection_only",canvas.paint_selection_only))
+	canvas.paint_new_layer=bool(preset.get("new_layer",canvas.paint_new_layer))
+	if preset.get("material") is KiwiTextureMaterial:
+		canvas.repair_tool.material=preset.material.copy_material()
+		# Brush presets configure future paint; they never mutate linked artwork.
+		document.live_edit_enabled=false
+	var browser:=get_node_or_null("MaterialBrowser")
+	if browser!=null: browser.set_material_value(canvas.repair_tool.material)
 	if kind=="brush":
 		canvas.stroke_correct=bool(preset.get("stroke_correct",canvas.stroke_correct))
 		canvas.brush_type=str(preset.get("brush_type",canvas.brush_type)); canvas.soften_strength=clampf(float(preset.get("soften_strength",canvas.soften_strength)),0,1)
@@ -1201,7 +1268,7 @@ func _save_paint_preset(kind: String,as_new: bool) -> void:
 	if not as_new and not active.is_empty():
 		for index in list.size():
 			if str((list[index] as Dictionary).get("id",""))==active:
-				var updated:=_current_paint_preset(str((list[index] as Dictionary).get("name","Preset"))); updated.id=active; list[index]=updated
+				var updated:=_current_paint_preset(str((list[index] as Dictionary).get("name","Preset"))); updated.id=active; updated.favorite=list[index].get("favorite",false); list[index]=updated
 				_paint_presets[kind]=list; _persist_paint_presets(); _refresh_context(); status.text="Preset updated"; return
 	var created:=_current_paint_preset("%s %d" % [kind.capitalize(),list.size()+1])
 	list.append(created); _paint_presets[kind]=list; _active_preset[kind]=created.id
@@ -1213,7 +1280,10 @@ func _current_paint_preset(label: String) -> Dictionary:
 	if canvas.tool=="brush": result.stroke_correct=canvas.stroke_correct; result.correction_strength=canvas.correction_strength
 	if canvas.tool=="brush": result.correction_scale=canvas.correction_scale
 	if canvas.tool=="brush": result.brush_type=canvas.brush_type; result.soften_strength=canvas.soften_strength
-	result.mode=canvas.brush_mode; return result
+	result.mode=canvas.brush_mode; result.painting_mode=canvas.painting_mode
+	result.material_strength=canvas.material_strength; result.selection_only=canvas.paint_selection_only; result.new_layer=canvas.paint_new_layer
+	if canvas.painting_mode=="material": result.material=canvas.repair_tool.material.copy_material()
+	return result
 
 
 func _delete_paint_preset(kind: String,id: String) -> void:
@@ -1445,11 +1515,11 @@ func _refresh_inspector() -> void:
 	var layer:=_main_layer()
 	if layer==null: return
 	if layer.properties.get("texture_material") is KiwiTextureMaterial:
-		if canvas.tool=="repair" and get_node_or_null("MaterialBrowser")==null:
+		if canvas.painting_mode=="material" and get_node_or_null("MaterialBrowser")==null:
 			canvas.repair_tool.material=layer.properties.texture_material.copy_material()
 			canvas.repair_tool.material.coverage=null; canvas.repair_tool.material.source=null
 		_button(inspector,"Edit painted material",func():
-			canvas.repair_tool.material=layer.properties.texture_material.copy_material(); canvas.repair_tool.main_mode="texture"; _set_tool("repair")
+			canvas.repair_tool.material=layer.properties.texture_material.copy_material(); canvas.painting_mode="material"; _set_tool("brush")
 			load("res://Workspaces/ImageWorkspace/texture_material_browser.gd").open(self),"Change the material without repainting its coverage","noise")
 		_button(inspector,"Bake material",rasterize_selected,"Convert this material layer into ordinary editable pixels","check")
 	if layer.properties.get("texture_recipe") is KiwiImageTextureRecipe:
@@ -1659,7 +1729,7 @@ func _choose_text_settings(layer: KiwiImageLayer) -> void:
 
 func _save_text_settings(layer: KiwiImageLayer) -> void:
 	var settings:=_ensure_text_settings(layer)
-	var result:=await ActorProjectResourceSaveDialog.pick(self,"Save Text Settings",layer.label+" Text Settings","tres",false)
+	var result:=await ActorProjectResourceSaveDialog.pick(self,"Save Text Settings",layer.label+" Text Settings","tres",false,PackedStringArray(),settings)
 	if result.get("cancelled",true): return
 	var destination:=str(result.get("path",""))
 	if destination.is_empty(): return
@@ -2006,7 +2076,7 @@ func _apply_effect(layer: KiwiImageLayer,index: int) -> void:
 		status.text="Merge the group before applying its effects."; return
 	var original:=document
 	var version:=_edit_version
-	var temporary:=Document.new()
+	var temporary:=Document.new(); temporary.live_materials.assign(document.live_materials)
 	temporary.canvas_size=Vector2i(layer.dimensions.ceil()).max(Vector2i.ONE)
 	var source:=layer.copy_layer()
 	source.parent_id=""; source.position=Vector2.ZERO; source.rotation=0.0
@@ -2026,7 +2096,7 @@ func _apply_effect(layer: KiwiImageLayer,index: int) -> void:
 	pixels.convert(Image.FORMAT_RGBA8)
 	var texture:=ImageTexture.create_from_image(pixels)
 	_action(func():
-		layer.kind="basic"; layer.texture=texture; layer.paint_base=texture; layer.mask=null
+		layer.kind="basic"; layer.texture=texture; layer.paint_base=texture; layer.mask=null; layer.live_paint.clear()
 		layer.effects.assign(layer.effects.slice(index+1))
 		layer.properties.erase("linked_style"))
 	status.text="Applied effects to layer pixels · Ctrl+Z to undo"
@@ -2229,7 +2299,7 @@ func rasterize_selected() -> void:
 	var roots:=document.selected_roots(canvas.selected)
 	var targets: Array[KiwiImageLayer]=[]
 	for layer in roots:
-		if layer.kind not in ["image","paint","basic"] or layer.properties.get("texture_material") is KiwiTextureMaterial: targets.append(layer)
+		if layer.kind not in ["image","paint","basic"] or not layer.live_paint.is_empty() or layer.properties.get("texture_material") is KiwiTextureMaterial: targets.append(layer)
 	if targets.is_empty(): return
 	_rasterizing=true; status.text="Preparing layer for pixel editing…"
 	var replacements:={}
@@ -2566,7 +2636,7 @@ func _prepare_pixel_selection() -> void:
 	var layer:=_main_layer()
 	if layer==null or not document.can_edit(layer): status.text="Select an unlocked layer to select its pixels."; return
 	var original:=document
-	var temporary:=Document.new(); temporary.canvas_size=document.canvas_size
+	var temporary:=Document.new(); temporary.live_materials.assign(document.live_materials); temporary.canvas_size=document.canvas_size
 	var isolated:=layer.copy_layer(); var world:=document.world_transform(layer)
 	isolated.parent_id=""; isolated.position=world*(layer.dimensions*.5)-layer.dimensions*.5
 	isolated.set_linear_basis(world); isolated.blend=0
@@ -2588,6 +2658,18 @@ func _apply_pixel_selection(action: String) -> void:
 	var layer:=_main_layer()
 	if layer==null or not document.can_edit(layer) or canvas.selection==null or canvas.pixel_source==null: return
 	if not canvas.selection.get_used_rect().has_area(): return
+	if action=="delete" and not layer.live_paint.is_empty():
+		var local_mask: Texture2D=await preload("res://Workspaces/ImageWorkspace/image_selection_fill.gd").capture_local_mask(self,layer)
+		if local_mask==null: return
+		var coverage:=local_mask.get_image()
+		_action(func():
+			layer.erase_live_paint(coverage)
+			var bitmap:=layer.texture.get_image(); var bytes:=bitmap.get_data()
+			if coverage.get_size()!=bitmap.get_size(): coverage.resize(bitmap.get_width(),bitmap.get_height(),Image.INTERPOLATE_BILINEAR)
+			var mask_bytes:=coverage.get_data()
+			for offset in range(3,bytes.size(),4): bytes[offset]=roundi(bytes[offset]*(1.0-mask_bytes[offset]/255.0))
+			bitmap.set_data(bitmap.get_width(),bitmap.get_height(),false,Image.FORMAT_RGBA8,bytes); layer.texture=ImageTexture.create_from_image(bitmap))
+		canvas.clear_selection(); canvas.pixel_source=null; _set_tool("move"); return
 	var pixels: Image=canvas.pixel_source.duplicate()
 	var extracted:=Image.create(pixels.get_width(),pixels.get_height(),false,Image.FORMAT_RGBA8); extracted.fill(Color(0,0,0,0))
 	var area:=Rect2i(Vector2i(canvas.pixel_selection_bounds.position.floor()),Vector2i(canvas.pixel_selection_bounds.size.ceil())).intersection(Rect2i(Vector2i.ZERO,pixels.get_size()))
@@ -2607,7 +2689,7 @@ func _apply_pixel_selection(action: String) -> void:
 			var parent:=document.layer_for_id(layer.parent_id)
 			var inverse:=document.world_transform(parent).affine_inverse() if parent!=null else Transform2D.IDENTITY
 			layer.kind="basic"; layer.dimensions=baked.dimensions; layer.position=inverse*(baked.position+baked.dimensions*.5)-baked.dimensions*.5
-			layer.rotation=0; layer.opacity=1; layer.texture=baked.texture; layer.paint_base=baked.paint_base; layer.mask=null; layer.warp=null; layer.effects.clear(); layer.properties=baked.properties
+			layer.live_paint.clear(); layer.rotation=0; layer.opacity=1; layer.texture=baked.texture; layer.paint_base=baked.paint_base; layer.mask=null; layer.warp=null; layer.effects.clear(); layer.properties=baked.properties
 			layer.set_linear_basis(inverse)
 			var new_inverse:=document.world_transform(layer).affine_inverse()
 			for child in document.children(layer.id):
@@ -2756,10 +2838,10 @@ func _replace_image() -> void:
 	var property:=ActorProperty.new(); property.options={"extensions":IMAGE_EXTENSIONS,"file_picker":true}
 	var chosen:=await ActorProjectFilePicker.pick(self,property,"Replace layer image")
 	if chosen==ActorProjectFilePicker.EMPTY_RESOURCE:
-		_action(func(): layer.texture=null; layer.paint_base=null; layer.properties.erase("noise_image"); layer.properties.erase("image_path")); return
+		_action(func(): layer.live_paint.clear(); layer.texture=null; layer.paint_base=null; layer.properties.erase("noise_image"); layer.properties.erase("image_path")); return
 	if chosen.is_empty(): return
 	var bitmap:=Image.load_from_file(chosen)
-	if bitmap!=null: _action(func(): layer.texture=ImageTexture.create_from_image(bitmap); layer.paint_base=layer.texture; layer.properties.erase("noise_image"); layer.properties.image_path=chosen)
+	if bitmap!=null: _action(func(): layer.live_paint.clear(); layer.texture=ImageTexture.create_from_image(bitmap); layer.paint_base=layer.texture; layer.properties.erase("noise_image"); layer.properties.image_path=chosen)
 
 
 func _import_paths(paths: PackedStringArray,at: Vector2) -> void:
@@ -2796,7 +2878,7 @@ func save_project() -> void:
 
 
 func save_project_as() -> void:
-	var result:=await ActorProjectResourceSaveDialog.pick(self,"Save image project", "Image Project","tres",false)
+	var result:=await ActorProjectResourceSaveDialog.pick(self,"Save image project", "Image Project","tres",false,PackedStringArray(),func(): _finish_pending(); return document.snapshot())
 	if result.get("cancelled",true): return
 	document_path=str(result.path)
 	await _save_targets(false,true)
@@ -2804,7 +2886,7 @@ func save_project_as() -> void:
 
 func _wait_for_repair() -> void:
 	if canvas.repair_tool.active: canvas.repair_tool.finish()
-	while canvas.repair_tool.active or (canvas.repair_tool.engine.busy() and not canvas.repair_tool._generation_target.is_empty()): await get_tree().process_frame
+	while canvas._material_busy or canvas.repair_tool.active or (canvas.repair_tool.engine.busy() and not canvas.repair_tool._generation_target.is_empty()): await get_tree().process_frame
 
 func _save_targets(write_image: bool,write_project: bool) -> void:
 	if _busy: return
@@ -2859,13 +2941,14 @@ func _save_targets(write_image: bool,write_project: bool) -> void:
 func save_as() -> void:
 	_finish_pending()
 	var result:=await ActorProjectResourceSaveDialog.pick(self,"Save image as",
-		path.get_file().get_basename() if not path.is_empty() else "Untitled Image","png",false,PackedStringArray(SAVE_FORMATS))
+		path.get_file().get_basename() if not path.is_empty() else "Untitled Image","png",false,PackedStringArray(SAVE_FORMATS),func(): return document.snapshot())
 	if result.get("cancelled",true): return
 	document.output_path=str(result.path); path=document.output_path; source=path
 	await _save_targets(true,false)
 
 
 func _pack_project_textures(snapshot: KiwiImageDocument) -> void:
+	snapshot.pack_live_material_textures()
 	# Serialize compact lossless buffers, not millions of decimal RGBA bytes.
 	# Work only on the immutable save snapshot; live layer textures stay editable.
 	var packed: Dictionary={}
@@ -3637,8 +3720,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_run_named_command(command_name); get_viewport().set_input_as_handled(); return
 	if not event.ctrl_pressed and not event.alt_pressed and canvas.tool in ["brush","eraser","fill"]:
 		var index:=int(event.keycode)-KEY_0
-		if index>=0 and index<10 and index<(_paint_presets[canvas.tool] as Array).size():
-			canvas.cancel_gesture(); _apply_paint_preset(canvas.tool,_paint_presets[canvas.tool][index]); get_viewport().set_input_as_handled(); return
+		var filtered: Array=(_paint_presets[canvas.tool] as Array).filter(func(p: Dictionary): return _preset_filter=="all" or p.get("painting_mode","color")==_preset_filter)
+		if index>=0 and index<10 and index<filtered.size():
+			canvas.cancel_gesture(); _apply_paint_preset(canvas.tool,filtered[index]); get_viewport().set_input_as_handled(); return
 	if event.ctrl_pressed:
 		match event.keycode:
 			KEY_S:
@@ -3688,3 +3772,155 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			KEY_BRACKETRIGHT: canvas.brush_size=minf(500,canvas.brush_size+4); _refresh_context()
 			_: return
 	get_viewport().set_input_as_handled()
+
+func _painting_mode_controls(host: Node) -> void:
+	var mode:=OptionButton.new(); mode.name="PaintingMode"; mode.add_item("Color"); mode.add_item("Material"); mode.select(1 if canvas.painting_mode=="material" else 0); host.add_child(mode)
+	mode.item_selected.connect(func(index: int):
+		if canvas._material_busy: return
+		_finish_pending(); canvas.cancel_gesture(); canvas.painting_mode="material" if index==1 else "color"; _refresh_context())
+	if canvas.painting_mode=="color": _context_color("Color",host); return
+	_material_swatch=_button(host,canvas.repair_tool.material.label.left(16),func(): load("res://Workspaces/ImageWorkspace/texture_material_browser.gd").open(self),"Edit Natural Material; artwork stays visible","noise")
+	_material_swatch.custom_minimum_size=Vector2(92,28); _material_swatch.expand_icon=true; _material_swatch.add_theme_constant_override("icon_max_width",28)
+	_material_icon_for(_material_swatch,canvas.repair_tool.material)
+	var extent:=DragNumber.new(); extent.name="MaterialTextureSize"; extent.min_value=2; extent.max_value=2048; extent.step=1; extent.value=canvas.repair_tool.material.texture_size; extent.suffix="px"; extent.custom_minimum_size.x=74; extent.tooltip_text="Texture Size (independent of Brush Size)"; host.add_child(extent)
+	var change_size:=func(next: float):
+		var value:=canvas.repair_tool.material.copy_material(); value.texture_size=next; _material_changed(value)
+	extent.preview_changed.connect(change_size); extent.value_changed.connect(func(next: float): change_size.call(next); _material_edit_committed()); extent.drag_committed.connect(func(_next: float): _material_edit_committed()); extent.drag_cancelled.connect(func(): _cancel())
+	var strength:=DragNumber.new(); strength.name="MaterialStrength"; strength.min_value=0; strength.max_value=100; strength.step=1; strength.value=canvas.material_strength*100; strength.suffix="%"; strength.custom_minimum_size.x=64; strength.tooltip_text="Material strength"; host.add_child(strength)
+	strength.value_changed.connect(func(next: float): canvas.material_strength=next/100.0); strength.preview_changed.connect(func(next: float): canvas.material_strength=next/100.0)
+	var live:=CheckButton.new(); live.name="LiveEdit"; live.text="Live Edit"; live.button_pressed=document.live_edit_enabled; host.add_child(live)
+	live.toggled.connect(func(enabled: bool):
+		if canvas._material_busy: return
+		_finish_pending(); document.live_edit_enabled=enabled
+		if enabled and document.live_material_for_id(document.active_live_material_id)!=null: _select_live_material(document.active_live_material_id)
+		else: _refresh_context())
+
+func _material_edit_committed() -> void:
+	if not canvas._material_busy: _commit()
+
+func _material_changed(value: KiwiTextureMaterial) -> void:
+	if canvas._material_busy: return
+	canvas.repair_tool.material=value.copy_material()
+	var template=document.live_material_for_id(document.active_live_material_id)
+	if document.live_edit_enabled and template!=null:
+		_begin(); document.set_live_material(template.id,value); _preview()
+	else:
+		# Retain editability for legacy material layers without duplicating the old tool.
+		canvas.repair_tool.apply_material_settings(true)
+	if is_instance_valid(_material_swatch):
+		_material_swatch.text=value.label.left(16); _material_icon_for(_material_swatch,value)
+	for button in live_material_row.find_children("*","Button",true,false):
+		if template!=null and button.get_meta("live_material_id","")==document.active_live_material_id:
+			button.text=template.label; _material_icon_for(button,value)
+
+func _material_icon_for(button: Button,value: KiwiTextureMaterial) -> void:
+	var key:=str(hash(preload("res://scripts/materials/natural_material_engine.gd").settings_from_material(value)))
+	button.set_meta("material_thumbnail_key",key)
+	if _material_thumbnail_cache.has(key): button.icon=_material_thumbnail_cache[key]; return
+	for index in range(_material_thumbnail_requests.size()-1,-1,-1):
+		if _material_thumbnail_requests[index].button.get_ref()==button: _material_thumbnail_requests.remove_at(index)
+	_material_thumbnail_requests.append({"button":weakref(button),"material":value.copy_material(),"key":key})
+	if not _material_thumbnail_busy: _render_material_thumbnails()
+
+func _render_material_thumbnails() -> void:
+	_material_thumbnail_busy=true
+	while not _material_thumbnail_requests.is_empty():
+		var request: Dictionary=_material_thumbnail_requests.pop_front()
+		if request.button.get_ref()==null or request.button.get_ref().get_meta("material_thumbnail_key","")!=request.key: continue
+		var key: String=request.key
+		if not _material_thumbnail_cache.has(key):
+			var bitmap: Image=await preload("res://Workspaces/ImageWorkspace/texture_material_renderer.gd").preview(self,request.material,Vector2i(64,40))
+			if bitmap==null: continue
+			if _material_thumbnail_cache.size()>96: _material_thumbnail_cache.erase(_material_thumbnail_cache.keys()[0])
+			_material_thumbnail_cache[key]=ImageTexture.create_from_image(bitmap)
+		var button: Button=request.button.get_ref()
+		if is_instance_valid(button) and button.get_meta("material_thumbnail_key","")==key: button.icon=_material_thumbnail_cache[key]
+	_material_thumbnail_busy=false
+
+func _live_material_controls() -> void:
+	if canvas.painting_mode!="material" or not document.live_edit_enabled or canvas.tool not in ["brush","fill"]: return
+	live_material_panel.show()
+	var caption:=Label.new(); caption.text="LIVE MATERIALS"; caption.add_theme_font_size_override("font_size",11); live_material_row.add_child(caption)
+	_button(live_material_row,"+ New",func():
+		if canvas._material_busy: return
+		_action(func(): document.create_live_material(canvas.repair_tool.material))
+		_refresh_context(),"Own a new independent set of painted regions")
+	var scroll:=ScrollContainer.new(); scroll.size_flags_horizontal=Control.SIZE_EXPAND_FILL; scroll.custom_minimum_size=Vector2(150,36); scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED; live_material_row.add_child(scroll)
+	var row:=HBoxContainer.new(); scroll.add_child(row)
+	for template in document.live_materials:
+		var button:=_button(row,template.label,func(): _select_live_material(template.id),"Select material settings and paint more linked regions")
+		button.set_meta("live_material_id",template.id); button.toggle_mode=true; button.set_pressed_no_signal(template.id==document.active_live_material_id); button.expand_icon=true; button.add_theme_constant_override("icon_max_width",28); _material_icon_for(button,template.material)
+		button.gui_input.connect(func(event: InputEvent):
+			if event is InputEventMouseButton and event.pressed and event.button_index==MOUSE_BUTTON_RIGHT: _live_material_menu(template.id))
+	var bake:=_button(live_material_row,"Bake",_bake_active_material,"Convert only this template's paint into raster pixels; undo available")
+	var remove:=_button(live_material_row,"Delete",_delete_active_material,"Delete only this template's unbaked artwork; undo available")
+	bake.disabled=document.active_live_material_id.is_empty(); remove.disabled=bake.disabled
+
+func _select_live_material(id: String) -> void:
+	if canvas._material_busy: return
+	_finish_pending(); canvas.cancel_gesture()
+	var template=document.live_material_for_id(id)
+	if template==null: return
+	document.active_live_material_id=id; canvas.repair_tool.material=template.material.copy_material(); _refresh_context()
+	var browser:=get_node_or_null("MaterialBrowser")
+	if browser!=null: browser.set_material_value(template.material)
+
+func _live_material_menu(id: String) -> void:
+	if canvas._material_busy: return
+	var template=document.live_material_for_id(id)
+	if template==null: return
+	var menu:=PopupMenu.new(); add_child(menu); menu.add_item("Rename",0); menu.add_check_item("Visible",1); menu.set_item_checked(1,template.visible)
+	menu.add_item("Duplicate settings",2)
+	menu.id_pressed.connect(func(action: int):
+		if canvas._material_busy: return
+		if action==0: _name_dialog("Rename Live Material",template.label,func(text: String): _action(func(): template.label=text); _refresh_context())
+		elif action==1: _action(func(): template.visible=not template.visible)
+		else: _action(func(): document.create_live_material(template.material,template.label+" copy"))
+		_refresh_context())
+	menu.popup_hide.connect(menu.queue_free); menu.position=Vector2i(get_global_mouse_position()); menu.popup()
+
+func _bake_active_material() -> void:
+	if canvas._material_busy: return
+	_finish_pending(); var id:=document.active_live_material_id
+	if document.live_material_for_id(id)==null: return
+	var baking_document:=document
+	_begin(); canvas._material_busy=true
+	renderer.sync(document)
+	var success: bool=await renderer.bake_live_material(id)
+	canvas._material_busy=false
+	if document!=baking_document: return
+	if success: _commit(); status.text="Material baked into editable pixels. Undo restores its template."
+	else: _cancel(); status.text="Show this template before baking, then try again."
+	_refresh_context(); _refresh_layers()
+
+func _delete_active_material() -> void:
+	if canvas._material_busy: return
+	var id:=document.active_live_material_id
+	if document.live_material_for_id(id)==null: return
+	var owner:=document
+	var remove:=func():
+		if canvas._material_busy or document!=owner: return
+		_action(func(): document.delete_live_material(id)); _refresh_context(); status.text="Live material and its artwork deleted. Undo restores both."
+	if not document.live_material_has_artwork(id): remove.call(); return
+	var dialog:=ConfirmationDialog.new(); dialog.title="Delete Live Material"; dialog.dialog_text="Delete this template and all of its unbaked artwork? Other artwork is kept. You can undo this action."; add_child(dialog)
+	dialog.confirmed.connect(func(): remove.call(); dialog.queue_free()); dialog.canceled.connect(dialog.queue_free); dialog.popup_centered()
+
+func _name_dialog(title: String,current: String,save_callback: Callable) -> void:
+	var dialog:=ConfirmationDialog.new(); dialog.title=title; add_child(dialog)
+	var entry:=LineEdit.new(); entry.text=current; entry.custom_minimum_size=Vector2(280,32); dialog.add_child(entry)
+	dialog.confirmed.connect(func(): if not entry.text.strip_edges().is_empty(): save_callback.call(entry.text.strip_edges()); dialog.queue_free())
+	dialog.canceled.connect(dialog.queue_free); dialog.popup_centered(); entry.grab_focus(); entry.select_all()
+
+func _paint_preset_menu(kind: String,preset: Dictionary) -> void:
+	var menu:=PopupMenu.new(); add_child(menu)
+	menu.add_item("Rename",0); menu.add_item("Duplicate",1); menu.add_check_item("Favorite",2); menu.set_item_checked(2,bool(preset.get("favorite",false))); menu.add_item("Delete",3)
+	menu.id_pressed.connect(func(action: int):
+		if action==0:
+			_name_dialog("Rename Brush Preset",str(preset.get("name","Preset")),func(text: String): preset.name=text; _persist_paint_presets(); _refresh_context())
+		elif action==1:
+			var copy:=preset.duplicate(true); copy.id=ActorData.new_id(); copy.name=str(preset.get("name","Preset"))+" copy"
+			if preset.get("material") is KiwiTextureMaterial: copy.material=preset.material.copy_material()
+			_paint_presets[kind].append(copy); _persist_paint_presets(); _refresh_context()
+		elif action==2: preset.favorite=not bool(preset.get("favorite",false)); _persist_paint_presets(); _refresh_context()
+		else: _delete_paint_preset(kind,str(preset.id)))
+	menu.popup_hide.connect(menu.queue_free); menu.position=Vector2i(get_global_mouse_position()); menu.popup()

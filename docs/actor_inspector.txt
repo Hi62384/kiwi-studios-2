@@ -1,0 +1,29 @@
+ACTOR INSPECTOR
+===============
+The two main tabs at the top stay fixed while property fields scroll:
+
+Actor: shared settings such as the actor's name, position, rotation, scale and
+screen-space layout/size. Transform is the initial Actor section.
+
+Properties: settings specific to the selected actor type, including shapes,
+media, materials, camera settings, rig poses and transformation-image states.
+
+Sections are tabs down the left side. Only one section is shown at a time.
+Long section lists scroll separately, and the selected section is brought into
+view when restored. Long tab names have full-name tooltips and the active page
+also shows its full section heading. Nested resources retain their expandable
+controls within the relevant page.
+
+Each actor remembers its main tab, section within each main tab, and scroll
+position within each section. This state is retained across reselection,
+inspector rebuilds, scene tabs and native scene save/load. The existing nested
+resource expansion and vector-link settings remain independent. Navigation is
+editor state, not an undo action; property changes and keyframes still use the
+normal scene undo/redo history.
+
+File previews temporarily replace the actor inspector and hide its actor tabs.
+Selecting an actor restores that actor's inspector navigation.
+
+ActorProperty options may explicitly set inspector_tab to Actor or Properties.
+Otherwise position, rotation, scale and the Transform/Layout groups are shared
+Actor settings; all other definition properties are type-specific Properties.

@@ -14,14 +14,23 @@ func _ready() -> void:
 	await get_tree().process_frame
 	update_root_folder()
 	
-	#constantly scan filesystem for change
-	while true:
-		var files_remaining = _all_files_paths.duplicate()
-		files_remaining.remove_at(0)
-		var result = _scan_folder_for_change(get_project_root_directory(), files_remaining, 0)
-		if result != files_remaining.size():
-			update_root_folder()
-		await get_tree().create_timer(_TIME_BETWEEN_SCANS).timeout
+	# A node-owned timer is cancelled on shutdown; a perpetual awaited
+	# SceneTreeTimer kept coroutine state alive after this workspace closed.
+	var scan_timer := Timer.new()
+	scan_timer.wait_time = _TIME_BETWEEN_SCANS
+	add_child(scan_timer)
+	scan_timer.timeout.connect(_scan_changes)
+	scan_timer.start()
+
+func _scan_changes() -> void:
+	if get_current_project() == null: return
+	var files_remaining = _all_files_paths.duplicate()
+	if not files_remaining.is_empty(): files_remaining.remove_at(0)
+	var result = _scan_folder_for_change(get_project_root_directory(), files_remaining, 0)
+	if result != files_remaining.size(): update_root_folder()
+
+func _exit_tree() -> void:
+	if node == self: node = null
 
 
 

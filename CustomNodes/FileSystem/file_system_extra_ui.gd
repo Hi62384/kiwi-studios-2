@@ -48,6 +48,11 @@ func display_operations(expandable_button: ExpandableButton) -> void:
 	_current_dialouge.create_new_folder_button.pressed.connect(create_folder)
 	_current_dialouge.delete_button.pressed.connect(show_delete_options)
 	_current_dialouge.duplicate_button.pressed.connect(duplicate_files)
+	var clipboard:=Button.new(); clipboard.text="Copy to Super Clipboard"; _current_dialouge.duplicate_button.get_parent().add_child(clipboard)
+	clipboard.pressed.connect(func():
+		for path: String in _arr_of_top_selected_file_paths():
+			if FileAccess.file_exists(path): KiwiSuperClipboardService.instance.quick_save(path,path.get_file().get_basename())
+		if is_instance_valid(_current_dialouge): _current_dialouge.queue_free())
 
 
 

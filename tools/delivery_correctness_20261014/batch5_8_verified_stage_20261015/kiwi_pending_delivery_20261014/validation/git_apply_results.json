@@ -1,0 +1,42 @@
+{
+  "pass": true,
+  "git_version": "git version 2.52.0",
+  "scope": "Fresh cloud temporary repository on exact batch3, existing original diffs unchanged, git apply --check then git apply in order4-8; all76 hashes checked after each. No native access.",
+  "results": [
+    {
+      "batch": 4,
+      "git_apply_check_exit": 0,
+      "git_apply_exit": 0,
+      "all76_postcondition_exact": true,
+      "warnings": ""
+    },
+    {
+      "batch": 5,
+      "git_apply_check_exit": 0,
+      "git_apply_exit": 0,
+      "all76_postcondition_exact": true,
+      "warnings": ""
+    },
+    {
+      "batch": 6,
+      "git_apply_check_exit": 0,
+      "git_apply_exit": 0,
+      "all76_postcondition_exact": true,
+      "warnings": ""
+    },
+    {
+      "batch": 7,
+      "git_apply_check_exit": 0,
+      "git_apply_exit": 0,
+      "all76_postcondition_exact": true,
+      "warnings": ""
+    },
+    {
+      "batch": 8,
+      "git_apply_check_exit": 0,
+      "git_apply_exit": 0,
+      "all76_postcondition_exact": true,
+      "warnings": ""
+    }
+  ]
+}

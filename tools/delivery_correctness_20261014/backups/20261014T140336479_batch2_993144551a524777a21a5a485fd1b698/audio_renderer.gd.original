@@ -1,0 +1,599 @@
+class_name KiwiAudioRenderer
+extends RefCounted
+## Streaming FFmpeg render graph. Original assets are never modified.
+static var _afir_capabilities:Dictionary={}
+static var _capability_mutex:=Mutex.new()
+static var _publish_mutex:=Mutex.new()
+static func render(document: KiwiAudioDocument, destination: String, options: Dictionary = {}, job: RefCounted = null) -> Dictionary:
+ var started := Time.get_ticks_msec()
+ if job!=null and job.is_cancelled():return {"success":false,"error":"Cancelled."}
+ var timing_error:=document.midi_timing_error()
+ if not timing_error.is_empty():return {"success":false,"error":timing_error}
+ document=document.snapshot()
+ var note_error:=KiwiAudioEditSession.render_current_notes(document,job)
+ if not note_error.is_empty():return {"success":false,"error":note_error}
+ var errors := document.validate()
+ if not errors.is_empty(): return {"success": false, "error": "\n".join(errors)}
+ if FileAccess.file_exists(destination): return {"success": false, "error": "The destination already exists. Choose a new name to preserve the existing file."}
+ var extension := destination.get_extension().to_lower()
+ if extension not in ["wav", "mp3", "ogg", "flac"]: return {"success": false, "error": "Choose WAV, MP3, Ogg Vorbis, or FLAC."}
+ var encoder := ActorVideo.executable("ffmpeg")
+ if encoder.is_empty(): return _fallback_wav(document, destination, options, job)
+ var rate := clampi(int(options.get("sample_rate", 44100)), 8000, 192000)
+ var channels := 1 if bool(options.get("mono", false)) else 2
+ var directory := ProjectSettings.globalize_path("user://audio_workspace/jobs/" + ActorData.new_id())
+ DirAccess.make_dir_recursive_absolute(directory)
+ var graph := build_graph(document, directory, options, rate, job)
+ if not str(graph.get("error", "")).is_empty():
+  graph.success=false
+  return finish_process_files(graph,directory)
+ var graph_file := directory.path_join("mix.ffgraph")
+ var file := FileAccess.open(graph_file, FileAccess.WRITE)
+ if file == null:
+  _remove_owned(directory)
+  return {"success": false, "error": "Could not create the temporary render graph."}
+ file.store_string(graph.graph); file.close()
+ var temporary := directory.path_join("render." + extension)
+ var args := PackedStringArray(["-nostdin", "-hide_banner", "-v", "error", "-n", "-threads", "1", "-filter_complex_threads", "1"])
+ args.append_array(graph.inputs)
+ args.append_array(PackedStringArray(["-filter_complex_script", graph_file, "-map", "[output]", "-ar", str(rate), "-ac", str(channels)]))
+ var depth := int(options.get("bit_depth", 24))
+ match extension:
+  "wav": args.append_array(PackedStringArray(["-c:a", "pcm_s24le" if depth == 24 else ("pcm_f32le" if depth == 32 else "pcm_s16le")]))
+  "mp3": args.append_array(PackedStringArray(["-c:a", "libmp3lame", "-b:a", str(clampi(int(options.get("bitrate", 192)), 64, 320)) + "k"]))
+  "ogg": args.append_array(PackedStringArray(["-c:a", "libvorbis", "-q:a", str(clampi(int(options.get("quality", 6)), 0, 10)), "-page_duration", "1"]))
+  "flac": args.append_array(PackedStringArray(["-c:a", "flac", "-sample_fmt", "s32" if depth >= 24 else "s16"]))
+ args.append_array(PackedStringArray(["-metadata", "title=" + document.title, "-metadata", "comment=Created in Kiwi Studios Audio Workspace", "-progress", "pipe:1", temporary]))
+ if job != null: job.update(0.05, "Rendering audio")
+ var result := execute(encoder, args, float(graph.duration), job)
+ # Lossy synthesis can overshoot a pre-encode limiter. Inspect the actual
+ # decoded floating-point output, attenuate the original graph, and re-encode.
+ # Never normalize from a clipped 16-bit decode or re-encode a lossy file.
+ if bool(result.success) and extension in ["mp3", "ogg"]:
+  var correction_db := 0.0
+  for attempt in 3:
+   var verification := encoded_peak(encoder, temporary, float(graph.duration), job)
+   if not bool(verification.get("success", false)):
+    result = verification
+    break
+   result.decoded_peak_db = verification.peak_db
+   if float(verification.peak_db) <= -0.05: break
+   if attempt == 2:
+    result = {"success": false, "error": "The lossy encoder exceeded safe decoded peak headroom. Export WAV or FLAC instead."}
+    break
+   correction_db -= maxf(0.5, float(verification.peak_db) + 0.5)
+   file = FileAccess.open(graph_file, FileAccess.WRITE)
+   if file == null:
+    result = {"success": false, "error": "Could not update the safety-corrected render graph."}
+    break
+   file.store_string(str(graph.graph).replace("[output]", ",volume=%sdB[output]" % KiwiAudioEffects.number(correction_db)))
+   file.close()
+   if DirAccess.remove_absolute(temporary) != OK:
+    result = {"success": false, "error": "Could not replace the temporary safety render."}
+    break
+   result = execute(encoder, args, float(graph.duration), job)
+   if not bool(result.success): break
+   result.encoding_headroom_db = correction_db
+ if job!=null and job.is_cancelled():
+  result.success=false
+  result.error="Cancelled." + (" Encoder exit could not be confirmed; temporary files were retained." if bool(result.get("cleanup_pending",false)) else "")
+ if bool(result.success):
+  var saved:=_publish_complete(temporary,destination,job)
+  if not bool(saved.success):
+   result.success=false;result.error=saved.error
+  else:
+   result.path = destination
+   result.duration = graph.duration
+   result.sample_rate = rate
+   result.channels = channels
+   result.seconds = (Time.get_ticks_msec() - started) / 1000.0
+ return finish_process_files(result,directory)
+
+static func execute(encoder: String, args: PackedStringArray, duration: float = 1, job: RefCounted = null) -> Dictionary:
+ return KiwiAudioEncoderProcess.run(encoder, args, duration, job)
+
+static func encoded_peak(encoder: String, path: String, duration: float, job: RefCounted = null) -> Dictionary:
+ var result := execute(encoder, PackedStringArray(["-nostdin", "-hide_banner", "-v", "info", "-threads", "1", "-i", path, "-af", "astats=metadata=0:reset=0", "-f", "null", "-"]), duration, job)
+ if not bool(result.success): return result
+ var peak := -120.0
+ var found := false
+ for line in str(result.get("diagnostics", "")).split("\n"):
+  var offset := line.find("Peak level dB:")
+  if offset < 0: continue
+  var value := line.substr(offset + 14).strip_edges()
+  if value.to_lower().contains("inf"):
+   if value.begins_with("-"): found = true
+   else: return {"success": false, "error": "Non-finite samples in encoded audio."}
+  elif value.is_valid_float():
+   found = true
+   peak = maxf(peak, float(value))
+ if not found: return {"success": false, "error": "Could not verify the encoded audio peak."}
+ return {"success": true, "peak_db": peak, "error": ""}
+
+static func build_graph(document: KiwiAudioDocument, directory: String, options: Dictionary, rate: int, job:RefCounted=null) -> Dictionary:
+ var bypass_track := bool(options.get("bypass_track_processing", false))
+ var bypass_master := bool(options.get("bypass_master_processing", false))
+ var automation_error := unsupported_automation(document, options)
+ if not automation_error.is_empty(): return {"error": automation_error}
+ var inputs: Array[String] = []
+ var filters := PackedStringArray()
+ var by_track := {}
+ var serial := 0
+ var selected: Array = options.get("clip_ids", [])
+ var selected_track := str(options.get("track_id", ""))
+ var total := maxf(1.0 / rate, document.duration())
+ var route_tails := {}
+ var solo_ids: Array[String] = []
+ if not selected_track.is_empty() and document.track_for_id(selected_track).is_empty(): return {"error": "The selected stem track is missing."}
+ for track in document.tracks:
+  by_track[track.id] = PackedStringArray()
+  route_tails[track.id] = 0.0
+  if bool(track.get("solo", false)): solo_ids.append(str(track.id))
+ for index in document.clips.size():
+  var clip := document.clips[index]
+  var actor := document.actors[index]
+  var track := document.track_for_clip(clip.id)
+  if not selected.is_empty() and not selected.has(clip.id): continue
+  if not selected_track.is_empty() and not route_reaches(document, str(track.id), selected_track): continue
+  if bool(actor.values.get(&"muted", false)) or (not bypass_track and bool(track.get("mute", false))): continue
+  if not bypass_track and not solo_ids.is_empty():
+   var audible := false
+   for solo_id in solo_ids:
+    if route_reaches(document, str(track.id), solo_id): audible = true; break
+   if not audible: continue
+  var value: Variant = actor.values.get(&"audio")
+  var source := str(value) if value is String else ""
+  if source.is_empty():
+   var stream := ActorAudio.source(value,job)
+   if stream == null: return {"error": "Missing source for " + actor.display_name}
+   source = directory.path_join("source_%d.wav" % index)
+   var wav := stream as AudioStreamWAV
+   if wav == null:
+    var decoded := KiwiAudioSourceCache.decode(stream, rate)
+    if not str(decoded.error).is_empty(): return {"error": decoded.error}
+    wav = KiwiAudioSourceCache.to_wav(decoded.samples, rate)
+   if wav.save_to_wav(source) != OK: return {"error": "Could not stage the embedded source."}
+  if not FileAccess.file_exists(source): return {"error": "Missing source: " + source}
+  var input_number:=inputs.count("-i")
+  if bool(actor.values.get(&"loop", false)): inputs.append_array(PackedStringArray(["-stream_loop", "-1"]))
+  inputs.append_array(PackedStringArray(["-i", ProjectSettings.globalize_path(source)]))
+  var chain := PackedStringArray(["apad=pad_dur=0.01", "aresample=%d" % rate, "aformat=sample_fmts=fltp:channel_layouts=stereo", "atrim=start=%s:duration=%s" % [KiwiAudioEffects.number(clip.source_offset), KiwiAudioEffects.number(clip.duration * clip.playback_speed)], "asetpts=PTS-STARTPTS"])
+  if bool(actor.values.get(&"reverse", false)): chain.append("areverse")
+  var pitch_points:Array=actor.values.get(&"automation",{}).get("pitch",[])
+  var pitch := 1.0 if not pitch_points.is_empty() else clampf(float(actor.values.get(&"pitch", 1)), 0.05, 16)
+  if not is_equal_approx(pitch, 1.0): chain.append("asetrate=%s,aresample=%d" % [KiwiAudioEffects.number(rate * pitch), rate])
+  if not is_equal_approx(clip.playback_speed / pitch, 1.0): chain.append(KiwiAudioEffects.tempo_filter(clip.playback_speed / pitch))
+  var fade_in := clampf(float(actor.values.get(&"fade_in", 0.003)), 0, clip.duration)
+  var fade_out := clampf(float(actor.values.get(&"fade_out", 0.005)), 0, clip.duration)
+  var curve := "qsin" if str(actor.values.get(&"fade_curve", "")) == "equal_power" else "tri"
+  if fade_in > 0: chain.append("afade=t=in:d=%s:curve=%s" % [KiwiAudioEffects.number(fade_in), curve])
+  if fade_out > 0: chain.append("afade=t=out:st=%s:d=%s:curve=%s" % [KiwiAudioEffects.number(clip.duration - fade_out), KiwiAudioEffects.number(fade_out), curve])
+  var effects: Array = actor.values.get(&"effects", [])
+  if not pitch_points.is_empty():
+   effects=effects.duplicate(true)
+   var bend:=KiwiAudioEffects.create("hq_pitch");bend.parameters.semitones=12*log(maxf(0.05,float(actor.values.get(&"pitch",1))))/log(2.0)
+   var bend_curve:Array=[]
+   for point in pitch_points:bend_curve.append({"time":point.time,"value":clampf(12*log(clampf(float(point.value),0.25,4))/log(2.0),-24,24),"curve":point.get("curve","linear")})
+   bend.automation.semitones=bend_curve;effects.push_front(bend)
+  var processed:=_ordered_effect_chain(effects,rate,"clip"+str(index),directory,inputs,filters,str(input_number)+":a",chain,clip.duration,job)
+  if not str(processed.error).is_empty():return processed
+  filters=processed.filters;chain=processed.chain
+  var source_label:=str(processed.input_label)
+  chain.append(gain_filter(actor.values.get(&"automation", {}).get("volume_db", []), float(actor.values.get(&"volume_db", 0))))
+  chain.append(pan_automation_filter(actor.values.get(&"automation", {}).get("pan", []), float(actor.values.get(&"pan", 0))))
+  chain.append("adelay=%dS:all=1" % int(round(clip.start_time * rate)))
+  var label := "clip_%d" % index
+  filters.append("[%s]%s[%s]" % [source_label, ",".join(chain), label])
+  by_track[track.id].append("[" + label + "]")
+  route_tails[track.id] = maxf(float(route_tails[track.id]), KiwiAudioEffects.tail_seconds(effects))
+ var remaining := document.tracks.duplicate()
+ var destination_labels := PackedStringArray()
+ var max_tail := 0.0
+ while not remaining.is_empty():
+  var candidate := -1
+  for i in remaining.size():
+   var id := str(remaining[i].id)
+   var receives := false
+   for other in remaining:
+    if str(other.id) == id: continue
+    if str(other.get("output", "")) == id: receives = true
+    for send in other.get("sends", []):
+     if str(send.get("target", "")) == id: receives = true
+   if not receives: candidate = i; break
+  if candidate < 0: return {"error": "Track output or send routing contains a feedback loop."}
+  var track: Dictionary = remaining[candidate]
+  remaining.remove_at(candidate)
+  var labels: PackedStringArray = by_track[track.id]
+  if labels.is_empty(): continue
+  var mixed := "mix_%d" % serial; serial += 1
+  filters.append("%samix=inputs=%d:normalize=0:dropout_transition=0[%s]" % ["".join(labels), labels.size(), mixed])
+  var chain := PackedStringArray()
+  var processed:=_ordered_effect_chain([] if bypass_track else track.get("effects",[]),rate,"track"+str(track.id),directory,inputs,filters,mixed,chain,document.duration()+float(route_tails[track.id]),job)
+  if not str(processed.error).is_empty():return processed
+  filters=processed.filters;chain=processed.chain
+  var track_input:=str(processed.input_label)
+  chain.append(gain_filter([] if bypass_track else track.get("automation", {}).get("volume_db", []), 0.0 if bypass_track else float(track.get("volume_db", 0))))
+  chain.append(pan_automation_filter([] if bypass_track else track.get("automation", {}).get("pan", []), 0.0 if bypass_track else float(track.get("pan", 0))))
+  if not bypass_track and bool(track.get("mute", false)): chain.append("volume=0")
+  var output := "track_%d" % serial; serial += 1
+  filters.append("[%s]%s[%s]" % [track_input, ",".join(chain), output])
+  var track_tail := float(route_tails[track.id]) + (0.0 if bypass_track else KiwiAudioEffects.tail_seconds(track.get("effects", [])))
+  # A stem includes every upstream output/send dependency, then taps only the
+  # requested track. Other dry outputs and sends are excluded from that stem.
+  var branches: Array[Dictionary] = []
+  if bypass_track or (not selected_track.is_empty() and str(track.id) == selected_track):
+   branches.append({"target": "", "gain": 0.0})
+  else:
+   var target := str(track.get("output", ""))
+   if selected_track.is_empty() or (not target.is_empty() and route_reaches(document, target, selected_track)):
+    branches.append({"target": target, "gain": 0.0})
+   for send in track.get("sends", []):
+    var target_id := str(send.get("target", ""))
+    if not by_track.has(target_id): return {"error": "Missing send target."}
+    if selected_track.is_empty() or route_reaches(document, target_id, selected_track):
+     branches.append({"target": target_id, "gain": float(send.get("volume_db", -12))})
+  if branches.is_empty():
+   filters.append("[%s]anullsink" % output)
+   continue
+  var labels_out := PackedStringArray()
+  for branch_index in branches.size(): labels_out.append("branch_%d_%d" % [serial, branch_index])
+  serial += 1
+  if branches.size() > 1:
+   var pads := ""
+   for label in labels_out: pads += "[" + label + "]"
+   filters.append("[%s]asplit=%d%s" % [output, branches.size(), pads])
+  else: labels_out[0] = output
+  for branch_index in branches.size():
+   var branch: Dictionary = branches[branch_index]
+   var label := "route_%d" % serial; serial += 1
+   filters.append("[%s]volume=%sdB[%s]" % [labels_out[branch_index], KiwiAudioEffects.number(branch.gain), label])
+   var target := str(branch.target)
+   if target.is_empty():
+    destination_labels.append("[" + label + "]")
+    max_tail = maxf(max_tail, track_tail)
+   elif by_track.has(target):
+    by_track[target].append("[" + label + "]")
+    route_tails[target] = maxf(float(route_tails[target]), track_tail)
+ var tail := float(options.get("tail_seconds", max_tail + (0.0 if bypass_master else KiwiAudioEffects.tail_seconds(document.master.get("effects", []))))) if bool(options.get("include_tail", true)) else 0.0
+ total += maxf(0, tail)
+ var master_in := "master_in"
+ if destination_labels.is_empty(): filters.append("anullsrc=r=%d:cl=stereo:d=%s[%s]" % [rate, KiwiAudioEffects.number(total), master_in])
+ else: filters.append("%samix=inputs=%d:normalize=0:dropout_transition=0[%s]" % ["".join(destination_labels), destination_labels.size(), master_in])
+ var master_chain := PackedStringArray()
+ var processed:=_ordered_effect_chain([] if bypass_master else document.master.get("effects",[]),rate,"master",directory,inputs,filters,master_in,master_chain,document.duration()+max_tail,job)
+ if not str(processed.error).is_empty():return processed
+ filters=processed.filters;master_chain=processed.chain
+ master_in=str(processed.input_label)
+ master_chain.append(gain_filter([] if bypass_master else document.master.get("automation", {}).get("volume_db", []), 0.0 if bypass_master else float(document.master.get("volume_db", -3))))
+ if bool(options.get("normalize", false)): master_chain.append("loudnorm=I=%s:TP=-1:LRA=11" % KiwiAudioEffects.number(options.get("target_lufs", -16)))
+ master_chain.append("aresample=%d" % rate)
+ master_chain.append("alimiter=limit=0.966:level=false:latency=true")
+ master_chain.append("apad=whole_dur=%s" % KiwiAudioEffects.number(total))
+ var range_start := clampf(float(options.get("start", 0)), 0, total)
+ var range_length := clampf(float(options.get("duration", total - range_start)), 0, total - range_start)
+ if range_length <= 0: return {"error": "The export range is empty."}
+ master_chain.append("atrim=start_sample=%d:end_sample=%d,asetpts=PTS-STARTPTS" % [int(round(range_start * rate)), int(round((range_start + range_length) * rate))])
+ filters.append("[%s]%s[output]" % [master_in, ",".join(master_chain)])
+ return {"inputs": PackedStringArray(inputs), "graph": ";\n".join(filters), "duration": range_length, "error": ""}
+
+# Doppler is a source-time resampler, not a static FFmpeg pan/pitch shortcut.
+# Every split stages the exact upstream ordered signal; later effects consume
+# its float32 result. The graph keeps the earlier branch as an explicit sink.
+static func _ordered_effect_chain(effects:Array,rate:int,context:String,directory:String,inputs:Array[String],filters:PackedStringArray,input_label:String,chain:PackedStringArray,duration:float,job:RefCounted=null)->Dictionary:
+ var pending:Array=[]
+ var current_duration:=maxf(1.0/rate,duration)
+ var part:=0
+ for index in effects.size():
+  var effect:Dictionary=effects[index]
+  if not bool(effect.get("enabled",true)):continue
+  if str(effect.get("type",""))!="doppler":
+   pending.append(effect)
+   continue
+  var parameters:Dictionary=KiwiAudioDoppler.parameters(effect.get("parameters",{}))
+  if float(parameters.mix)<=0.0:continue
+  var prepared:=effect_chain(pending,rate,context+"_part"+str(part),directory,inputs,job)
+  if not str(prepared.get("error","")).is_empty():return prepared
+  if not str(prepared.filter).is_empty():chain.append(str(prepared.filter))
+  current_duration+=KiwiAudioEffects.tail_seconds(pending)
+  pending.clear()
+  var tail:=KiwiAudioDoppler.tail_seconds(parameters)
+  var input_frames:=ceili(current_duration*rate)
+  var output_frames:=input_frames+ceili(tail*rate)
+  if output_frames*8>KiwiAudioDoppler.MAX_STAGE_BYTES:
+   return {"error":"Doppler staging is limited to 512 MiB per stereo float stage. Split or bake a shorter region."}
+  # Across all ordered stages, retained intermediates are capped separately.
+  if _staging_bytes(directory)+(input_frames+output_frames)*8>2*1024*1024*1024:
+   return {"error":"Doppler intermediates exceed the 2 GiB job staging limit. Split or bake a shorter region."}
+  var tag:="doppler_"+(context+"_"+str(index)).sha256_text().substr(0,16)
+  if chain.is_empty():chain.append("anull")
+  # Stage through natural EOF. Padding/trimming to an estimated duration here
+  # would change ordered stretch/time-warp/reverse semantics downstream.
+  filters.append("[%s]%s[%s]"%[input_label,",".join(chain),tag])
+  var raw_path:=directory.path_join(tag+"_input.f32")
+  var wet_path:=directory.path_join(tag+"_output.f32")
+  var tail_bytes:=ceili(tail*rate)*8
+  var input_budget:=mini(KiwiAudioDoppler.MAX_STAGE_BYTES-tail_bytes,maxi(0,(2*1024*1024*1024-_staging_bytes(directory)-tail_bytes)/2))
+  var rendered:=_render_float_stage(inputs,filters,tag,raw_path,rate,input_frames,input_budget,job)
+  if not bool(rendered.get("success",false)):return rendered
+  var actual_frames:=int(rendered.stage_frames)
+  if _staging_bytes(directory)+(actual_frames+ceili(tail*rate))*8>2*1024*1024*1024:
+   return {"error":"Doppler intermediates exceed the 2 GiB job staging limit. Split or bake a shorter region."}
+  var processed:=KiwiAudioDoppler.process_f32(raw_path,wet_path,effect,rate,job)
+  if not bool(processed.get("success",false)):return processed
+  DirAccess.remove_absolute(raw_path)
+  filters.append("[%s]anullsink"%tag)
+  var next_input:=inputs.count("-i")
+  inputs.append_array(["-f","f32le","-ar",str(rate),"-ac","2","-i",wet_path])
+  input_label=str(next_input)+":a"
+  chain=PackedStringArray()
+  current_duration=float(processed.duration)
+  part+=1
+ var prepared:=effect_chain(pending,rate,context+"_part"+str(part),directory,inputs,job)
+ if not str(prepared.get("error","")).is_empty():return prepared
+ if not str(prepared.filter).is_empty():chain.append(str(prepared.filter))
+ return {"error":"","filters":filters,"input_label":input_label,"chain":chain}
+
+static func _staging_bytes(directory:String)->int:
+ var total:=0
+ var access:=DirAccess.open(directory)
+ if access==null:return 0
+ for name in access.get_files():
+  var file:=FileAccess.open(directory.path_join(name),FileAccess.READ)
+  if file!=null:total+=file.get_length();file.close()
+ return total
+
+static func _render_float_stage(inputs:Array[String],filters:PackedStringArray,label:String,path:String,rate:int,frames:int,max_bytes:int,job:RefCounted)->Dictionary:
+ if job!=null and job.is_cancelled():return {"success":false,"error":"Cancelled."}
+ var encoder:=ActorVideo.executable("ffmpeg")
+ if encoder.is_empty():return {"success":false,"error":"FFmpeg is required for offline Doppler."}
+ var graph:=_stage_graph(filters,label)
+ var graph_path:=path+".ffgraph"
+ var file:=FileAccess.open(graph_path,FileAccess.WRITE)
+ if file==null:return {"success":false,"error":"Could not create the Doppler staging graph."}
+ file.store_string(graph)
+ var graph_bytes:=file.get_position();file.close()
+ max_bytes=maxi(0,max_bytes-graph_bytes)
+ if max_bytes<8:return {"success":false,"error":"No room remains in the Doppler staging budget. Split or bake a shorter region."}
+ var args:=PackedStringArray(["-hide_banner","-v","error","-n","-threads","1","-filter_complex_threads","1"])
+ args.append_array(PackedStringArray(inputs))
+ args.append_array(PackedStringArray(["-filter_complex_script",graph_path,"-map","["+label+"]","-ar",str(rate),"-ac","2","-c:a","pcm_f32le","-f","f32le","-fs",str(max_bytes),"-progress","pipe:1",path]))
+ var result:=execute(encoder,args,float(frames)/rate,job)
+ if not bool(result.success):return result
+ file=FileAccess.open(path,FileAccess.READ)
+ if file==null:return {"success":false,"error":"Doppler staging produced no readable audio."}
+ var bytes:=file.get_length();file.close()
+ # FFmpeg may finish with code zero on -fs. Reaching the reserved limit is
+ # rejected even when the file happens to align; never use a truncated stage.
+ if bytes<=0 or bytes%8!=0 or bytes>=max_bytes:return {"success":false,"error":"Doppler staging reached its byte limit or produced incomplete float32 audio. Split or bake a shorter region; no partial stage was used."}
+ result.stage_frames=bytes/8
+ return result
+
+static func _stage_graph(filters:PackedStringArray,selected_label:String)->String:
+ # Every internal pad is generated by this renderer. A pad appearing once is
+ # an unconsumed graph output; numeric FFmpeg input selectors do not match.
+ # Sink other terminal outputs so staging one owner never mixes in its peers.
+ var graph:=";\n".join(filters)
+ var matcher:=RegEx.new()
+ matcher.compile("\\[([A-Za-z_][A-Za-z0-9_]*)\\]")
+ var references:Dictionary={}
+ for match_result in matcher.search_all(graph):
+  var label:=match_result.get_string(1)
+  references[label]=int(references.get(label,0))+1
+ for label in references:
+  if int(references[label])==1 and str(label)!=selected_label:graph+=";\n[%s]anullsink"%label
+ return graph
+
+static func effect_chain(effects:Array,rate:int,context:String,directory:String,inputs:Array[String],job:RefCounted=null)->Dictionary:
+ var filters:=PackedStringArray()
+ for index in effects.size():
+  var effect:Dictionary=effects[index]
+  if not bool(effect.get("enabled",true)):continue
+  var type:=str(effect.get("type",""));var p:Dictionary=effect.get("parameters",{})
+  if type=="doppler":return {"error":"Doppler must use the ordered float32 staging path."}
+  if type not in ["convolution","plate","spring","pingpong"]:
+   var filter:=KiwiAudioEffects.rendered_filter(effect,rate,context+str(index))
+   if not filter.is_empty():filters.append(filter)
+   continue
+  var wet:=clampf(float(p.get("mix",0.3)),0,1)
+  if wet<=0:continue
+  var impulse:AudioStreamWAV
+  if type=="convolution":
+   var source:=ActorAudio.source(p.get("impulse"),job)
+   if source==null:return {"error":"Choose an impulse-response audio file for Convolution Reverb."}
+   var decoded:=KiwiAudioSourceCache.decode(source,rate,0,KiwiAudioImpulse.duration(type,p),20)
+   if not str(decoded.get("error","")).is_empty():return decoded
+   if (decoded.samples as PackedVector2Array).is_empty():return {"error":"The impulse response is empty."}
+   impulse=KiwiAudioSourceCache.to_wav(decoded.samples,rate)
+  else:impulse=KiwiAudioImpulse.generate(type,p,rate,job)
+  if impulse==null:return {"error":"Impulse generation was cancelled or failed."}
+  var tag:="ir_"+(context+str(index)).sha256_text().substr(0,12)
+  var path:=directory.path_join(tag+".wav")
+  if impulse.save_to_wav(path)!=OK:return {"error":"Could not stage the convolution impulse."}
+  var input_index:=inputs.count("-i");inputs.append_array(["-i",path])
+  var pre:="pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1," if type=="pingpong" else ""
+  # Explicit dry branch; afir wet is the convolved branch, not its dry control.
+  var filter:="asplit=2[%sd][%sw];[%sw]%sapad=pad_dur=%s[%sp];[%d:a]aresample=%d,aformat=channel_layouts=stereo[%si];[%sp][%si]afir=dry=1:wet=1:%s:irgain=1:maxir=20:minp=256:maxp=2048[%sc];[%sd][%sc]amix=inputs=2:normalize=0:weights='1 %s'"%[tag,tag,tag,pre,KiwiAudioEffects.number(impulse.get_length()),tag,input_index,rate,tag,tag,tag,_afir_normalization(job),tag,tag,tag,KiwiAudioEffects.number(wet)]
+  if job!=null and job.is_cancelled():return {"error":"Cancelled."}
+  filters.append(filter)
+ return {"error":"","filter":",".join(filters)}
+
+static func _afir_normalization(job:RefCounted=null)->String:
+ var encoder:=ActorVideo.executable("ffmpeg")
+ _capability_mutex.lock()
+ if _afir_capabilities.has(encoder):
+  var cached:String=_afir_capabilities[encoder];_capability_mutex.unlock();return cached
+ _capability_mutex.unlock()
+ var probe:=KiwiAudioEncoderProcess.run(encoder,PackedStringArray(["-hide_banner","-h","filter=afir"]),1.0,job,15.0)
+ var output:=str(probe.get("stdout",""))+"\n"+str(probe.get("diagnostics",""))
+ var result:="irnorm=-1" if output.contains("irnorm") else "gtype=none"
+ if bool(probe.get("success",false)):
+  _capability_mutex.lock();_afir_capabilities[encoder]=result;_capability_mutex.unlock()
+ return result
+
+static func route_reaches(document: KiwiAudioDocument, source: String, target: String, visited: Dictionary = {}) -> bool:
+ var pending:Array[String]=[source]
+ var seen:=visited.duplicate()
+ while not pending.is_empty():
+  var id:String=pending.pop_back()
+  if id==target:return true
+  if seen.has(id):continue
+  seen[id]=true
+  var track:=document.track_for_id(id)
+  var output:=str(track.get("output",""))
+  if not output.is_empty():pending.append(output)
+  for send in track.get("sends",[]):pending.append(str(send.get("target","")))
+ return false
+
+static func unsupported_automation(document: KiwiAudioDocument, options: Dictionary = {}) -> String:
+ var owners: Array[Dictionary] = []
+ if not bool(options.get("bypass_master_processing", false)): owners.append({"owner": document.master, "label": "Master", "allowed": ["volume_db"]})
+ if not bool(options.get("bypass_track_processing", false)):
+  for track in document.tracks: owners.append({"owner": track, "label": str(track.get("name", "Track")), "allowed": ["volume_db", "pan"]})
+ var selected: Array = options.get("clip_ids", [])
+ for index in document.actors.size():
+  if not selected.is_empty() and not selected.has(document.clips[index].id): continue
+  var actor := document.actors[index]
+  owners.append({"owner": actor.values, "label": actor.display_name, "allowed": ["volume_db", "pan", "pitch"]})
+ for entry in owners:
+  var owner: Dictionary = entry.owner
+  var automation: Dictionary = owner.get("automation", {})
+  for key in automation:
+   if not (automation[key] as Array).is_empty() and not entry.allowed.has(str(key)):
+    return "%s: offline automation for %s is not implemented. Remove or bake that automation before exporting." % [entry.label, key]
+  for source_key in ["instrument", "generator"]:
+   var generated: Dictionary = owner.get(source_key, {})
+   for points in generated.get("automation", {}).values():
+    if not (points as Array).is_empty(): return "%s: automated instrument/generator parameters must be baked before offline export." % entry.label
+  for effect in owner.get("effects", []):
+   if not bool(effect.get("enabled", true)): continue
+   var supported:=KiwiAudioEffects.automation_commands(str(effect.get("type","")))
+   for parameter_name in effect.get("automation",{}):
+    if not (effect.automation[parameter_name] as Array).is_empty() and not supported.has(str(parameter_name)):return "%s: %s automation is unsupported for %s; bake or remove that automation."%[entry.label,parameter_name,effect.type]
+ return ""
+
+static func pan_automation_filter(points: Array, fallback: float) -> String:
+ if points.is_empty(): return KiwiAudioEffects.pan_filter(fallback)
+ var expression := "clip((%s),-1,1)" % automation_expression(points, fallback)
+ return "aeval='val(0)*min(1,1-(%s))|val(1)*min(1,1+(%s))'" % [expression, expression]
+
+static func gain_filter(points: Array, fallback: float) -> String:
+ var expr := automation_expression(points, fallback)
+ return "aeval='val(0)*pow(10,(%s)/20)|val(1)*pow(10,(%s)/20)'" % [expr, expr]
+
+static func automation_expression(points: Array, fallback: float) -> String:
+ if points.is_empty(): return KiwiAudioEffects.number(fallback)
+ var ordered:Array=points.duplicate(true)
+ ordered.sort_custom(func(a:Dictionary,b:Dictionary):return float(a.time)<float(b.time))
+ return _automation_tree(ordered,0,ordered.size()-1)
+
+static func _automation_tree(points:Array,first:int,last:int)->String:
+ if first==last:
+  var a:Dictionary=points[first]
+  if first==points.size()-1:return KiwiAudioEffects.number(a.value)
+  var b:Dictionary=points[first+1]
+  var weight:="clip((t-%s)/%s,0,1)"%[KiwiAudioEffects.number(a.time),KiwiAudioEffects.number(maxf(0.000001,float(b.time)-float(a.time)))]
+  if str(a.get("curve",""))=="smooth":weight="(%s)*(%s)*(3-2*(%s))"%[weight,weight,weight]
+  return KiwiAudioEffects.number(a.value) if str(a.get("curve",""))=="hold" else "%s+(%s)*(%s)"%[KiwiAudioEffects.number(a.value),KiwiAudioEffects.number(float(b.value)-float(a.value)),weight]
+ var middle:=(first+last)/2
+ return "if(lt(t,%s),%s,%s)"%[KiwiAudioEffects.number(points[middle+1].time),_automation_tree(points,first,middle),_automation_tree(points,middle+1,last)]
+
+static func _publish_complete(temporary:String,destination:String,job:RefCounted=null)->Dictionary:
+ var absolute:=ProjectSettings.globalize_path(destination)
+ if job!=null and job.is_cancelled():return {"success":false,"error":"Cancelled."}
+ if FileAccess.file_exists(absolute):return {"success":false,"error":"The destination appeared during rendering. Choose a new name; it was not overwritten."}
+ if DirAccess.make_dir_recursive_absolute(absolute.get_base_dir())!=OK:return {"success":false,"error":"Could not create the export directory."}
+ # Copy across filesystems to an owned sibling first. A failed copy cannot
+ # leave a partial final destination. Serialize this app's publication steps.
+ var staged:=absolute+".kiwi-"+ActorData.new_id()+".partial"
+ var copied:=DirAccess.copy_absolute(temporary,staged)
+ if copied!=OK:
+  DirAccess.remove_absolute(staged)
+  return {"success":false,"error":"Could not stage the completed render (%s)."%copied}
+ _publish_mutex.lock()
+ var error:=""
+ if job!=null and job.is_cancelled():error="Cancelled."
+ elif FileAccess.file_exists(absolute):error="The destination appeared during rendering. Choose a new name; it was not overwritten."
+ else:
+  # Godot offers no atomic no-replace rename: an unrelated external writer in
+  # this final check/rename gap cannot be excluded by a GDScript mutex.
+  var renamed:=DirAccess.rename_absolute(staged,absolute)
+  if renamed!=OK:error="Could not publish the completed render (%s)."%renamed
+ _publish_mutex.unlock()
+ if not error.is_empty():DirAccess.remove_absolute(staged)
+ return {"success":error.is_empty(),"error":error}
+
+static func finish_process_files(result:Dictionary,directory:String)->Dictionary:
+ if bool(result.get("cleanup_pending",false)):
+  result.temporary_directory=directory
+  result.cleanup_warning="Encoder exit was not confirmed. Retained temporary files: "+directory
+  push_warning(str(result.cleanup_warning))
+ else:
+  var remaining:=_remove_owned(directory)
+  if not remaining.is_empty():
+   result.temporary_directory=directory
+   result.cleanup_warning="Some owned temporary files could not be removed: "+directory
+   push_warning(str(result.cleanup_warning))
+ return result
+
+static func _remove_owned(directory: String) -> PackedStringArray:
+ var remaining:=PackedStringArray()
+ var access := DirAccess.open(directory)
+ if access == null: return remaining
+ for file in access.get_files():
+  var path:=directory.path_join(file)
+  if DirAccess.remove_absolute(path)!=OK:remaining.append(path)
+ if DirAccess.remove_absolute(directory)!=OK:remaining.append(directory)
+ return remaining
+
+static func _fallback_wav(document: KiwiAudioDocument, destination: String, options: Dictionary, job: RefCounted) -> Dictionary:
+ if destination.get_extension().to_lower() != "wav": return {"success": false, "error": "FFmpeg is required for this codec. Set kiwi/media/ffmpeg_path in project settings."}
+ if bool(options.get("bypass_track_processing", false)) or bool(options.get("bypass_master_processing", false)): return {"success": false, "error": "FFmpeg is required for isolated clip or track baking."}
+ if bool(options.get("normalize", false)): return {"success": false, "error": "FFmpeg is required for loudness normalization."}
+ if int(options.get("bit_depth", 16)) != 16: return {"success": false, "error": "The native WAV fallback supports 16-bit PCM only. Select 16-bit or configure FFmpeg."}
+ var rate := clampi(int(options.get("sample_rate", 44100)), 8000, 192000)
+ var duration := maxf(1.0 / rate, document.duration())
+ var solo_ids: Array[String] = []
+ for track in document.tracks:
+  if bool(track.get("solo", false)): solo_ids.append(str(track.id))
+  if not str(track.get("output", "")).is_empty() or not (track.get("sends", []) as Array).is_empty(): return {"success": false, "error": "FFmpeg is required for routed or send-bus mixes."}
+  if not (track.get("automation", {}) as Dictionary).is_empty(): return {"success": false, "error": "FFmpeg is required for offline automation."}
+ if not (document.master.get("automation", {}) as Dictionary).is_empty(): return {"success": false, "error": "FFmpeg is required for offline automation."}
+ if duration > 120: return {"success": false, "error": "FFmpeg is required for streaming renders longer than 120 seconds."}
+ if not (document.master.get("effects", []) as Array).is_empty(): return {"success": false, "error": "FFmpeg is required for offline effect rendering."}
+ var output := PackedVector2Array(); output.resize(int(ceil(duration * rate)))
+ for i in document.clips.size():
+  if job != null and job.is_cancelled(): return {"success": false, "error": "Cancelled."}
+  var clip := document.clips[i]; var actor := document.actors[i]; var track := document.track_for_clip(clip.id)
+  if not (options.get("clip_ids", []) as Array).is_empty() and not (options.clip_ids as Array).has(clip.id): continue
+  if not str(options.get("track_id", "")).is_empty() and str(track.id) != str(options.track_id): continue
+  if not solo_ids.is_empty() and not solo_ids.has(str(track.id)): continue
+  if bool(actor.values.get(&"loop", false)): return {"success": false, "error": "FFmpeg is required for looped offline rendering."}
+  if not (actor.values.get(&"automation", {}) as Dictionary).is_empty(): return {"success": false, "error": "FFmpeg is required for offline automation."}
+  if not (actor.values.get(&"effects", []) as Array).is_empty() or not (track.get("effects", []) as Array).is_empty() or not is_equal_approx(clip.playback_speed, 1) or not is_equal_approx(float(actor.values.get(&"pitch", 1)), 1): return {"success": false, "error": "FFmpeg is required for time/pitch processing and offline effects."}
+  if bool(actor.values.get(&"muted", false)) or bool(track.get("mute", false)): continue
+  var decoded := KiwiAudioSourceCache.decode(ActorAudio.source(actor.values.get(&"audio"),job), rate, clip.source_offset, clip.duration, 120)
+  if not str(decoded.error).is_empty(): return {"success": false, "error": decoded.error}
+  var samples: PackedVector2Array = decoded.samples
+  if bool(actor.values.get(&"reverse", false)): samples.reverse()
+  var gain := db_to_linear(float(actor.values.get(&"volume_db", 0)) + float(track.get("volume_db", 0)) + float(document.master.get("volume_db", -3)))
+  var pan := clampf(float(actor.values.get(&"pan", 0)) + float(track.get("pan", 0)), -1, 1)
+  var balance := Vector2(minf(1, 1-pan), minf(1, 1+pan))
+  for frame in samples.size():
+   var target := int(round(clip.start_time * rate)) + frame
+   if target < output.size(): output[target] += samples[frame] * gain * balance * ActorAudio.fade_gain(actor, clip, clip.start_time + float(frame)/rate)
+  if job != null: job.update(float(i+1)/maxi(1, document.clips.size()), "Rendering WAV")
+ for i in output.size(): output[i] = output[i].clamp(Vector2(-0.966, -0.966), Vector2(0.966, 0.966))
+ var first := clampi(int(round(float(options.get("start", 0)) * rate)), 0, output.size())
+ var last := clampi(first + int(round(float(options.get("duration", duration - float(first) / rate)) * rate)), first, output.size())
+ if last <= first: return {"success": false, "error": "The export range is empty."}
+ output = output.slice(first, last)
+ duration = float(output.size()) / rate
+ var stream := KiwiAudioSourceCache.to_wav(output, rate, not bool(options.get("mono", false)))
+ var directory:=ProjectSettings.globalize_path("user://audio_workspace/jobs/"+ActorData.new_id())
+ if DirAccess.make_dir_recursive_absolute(directory)!=OK:return {"success":false,"error":"Could not create WAV staging directory."}
+ var temporary:=directory.path_join("render.wav")
+ var error:=stream.save_to_wav(temporary)
+ var result:={"success":false,"error":"Could not save WAV."} if error!=OK else _publish_complete(temporary,destination,job)
+ if bool(result.success):
+  result.path=destination;result.duration=duration;result.backend="bounded native PCM fallback"
+ return finish_process_files(result,directory)

@@ -2,14 +2,18 @@ extends SceneTree
 const Library=preload("res://Workspaces/ImageWorkspace/texture_material_library.gd")
 const Render=preload("res://Workspaces/ImageWorkspace/texture_material_renderer.gd")
 var failures:=0
-func _initialize() -> void: run.call_deferred()
+func _initialize() -> void: execute.call_deferred()
+func execute() -> void:
+	await run()
+	for frame in 10: await process_frame
+	quit(failures)
 func check(value: bool,message: String) -> void:
 	if not value: failures+=1; push_error(message)
 func run() -> void:
 	var studio:=KiwiImageWorkspace.new(); root.add_child(studio); studio.size=Vector2(1400,900)
 	await process_frame; await process_frame
-	studio._set_tool("repair"); studio.canvas.repair_tool.main_mode="texture"; studio._refresh_context()
-	check(studio.find_child("RepairMode",true,false)!=null,"Two-mode toolbar loads and builds")
+	studio._set_tool("brush"); studio.canvas.painting_mode="material"; studio._refresh_context()
+	check(studio.find_child("PaintingMode",true,false)!=null,"Materials are integrated in Brush toolbar")
 	load("res://Workspaces/ImageWorkspace/texture_material_browser.gd").open(studio)
 	var sheet:=Image.create(800,320,false,Image.FORMAT_RGBA8)
 	var fingerprints: Dictionary={}; var index:=0
@@ -34,7 +38,7 @@ func run() -> void:
 	await application_checks()
 	await integration(studio)
 	studio.queue_free(); await process_frame; await process_frame
-	print("Texture material checks: %d failures" % failures); quit(failures)
+	print("Texture material checks: %d failures" % failures)
 
 func wait_tool(tool: RefCounted) -> void:
 	var deadline:=Time.get_ticks_msec()+15000
@@ -72,50 +76,57 @@ func integration(studio: KiwiImageWorkspace) -> void:
 	if browser!=null: browser.close()
 	await process_frame
 	var bitmap:=Image.create(96,96,false,Image.FORMAT_RGBA8); bitmap.fill(Color(.25,.35,.45))
-	studio.open_source(ImageTexture.create_from_image(bitmap)); studio._set_tool("repair")
-	var tool=studio.canvas.repair_tool; tool.main_mode="texture"; tool.choose_material("wood/oak"); tool.mode="pattern_fill"; tool.config.selection_only=false; tool.config.hardness=1.; tool.config.size=24.; tool.config.opacity=.5
-	var original:=studio._main_layer(); var history:=studio._undo.size()
-	tool.begin(original,Vector2(48,48)); tool.process(); tool.finish(); await wait_tool(tool)
-	check(studio.document.layers.size()==2,"Texture paint creates an independent editable material layer")
-	var layer:=studio._main_layer(); var value: KiwiTextureMaterial=layer.properties.get("texture_material")
-	check(value!=null and absf(value.coverage.get_image().get_pixel(48,48).a-.5)<.01,"Material strokes store fractional opacity as coverage")
-	check(value.coverage.get_image().get_pixel(0,0).a==0,"Unpainted material pixels remain transparent")
-	check(original.texture.get_image().get_data()==bitmap.get_data(),"Material paint leaves original pixels unchanged")
+	studio.open_source(ImageTexture.create_from_image(bitmap)); studio._set_tool("brush")
+	studio.canvas.painting_mode="material"; studio.document.live_edit_enabled=true
+	studio.canvas.repair_tool.material=Library.create("wood/oak"); studio.canvas.paint_selection_only=false
+	studio.canvas.hardness=1.; studio.canvas.brush_size=24.; studio.canvas.brush_opacity=.5; studio.canvas.material_strength=1.; studio.canvas.brush_type="normal"
+	var history:=studio._undo.size()
+	await studio.canvas._begin_paint(Vector2(48,48)); await studio.canvas._finish(Vector2(48,48))
+	check(studio.document.layers.size()==1 and studio.document.live_materials.size()==1,"Material brush creates independent editable ownership within the selected layer")
+	var layer:=studio._main_layer(); var region: KiwiLivePaintRegion=layer.live_paint[-1]
+	var template:=studio.document.live_material_for_id(region.template_id); var id:=template.id
+	check(absf(region.coverage.get_image().get_pixel(48,48).a-.5)<.01,"Material strokes store fractional opacity as coverage")
+	check(region.coverage.get_image().get_pixel(0,0).a==0,"Unpainted material pixels remain transparent")
+	check(layer.live_paint[0].raster.get_image().get_data()==bitmap.get_data(),"Material paint preserves the original raster in its ordered stack")
 	check(studio._undo.size()==history+1,"A material stroke is one undo action")
-	studio.undo(); check(studio.document.layers.size()==1,"Undo removes the new material layer")
-	studio.redo(); layer=studio.document.layers[-1]; studio.canvas.selected.assign([layer.id])
-	check(layer.properties.texture_material.coverage!=null,"Redo restores material coverage")
-	tool.material=layer.properties.texture_material.copy_material(); var old_color: Color=tool.material.parameters.primary
-	tool.material.parameters.primary=Color.RED; tool.apply_material_settings(true); tool.material.parameters.primary=Color.GREEN; tool.apply_material_settings(true); studio._commit()
+	studio.undo(); check(studio.document.live_materials.is_empty() and studio._main_layer().live_paint.is_empty(),"Undo removes linked coverage and restores the original raster")
+	studio.redo(); layer=studio._main_layer(); region=layer.live_paint[-1]; template=studio.document.live_material_for_id(id)
+	check(region.coverage!=null,"Redo restores material coverage")
+	var value:=template.material.copy_material(); var old_color: Color=value.parameters.primary
+	value.parameters.primary=Color.RED; studio._material_changed(value); value.parameters.primary=Color.GREEN; studio._material_changed(value); studio._commit()
 	check(studio._undo.size()==history+2,"Multiple live material previews commit as one edit")
-	studio.undo(); layer=studio.document.layers[-1]; check(layer.properties.texture_material.parameters.primary==old_color,"Undo restores edited material parameters")
-	studio.redo(); layer=studio.document.layers[-1]; studio.canvas.selected.assign([layer.id]); value=layer.properties.texture_material
+	studio.undo(); check(studio.document.live_material_for_id(id).material.parameters.primary==old_color,"Undo restores edited material parameters")
+	studio.redo(); layer=studio._main_layer(); region=layer.live_paint[-1]; template=studio.document.live_material_for_id(id)
 	load("res://Workspaces/ImageWorkspace/texture_material_browser.gd").open(studio)
-	var editor:=studio.get_node("MaterialBrowser"); var contrast: SpinBox
+	var editor:=studio.get_node("MaterialBrowser"); var contrast: HSlider; var numeric: SpinBox
 	for label in editor.fields.find_children("*","Label",true,false):
-		if label.text=="Contrast": contrast=label.get_parent().get_child(1)
-	check(contrast!=null,"Material browser includes precise numeric controls")
+		if label.text=="Contrast": contrast=label.get_parent().get_child(1); numeric=label.get_parent().get_child(2)
+	check(contrast!=null and numeric!=null,"Material browser includes live sliders and precise numeric controls")
 	if contrast!=null:
-		var count:=studio._undo.size(); contrast._begin_drag(Vector2.ZERO); contrast.dragging=true; contrast.drag_pixels(8,false,false); contrast.drag_pixels(8,false,false)
+		var count:=studio._undo.size(); contrast.drag_started.emit(); contrast.value=1.2; contrast.value=1.4
 		check(studio._undo.size()==count,"Dragging material controls previews without adding history")
-		contrast.finish_drag(); check(studio._undo.size()==count+1,"Releasing a material control commits one undo action")
-		studio.undo(); check(is_equal_approx(studio.document.layers[-1].properties.texture_material.parameters.contrast,1.),"Browser refreshes its material instance after undo")
-	editor.close(); await process_frame; layer=studio.document.layers[-1]; studio.canvas.selected.assign([layer.id]); value=layer.properties.texture_material
+		contrast.drag_ended.emit(true); check(studio._undo.size()==count+1,"Releasing a material control commits one undo action")
+		studio.undo(); check(is_equal_approx(editor.value.parameters.contrast,1.),"Browser refreshes its independent material instance after undo")
+	editor.close(); await process_frame
+	layer=studio._main_layer(); region=layer.live_paint[-1]; template=studio.document.live_material_for_id(id)
+	value=template.material.copy_material(); value.coverage=region.coverage
 	var painted:=await Render.preview(root,value,Vector2i(96,96)); check(painted.get_pixel(48,48).g>0 and painted.get_pixel(0,0).a==0,"Material preview uses editable coverage and current parameters")
 	value.secondary=Library.create("geometry/checkerboard"); value.mix_amount=1
 	var mixed:=await Render.preview(root,value,Vector2i(96,96)); check(mixed.get_data()!=painted.get_data(),"Mixer evaluates a structurally independent second material")
+	studio._material_changed(value); studio._commit()
 	var path:="res://.godot/painted_material_document.tres"; ResourceSaver.save(studio.document,path)
 	var document:=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE) as KiwiImageDocument
-	check(document.layers[-1].properties.texture_material.secondary!=null and document.layers[-1].properties.texture_material.coverage.get_image().get_data()==value.coverage.get_image().get_data(),"Native documents preserve material, mixer and coverage")
+	check(document.live_material_for_id(id).material.secondary!=null and document.layers[-1].live_paint[-1].coverage.get_image().get_data()==region.coverage.get_image().get_data(),"Native documents preserve material, mixer and coverage")
 	studio.renderer.sync(studio.document); var exported:=await studio.renderer.flattened()
-	check(exported!=null and exported.get_pixel(48,48)!=bitmap.get_pixel(48,48),"Export renders non-destructive material layers")
+	check(exported!=null and exported.get_pixel(48,48)!=bitmap.get_pixel(48,48),"Export renders non-destructive material artwork")
 	layer.dimensions=Vector2(192,96)
 	var selection:=Image.create(192,96,false,Image.FORMAT_RGBA8); selection.fill_rect(Rect2i(0,0,48,96),Color(1,1,1,.5))
 	studio.document.pixel_selection=ImageTexture.create_from_image(selection); studio.document.pixel_selection_owner=layer.id; studio.canvas.sync_pixel_selection()
-	tool.material=value.copy_material(); tool.config.opacity=1; await tool.fill_selection(); tool.finish(); await wait_tool(tool)
-	check(absf(studio._main_layer().properties.texture_material.coverage.get_image().get_pixel(12,12).a-.5)<.02,"Fill selection scales a fractional mask into resized-layer pixel coordinates")
-	await studio.rasterize_selected(); check(not studio._main_layer().properties.has("texture_material"),"Bake turns a material into ordinary pixels")
-	studio.undo(); check(studio.document.layers[-1].properties.get("texture_material") is KiwiTextureMaterial,"Bake is undoable")
+	studio._set_tool("fill"); studio.canvas.painting_mode="material"; studio.canvas.paint_selection_only=true; studio.canvas.brush_opacity=1; studio.canvas.fill_threshold=1
+	await studio.canvas._begin_paint(Vector2(12,12))
+	check(absf(studio._main_layer().live_paint[-1].coverage.get_image().get_pixel(12,12).a-.5)<.02,"Material Bucket scales a fractional selection into resized-layer pixel coordinates")
+	await studio._bake_active_material(); check(studio.document.live_material_for_id(id)==null and studio._main_layer().live_paint.is_empty(),"Bake turns owned material regions into ordinary pixels")
+	studio.undo(); check(studio.document.live_material_for_id(id)!=null and not studio._main_layer().live_paint.is_empty(),"Bake is undoable")
 
 func application_checks() -> void:
 	var engine:=preload("res://Workspaces/ImageWorkspace/image_repair_engine.gd").new()

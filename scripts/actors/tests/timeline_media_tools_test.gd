@@ -105,6 +105,17 @@ func run() -> void:
 	editor.undo()
 	check(editor.model.clips.size() == before, "File drop creation is undoable")
 	editor._create_dropped_actors(PackedStringArray([ProjectSettings.globalize_path(image_path)]), 10.0, 1)
+	if DisplayServer.get_name() != "headless":
+		await process_frame
+		var chooser: ActorDimensionDialog
+		for child in editor.get_children():
+			if child is ActorDimensionDialog: chooser = child
+		check(chooser != null, "Image drop opens the dimension chooser")
+		if chooser != null:
+			var choose_3d := chooser.find_child("Choose3D", true, false) as Button
+			check(choose_3d != null, "The dimension chooser offers a 3D actor")
+			if choose_3d != null: choose_3d.pressed.emit()
+		await process_frame
 	check(editor.model.selected_actor().type_id == &"image_3d", "Image drop creates an image actor")
 	editor._create_dropped_actors(PackedStringArray([ProjectSettings.globalize_path(mesh_path)]), 10.0, 2)
 	check(editor.model.selected_actor().type_id == &"basic_mesh", "Mesh drop creates a mesh actor")

@@ -34,12 +34,18 @@ var _indexed_paths: Array[String]=[]
 var _scan_ready:=false
 var _scan_entries:=0
 var _path_match_cache: Dictionary={}
+var clipboard_source:=false
+var clipboard_folder:="default"
+var _clipboard_ids: Dictionary={}
+var source_project: Button
+var source_clipboard: Button
 
 
-static func pick(owner: Node, property: ActorProperty, title: String = "Choose a project asset") -> String:
+static func pick(owner: Node, property: ActorProperty, title: String = "Choose a project asset",from_clipboard: bool=false) -> String:
 	var picker := ActorProjectFilePicker.new()
 	owner.add_child(picker)
 	picker._build(property, title)
+	if from_clipboard: picker._set_clipboard_source(true)
 	picker.popup_centered(Vector2i(980, 650))
 	picker.search.grab_focus()
 	var result: String = await picker.finished
@@ -113,6 +119,10 @@ func _build(property: ActorProperty, title_text: String) -> void:
 	close.custom_minimum_size = Vector2(42, 38)
 	close.pressed.connect(func(): _resolve(""))
 	header.add_child(close)
+	var sources:=HBoxContainer.new(); column.add_child(sources)
+	source_project=Button.new(); source_project.text="Project"; source_project.toggle_mode=true; source_project.button_pressed=true; sources.add_child(source_project); source_project.pressed.connect(func(): _set_clipboard_source(false))
+	source_clipboard=Button.new(); source_clipboard.text="Super Clipboard"; source_clipboard.toggle_mode=true; sources.add_child(source_clipboard); source_clipboard.pressed.connect(func(): _set_clipboard_source(true))
+	var quick:=Button.new(); quick.text="★ Default Slot"; sources.add_child(quick); quick.pressed.connect(_choose_default_slot)
 
 	search = LineEdit.new()
 	search.name = "AssetSearch"
@@ -232,10 +242,12 @@ func _build(property: ActorProperty, title_text: String) -> void:
 
 
 func _rebuild_folders() -> void:
+	if clipboard_source: return
 	_tree_generation += 1
+	var generation:=_tree_generation
 	folders.clear()
-	var scan: Dictionary = await _scan_directory(project_root)
-	if _resolved: return
+	var scan: Dictionary = await _scan_directory(project_root,generation)
+	if _resolved or clipboard_source or generation!=_tree_generation: return
 	var root_item := folders.create_item()
 	root_item.set_text(0, "%s  (%d)" % [project_root.get_file(), int(scan.count)])
 	root_item.set_icon(0, FileOperations.FOLDER_COLORED_TEXTURE)
@@ -249,13 +261,14 @@ func _rebuild_folders() -> void:
 	_refresh_files()
 
 
-func _scan_directory(directory: String) -> Dictionary:
+func _scan_directory(directory: String,generation: int=-1) -> Dictionary:
+	if generation<0: generation=_tree_generation
 	var matching_files: Array[String] = []
 	var child_folders: Array[Dictionary] = []
 	var file_names := Array(DirAccess.get_files_at(directory))
 	file_names.sort()
 	for file_name: String in file_names:
-		if _resolved: break
+		if _resolved or clipboard_source or generation!=_tree_generation: break
 		_scan_entries+=1
 		if _scan_entries%16==0: await get_tree().process_frame
 		var path := directory.path_join(file_name).simplify_path()
@@ -265,12 +278,12 @@ func _scan_directory(directory: String) -> Dictionary:
 	var folder_names := Array(DirAccess.get_directories_at(directory))
 	folder_names.sort()
 	for folder_name: String in folder_names:
-		if _resolved: break
+		if _resolved or clipboard_source or generation!=_tree_generation: break
 		if folder_name.begins_with("."):
 			continue
 		var access:=DirAccess.open(directory)
 		if access!=null and access.is_link(folder_name): continue
-		var child_scan: Dictionary = await _scan_directory(directory.path_join(folder_name).simplify_path())
+		var child_scan: Dictionary = await _scan_directory(directory.path_join(folder_name).simplify_path(),generation)
 		if int(child_scan.count) > 0:
 			child_folders.append(child_scan)
 	var total := matching_files.size()
@@ -303,6 +316,8 @@ func _tree_item_selected() -> void:
 	var item := folders.get_selected()
 	if item == null:
 		return
+	if clipboard_source:
+		clipboard_folder=str(item.get_metadata(0)); _refresh_files(); return
 	var path := str(item.get_metadata(0)).simplify_path()
 	if item.get_meta("is_file", false):
 		_select_asset(path, item.get_icon(0))
@@ -328,6 +343,7 @@ func _tree_item_activated() -> void:
 
 
 func _refresh_files() -> void:
+	if clipboard_source: _refresh_clipboard_files(); return
 	if files == null or not _scan_ready or _resolved:
 		return
 	_refresh_generation += 1
@@ -437,8 +453,11 @@ func _path_allowed(path: String) -> bool:
 	return result
 
 func _path_allowed_uncached(path: String) -> bool:
-	if not is_allowed_path(project_root, path, allowed_extensions):
+	var library:=KiwiSuperClipboardService.instance
+	var scope: String=library.store.root if clipboard_source and library!=null else project_root
+	if not is_allowed_path(scope, path, allowed_extensions):
 		return false
+	if clipboard_source and not KiwiClipboardSnapshot.safe_resource(path): return false
 	# Image documents embed full layer images. Read their type declaration
 	# instead of deserializing every document just to list its filename.
 	if path.get_extension().to_lower()=="tres" and allowed_native_types==PackedStringArray(["KiwiImageDocument"]):
@@ -453,6 +472,10 @@ func _path_allowed_uncached(path: String) -> bool:
 			or (allowed_native_types.has("Texture2D") and native_resource is Texture2D) \
 			or (allowed_native_types.has("ActorSceneData") and native_resource is ActorSceneData) \
 			or (allowed_native_types.has("KiwiImageDocument") and native_resource is KiwiImageDocument) \
+			or (allowed_native_types.has("KiwiTransformationImage2D") and native_resource is KiwiTransformationImage2D) \
+			or (allowed_native_types.has("KiwiModelDocument") and native_resource is KiwiModelDocument) \
+			or (allowed_native_types.has("KiwiRigPreset") and native_resource is KiwiRigPreset) \
+			or (allowed_native_types.has("Material") and native_resource is Material) \
 			or (allowed_native_types.has("KiwiImagePatternPreset") and native_resource is KiwiImagePatternPreset) \
 			or (native_resource is ActorObjectData and not allowed_resource_type.is_empty() and accepted_object_types.has(str(native_resource.type_id)))
 	if allowed_resource_type.is_empty():
@@ -477,7 +500,56 @@ func _godot_resource_path(path: String) -> String:
 
 func _choose() -> void:
 	if _path_allowed(selected_path):
-		_resolve(selected_path)
+		if clipboard_source:
+			var path:=KiwiSuperClipboardService.instance.import_item(str(_clipboard_ids.get(selected_path,"")))
+			if not path.is_empty(): _resolve(path)
+			else: selection_path.text=KiwiSuperClipboardService.instance.store.error
+		else: _resolve(selected_path)
+
+func _set_clipboard_source(enabled: bool) -> void:
+	clipboard_source=enabled; source_project.set_pressed_no_signal(not enabled); source_clipboard.set_pressed_no_signal(enabled); _tree_generation+=1; _refresh_generation+=1; _path_match_cache.clear(); _thumbnail_jobs.clear(); selected_path=""; choose_button.disabled=true; search.editable=true
+	if not enabled:
+		_indexed_paths.clear(); _scan_ready=false; current_directory=project_root; _rebuild_folders(); return
+	folders.clear(); var root:=folders.create_item(); root.set_text(0,"Super Clipboard"); root.set_metadata(0,"default"); _clipboard_folders(root,"",{}); _refresh_clipboard_files()
+func _clipboard_folders(parent: TreeItem,id: String,visited: Dictionary) -> void:
+	if visited.has(id): return
+	visited[id]=true
+	var library:=KiwiSuperClipboardService.instance
+	if library==null: return
+	for key: String in library.store.data.folders:
+		var entry: Dictionary=library.store.data.folders[key]
+		if entry.get("deleted",false) or str(entry.parent)!=id: continue
+		var row:=folders.create_item(parent); row.set_text(0,str(entry.name)); row.set_metadata(0,key); row.set_icon(0,FileOperations.FOLDER_COLORED_TEXTURE); row.set_icon_max_width(0,18); _clipboard_folders(row,key,visited)
+func _refresh_clipboard_files() -> void:
+	if files==null: return
+	_refresh_generation+=1; files.clear(); _clipboard_ids.clear(); selected_path=""; choose_button.disabled=true
+	var library:=KiwiSuperClipboardService.instance
+	if library==null: return
+	var query:=search.text.strip_edges().to_lower()
+	for id: String in library.store.data.entries:
+		var entry: Dictionary=library.store.data.entries[id]
+		if entry.get("deleted",false) or (query.is_empty() and str(entry.folder)!=clipboard_folder): continue
+		if not query.is_empty() and not (str(entry.name)+" "+str(entry.type)).to_lower().contains(query): continue
+		var path:=library.store.entry_path(id)
+		if path.is_empty() or not _clipboard_compatible(entry): continue
+		_clipboard_ids[path]=id; files.add_item(str(entry.name),library.store.icon(id)); files.set_item_metadata(files.item_count-1,path)
+	breadcrumb.text="Super Clipboard / "+str(library.store.data.folders.get(clipboard_folder,{}).get("name","Default")); file_count.text=str(files.item_count)+" compatible resources"
+func _clipboard_compatible(entry: Dictionary) -> bool:
+	var extension:=str(entry.get("extension",""))
+	if not allowed_extensions.is_empty() and not allowed_extensions.has(extension): return false
+	if allowed_raw_extensions.has(extension): return true
+	if allowed_resource_type.is_empty() and allowed_native_types.is_empty(): return true
+	if not allowed_resource_type.is_empty() and accepted_object_types.has(str(entry.get("object_type",""))): return true
+	for type: String in allowed_native_types:
+		if (entry.get("native_types",[]) as Array).has(type): return true
+	return false
+func _choose_default_slot() -> void:
+	var library:=KiwiSuperClipboardService.instance
+	if library==null: return
+	_set_clipboard_source(true)
+	var id:=str(library.store.data.default_slot); var path:=library.store.entry_path(id)
+	if path.is_empty() or not _path_allowed(path): selection_name.text="Default Slot is empty or incompatible"; return
+	_clipboard_ids[path]=id; selected_path=path; _choose()
 
 
 func _resolve(path: String) -> void:

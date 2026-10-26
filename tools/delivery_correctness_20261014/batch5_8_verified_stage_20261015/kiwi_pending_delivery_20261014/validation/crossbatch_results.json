@@ -1,0 +1,159 @@
+{
+  "timestamp_utc": "2026-10-15T00:01:40.245045+00:00",
+  "final_revision": "kiwi-recovery-checkpoints-20261014",
+  "suites": {
+    "3_candidate": {
+      "harness_seams": [
+        "Retained historical fail_duration ActorAudio mock; newer relink declarations are not exercised in this suite",
+        "Silence-review hooks are no-op in historical fixtures; tested with real handlers separately"
+      ],
+      "full_class_sha256": {
+        "audio_edit_session.gd": "d0451bbad067e76233c3482213a9936462b02cdbeeaf7274681d0f91892d84b9",
+        "audio_document.gd": "75b98d8ecccb3775d8be786ec1ad5504b5623ad8eda659d4103c30df46caa30d",
+        "audio_analysis.gd": "8d85fc9f55357714337e2c27ecc2c12fa83e97ccdd2076f02cc0a2d7a834cb12",
+        "audio_region_edit.gd": "b9711c5bf8ae447ccb2388f22f17f37b8c94c50e2c957495ec84730009ad7cb0",
+        "audio_source_cache.gd": "13be57e05a8ba5ef6fd8cfb5b8b7a3776cdf59ad22950b5baeeac5ce696a3227"
+      },
+      "stages": {
+        "import": {
+          "exit_code": 0,
+          "errors": 0,
+          "warnings": 0,
+          "log": "crossbatch_3_candidate_import.log"
+        },
+        "run": {
+          "exit_code": 0,
+          "errors": 0,
+          "warnings": 0,
+          "log": "crossbatch_3_candidate_run.log"
+        }
+      },
+      "result_lines": [
+        "EDIT_PRESERVATION_CHECKS=250 FAILURES=0"
+      ],
+      "pass": true
+    },
+    "4_candidate": {
+      "harness_seams": [],
+      "full_class_sha256": {
+        "audio_edit_session.gd": "d0451bbad067e76233c3482213a9936462b02cdbeeaf7274681d0f91892d84b9",
+        "audio_document.gd": "75b98d8ecccb3775d8be786ec1ad5504b5623ad8eda659d4103c30df46caa30d",
+        "audio_analysis.gd": "8d85fc9f55357714337e2c27ecc2c12fa83e97ccdd2076f02cc0a2d7a834cb12",
+        "audio_region_edit.gd": "b9711c5bf8ae447ccb2388f22f17f37b8c94c50e2c957495ec84730009ad7cb0",
+        "audio_source_cache.gd": "13be57e05a8ba5ef6fd8cfb5b8b7a3776cdf59ad22950b5baeeac5ce696a3227"
+      },
+      "stages": {
+        "import": {
+          "exit_code": 0,
+          "errors": 0,
+          "warnings": 0,
+          "log": "crossbatch_4_candidate_import.log"
+        },
+        "run": {
+          "exit_code": 0,
+          "errors": 0,
+          "warnings": 0,
+          "log": "crossbatch_4_candidate_run.log"
+        }
+      },
+      "result_lines": [
+        "GESTURE_SAFETY_CHECKS=443 FAILURES=0"
+      ],
+      "pass": true
+    },
+    "4_workspace_candidate": {
+      "harness_seams": [
+        "Silence-review hooks are no-op in historical fixtures; tested with real handlers separately"
+      ],
+      "full_class_sha256": {
+        "audio_edit_session.gd": "d0451bbad067e76233c3482213a9936462b02cdbeeaf7274681d0f91892d84b9",
+        "audio_document.gd": "75b98d8ecccb3775d8be786ec1ad5504b5623ad8eda659d4103c30df46caa30d",
+        "audio_analysis.gd": "8d85fc9f55357714337e2c27ecc2c12fa83e97ccdd2076f02cc0a2d7a834cb12",
+        "audio_region_edit.gd": "b9711c5bf8ae447ccb2388f22f17f37b8c94c50e2c957495ec84730009ad7cb0",
+        "audio_source_cache.gd": "13be57e05a8ba5ef6fd8cfb5b8b7a3776cdf59ad22950b5baeeac5ce696a3227"
+      },
+      "stages": {
+        "import": {
+          "exit_code": 0,
+          "errors": 0,
+          "warnings": 0,
+          "log": "crossbatch_4_workspace_candidate_import.log"
+        },
+        "run": {
+          "exit_code": 0,
+          "errors": 0,
+          "warnings": 0,
+          "log": "crossbatch_4_workspace_candidate_run.log"
+        }
+      },
+      "result_lines": [
+        "WORKSPACE_GESTURE_CHECKS=40 FAILURES=0"
+      ],
+      "pass": true
+    },
+    "5_candidate": {
+      "harness_seams": [
+        "Silence-review hooks are no-op in historical fixtures; tested with real handlers separately",
+        "Added current recording-token fields to historical playback prefix"
+      ],
+      "full_class_sha256": {
+        "audio_edit_session.gd": "d0451bbad067e76233c3482213a9936462b02cdbeeaf7274681d0f91892d84b9",
+        "audio_document.gd": "75b98d8ecccb3775d8be786ec1ad5504b5623ad8eda659d4103c30df46caa30d",
+        "audio_analysis.gd": "8d85fc9f55357714337e2c27ecc2c12fa83e97ccdd2076f02cc0a2d7a834cb12",
+        "audio_region_edit.gd": "b9711c5bf8ae447ccb2388f22f17f37b8c94c50e2c957495ec84730009ad7cb0",
+        "audio_source_cache.gd": "13be57e05a8ba5ef6fd8cfb5b8b7a3776cdf59ad22950b5baeeac5ce696a3227"
+      },
+      "stages": {
+        "import": {
+          "exit_code": 0,
+          "errors": 0,
+          "warnings": 0,
+          "log": "crossbatch_5_candidate_import.log"
+        },
+        "run": {
+          "exit_code": 0,
+          "errors": 0,
+          "warnings": 0,
+          "log": "crossbatch_5_candidate_run.log"
+        }
+      },
+      "result_lines": [
+        "MEDIA_RELINK_CHECKS=184 FAILURES=0"
+      ],
+      "pass": true
+    },
+    "6_candidate": {
+      "harness_seams": [
+        "Silence-review hooks are no-op in historical fixtures; tested with real handlers separately"
+      ],
+      "full_class_sha256": {
+        "audio_edit_session.gd": "d0451bbad067e76233c3482213a9936462b02cdbeeaf7274681d0f91892d84b9",
+        "audio_document.gd": "75b98d8ecccb3775d8be786ec1ad5504b5623ad8eda659d4103c30df46caa30d",
+        "audio_analysis.gd": "8d85fc9f55357714337e2c27ecc2c12fa83e97ccdd2076f02cc0a2d7a834cb12",
+        "audio_region_edit.gd": "b9711c5bf8ae447ccb2388f22f17f37b8c94c50e2c957495ec84730009ad7cb0",
+        "audio_source_cache.gd": "13be57e05a8ba5ef6fd8cfb5b8b7a3776cdf59ad22950b5baeeac5ce696a3227"
+      },
+      "stages": {
+        "import": {
+          "exit_code": 0,
+          "errors": 0,
+          "warnings": 0,
+          "log": "crossbatch_6_candidate_import.log"
+        },
+        "run": {
+          "exit_code": 0,
+          "errors": 0,
+          "warnings": 0,
+          "log": "crossbatch_6_candidate_run.log"
+        }
+      },
+      "result_lines": [
+        "RECORD_STREAM_CHECKS=125 FAILURES=0 LARGE_MEMORY_GROWTH=648424"
+      ],
+      "pass": true
+    }
+  },
+  "production_edits": false,
+  "mocks": "Same focused historical test mocks, plus newer unrelated dependencies and silence-review no-op hooks; cross-flow tests separately use actual silence core/UI methods.",
+  "pass": true
+}

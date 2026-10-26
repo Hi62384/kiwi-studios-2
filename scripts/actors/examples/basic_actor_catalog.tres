@@ -30,6 +30,10 @@
 [ext_resource type="Resource" uid="uid://csbc7ervc7dux" path="res://scripts/actors/examples/fog_volume_actor.tres" id="28_fog"]
 [ext_resource type="Resource" uid="uid://frgfgk8j5t22" path="res://scripts/actors/examples/reflection_probe_actor.tres" id="29_probe"]
 [ext_resource type="Resource" uid="uid://bcuk7qsc0k76j" path="res://scripts/actors/examples/remote_transform_actor.tres" id="30_remote"]
+[ext_resource type="Resource" path="res://scripts/actors/examples/natural_material.tres" id="31_natural_material"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/skeleton_rig_actor.tscn" id="32_rig"]
+[ext_resource type="Texture2D" path="res://resources/Images/ActorIcons/SkeletonRig.svg" id="33_rig_icon"]
+[ext_resource type="Resource" path="res://scripts/actors/examples/transform_image_2d_actor.tres" id="34_transform2d"]
 
 [sub_resource type="Resource" id="position_origin"]
 script = ExtResource("3_property")
@@ -555,7 +559,7 @@ label = "Material"
 value_type = 24
 object_type = &"material"
 options = {
-"accepted_object_types": ["material", "shader_material"],
+"accepted_object_types": ["material", "shader_material", "natural_material"],
 "default": null,
 "extensions": ["tres"],
 "file_resource_mode": "editable",
@@ -583,7 +587,7 @@ options = {
 "file_picker": true,
 "file_resource_mode": "uneditable",
 "group": "Mesh",
-"native_resource_types": ["Mesh", "PackedScene"]
+"native_resource_types": ["Mesh", "PackedScene", "KiwiModelDocument"]
 }
 
 [sub_resource type="Resource" id="mesh_actor"]
@@ -666,7 +670,7 @@ label = "Material"
 value_type = 24
 object_type = &"material"
 options = {
-"accepted_object_types": ["material", "shader_material"],
+"accepted_object_types": ["material", "shader_material", "natural_material"],
 "default": null,
 "extensions": ["tres"],
 "file_resource_mode": "editable",
@@ -2520,7 +2524,17 @@ type_id = &"environment"
 display_name = "Environment"
 properties = Array[ExtResource("3_property")]([SubResource("envp_background_mode"), SubResource("world_background_color"), SubResource("envp_background_image"), SubResource("envp_sky_material"), SubResource("world_background_energy"), SubResource("envp_sky_rotation"), SubResource("envp_sky_top_color"), SubResource("envp_sky_horizon_color"), SubResource("envp_sky_curve"), SubResource("envp_sky_energy"), SubResource("envp_ground_bottom_color"), SubResource("envp_ground_horizon_color"), SubResource("envp_ground_curve"), SubResource("envp_ground_energy"), SubResource("envp_sun_angle_max"), SubResource("envp_sun_curve"), SubResource("envp_sky_debanding"), SubResource("envp_ambient_source"), SubResource("world_ambient_color"), SubResource("world_ambient_energy"), SubResource("envp_ambient_sky_contribution"), SubResource("envp_reflected_source"), SubResource("world_tone_mapper"), SubResource("world_exposure"), SubResource("envp_white_point"), SubResource("envp_ssr_enabled"), SubResource("envp_ssr_max_steps"), SubResource("envp_ssr_fade_in"), SubResource("envp_ssr_fade_out"), SubResource("envp_ssr_depth_tolerance"), SubResource("envp_ssil_enabled"), SubResource("envp_ssil_radius"), SubResource("envp_ssil_intensity"), SubResource("envp_ssil_sharpness"), SubResource("envp_ssil_normal_rejection"), SubResource("envp_sdfgi_enabled"), SubResource("envp_sdfgi_use_occlusion"), SubResource("envp_sdfgi_read_sky_light"), SubResource("envp_sdfgi_bounce_feedback"), SubResource("envp_sdfgi_cascades"), SubResource("envp_sdfgi_min_cell_size"), SubResource("envp_sdfgi_energy"), SubResource("envp_glow_enabled"), SubResource("envp_glow_intensity"), SubResource("envp_glow_strength"), SubResource("envp_glow_mix"), SubResource("envp_glow_bloom"), SubResource("envp_glow_blend_mode"), SubResource("envp_glow_hdr_threshold"), SubResource("world_fog_enabled"), SubResource("envp_fog_mode"), SubResource("world_fog_color"), SubResource("envp_fog_light_energy"), SubResource("envp_fog_sun_scatter"), SubResource("world_fog_density"), SubResource("envp_fog_sky_affect"), SubResource("envp_fog_height"), SubResource("envp_fog_height_density"), SubResource("envp_volumetric_fog_enabled"), SubResource("envp_volumetric_fog_density"), SubResource("envp_volumetric_fog_albedo"), SubResource("envp_volumetric_fog_emission"), SubResource("envp_volumetric_fog_emission_energy"), SubResource("envp_volumetric_fog_gi_inject"), SubResource("envp_volumetric_fog_anisotropy"), SubResource("envp_volumetric_fog_length"), SubResource("envp_volumetric_fog_detail_spread"), SubResource("envp_volumetric_fog_sky_affect"), SubResource("envp_adjustment_enabled"), SubResource("envp_adjustment_brightness"), SubResource("envp_adjustment_contrast"), SubResource("envp_adjustment_saturation")])
 
+[sub_resource type="Resource" id="skeleton_rig"]
+script = ExtResource("2_definition")
+type_id = &"skeleton_rig"
+display_name = "Skeleton Rig"
+category = "Utilities"
+description = "Imported skeleton with editable, animatable bone poses."
+icon = ExtResource("33_rig_icon")
+properties = Array[ExtResource("3_property")]([SubResource("position_origin"), SubResource("rotation_zero"), SubResource("scale_one")])
+runtime_scene = ExtResource("32_rig")
+
 [resource]
 script = ExtResource("1_catalog")
-definitions = Array[ExtResource("2_definition")]([SubResource("point"), ExtResource("23_point2d"), ExtResource("30_remote"), SubResource("shape"), ExtResource("21_shape2d"), ExtResource("26_line2d"), SubResource("mesh_actor"), SubResource("text"), ExtResource("19_text2d"), SubResource("image"), ExtResource("20_image2d"), ExtResource("24_decal"), ExtResource("25_particles"), ExtResource("27_particles2d"), SubResource("light"), SubResource("directional_light_actor"), ExtResource("28_fog"), ExtResource("29_probe"), SubResource("camera"), SubResource("world"), ExtResource("16_audio"), ExtResource("17_video"), ExtResource("22_video2d")])
-object_definitions = Array[ExtResource("13_object_definition")]([SubResource("image_object_definition"), SubResource("noise_image_definition"), SubResource("material_definition"), SubResource("shader_material_definition"), SubResource("canvas_shader_material_definition"), SubResource("fog_shader_material_definition"), SubResource("environment_definition"), ExtResource("18_text_settings")])
+definitions = Array[ExtResource("2_definition")]([SubResource("point"), SubResource("skeleton_rig"), ExtResource("23_point2d"), ExtResource("30_remote"), SubResource("shape"), ExtResource("21_shape2d"), ExtResource("26_line2d"), SubResource("mesh_actor"), SubResource("text"), ExtResource("19_text2d"), SubResource("image"), ExtResource("20_image2d"), ExtResource("34_transform2d"), ExtResource("24_decal"), ExtResource("25_particles"), ExtResource("27_particles2d"), SubResource("light"), SubResource("directional_light_actor"), ExtResource("28_fog"), ExtResource("29_probe"), SubResource("camera"), SubResource("world"), ExtResource("16_audio"), ExtResource("17_video"), ExtResource("22_video2d")])
+object_definitions = Array[ExtResource("13_object_definition")]([SubResource("image_object_definition"), SubResource("noise_image_definition"), SubResource("material_definition"), ExtResource("31_natural_material"), SubResource("shader_material_definition"), SubResource("canvas_shader_material_definition"), SubResource("fog_shader_material_definition"), SubResource("environment_definition"), ExtResource("18_text_settings")])

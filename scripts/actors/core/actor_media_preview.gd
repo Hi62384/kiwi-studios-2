@@ -12,6 +12,12 @@ var transport := Button.new()
 var audio_job: Dictionary = {}
 var audio_path := ""
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		# Image previews never mount the audio/video transport controls.
+		for control in [image, player, seek, transport]:
+			if is_instance_valid(control) and control.get_parent() == null: control.free()
+
 func _ready() -> void:
 	add_child(player)
 	image.custom_minimum_size = Vector2(180, 160)

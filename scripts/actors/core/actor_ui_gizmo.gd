@@ -21,6 +21,7 @@ var preview_position := Vector2(-1, -1)
 var preview_dragging := false
 var preview_drag_delta := Vector2.ZERO
 var preview_user_moved := false
+var spatial:=preload("res://scripts/actors/core/actor_spatial_gizmo.gd").new()
 
 func display_transform() -> Transform2D:
 	if display == null or not is_instance_valid(editor) or not is_instance_valid(editor.runtime_holder): return Transform2D.IDENTITY
@@ -46,6 +47,7 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_ALL
 	batch.model = editor.model
 	batch.registry = editor.registry
+	spatial.editor=editor;spatial.gizmo=self;add_child(spatial)
 	camera_preview = SubViewport.new()
 	camera_preview.name = "SelectedCameraPreview"
 	camera_preview.size = Vector2i(640, 360)
@@ -78,6 +80,7 @@ func corners(runtime: ActorUIRuntime) -> PackedVector2Array:
 	return result
 
 func _process(_delta: float) -> void:
+	spatial.sync()
 	preview_active = false
 	var preview_material: Material
 	if is_instance_valid(editor) and is_instance_valid(editor.runtime_holder):
@@ -142,6 +145,14 @@ func _preview_rect() -> Rect2:
 	return Rect2(preview_position, Vector2(width, height))
 
 func _draw() -> void:
+	if not is_instance_valid(editor) or editor.exporting:return
+	spatial.draw()
+	for actor in editor.model.selected_actors():
+		if actor==editor.model.selected_actor():continue
+		var clip:=editor.model.clip_for_actor_id(actor.id)
+		var other:=editor._runtime_for_clip(clip.id) as ActorUIRuntime if clip!=null else null
+		if other==null or not other.active:continue
+		var outline:=corners(other);outline.append(outline[0]);draw_polyline(outline,Color("7ebadf"),2,true)
 	if preview_active:
 		var card := _preview_rect()
 		draw_rect(card.grow(2), Color("0b1720"))
@@ -230,7 +241,7 @@ func finish_drag(cancel: bool = false) -> void:
 	editor.hints.end(self)
 
 func _gui_input(event: InputEvent) -> void:
-	if not is_instance_valid(editor) or editor.audio_recorder.recording or editor.screen_recorder.recording: return
+	if not is_instance_valid(editor) or editor.exporting or editor.audio_recorder.recording or editor.screen_recorder.recording: return
 	if preview_dragging:
 		if event is InputEventMouseMotion:
 			preview_user_moved = true
@@ -250,6 +261,15 @@ func _gui_input(event: InputEvent) -> void:
 			preview_drag_delta = event.position - preview_position
 		accept_event()
 		return
+	if spatial.handle_event(event):accept_event();return
+	if event is InputEventKey and event.pressed and not event.echo and has_focus() and not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		if event.is_action_pressed("undo") or event.is_action_pressed("redo"):
+			if not spatial.rig.before.is_empty():spatial.rig.finish(true)
+			elif not spatial.before.is_empty():spatial.finish(true)
+			elif not before.is_empty():finish_drag(true)
+			elif event.is_action_pressed("redo"):editor.redo()
+			else:editor.undo()
+			accept_event();return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE and not before.is_empty(): finish_drag(true); accept_event(); return
 	if event is InputEventMouseMotion and not before.is_empty(): update_drag(scene_point(event.position)); accept_event(); return
 	if event is InputEventMouseMotion:
@@ -277,13 +297,15 @@ func _gui_input(event: InputEvent) -> void:
 				if tooltip_text.is_empty() and Geometry2D.is_point_in_polygon(event.position, corners(hovered)):
 					tooltip_text = "Move"
 					mouse_default_cursor_shape = Control.CURSOR_MOVE
+		if hovered==null:spatial.hover(event.position)
 		return
 	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT: return
 	if not event.pressed:
 		if not before.is_empty(): finish_drag(); accept_event()
 		return
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):return
 	var runtime := selected_runtime()
-	if runtime != null and runtime.active:
+	if runtime != null and runtime.active and not event.ctrl_pressed and not event.shift_pressed:
 		var points := corners(runtime)
 		var handles := handle_points(runtime)
 		if handles.rotation.distance_to(event.position) < 16: begin_drag(&"rotation", scene_point(event.position)); accept_event(); return
@@ -294,11 +316,19 @@ func _gui_input(event: InputEvent) -> void:
 			if resize_handles[index].distance_to(event.position) < 14:
 				resize_axis = axes[index]
 				begin_drag(&"size", scene_point(event.position)); accept_event(); return
-		if Geometry2D.is_point_in_polygon(event.position, points): begin_drag(&"position", scene_point(event.position)); accept_event(); return
 	for index in range(editor.model.clips.size() - 1, -1, -1):
 		var candidate := editor._runtime_for_clip(editor.model.clips[index].id) as ActorUIRuntime
 		if candidate != null and candidate.active and Geometry2D.is_point_in_polygon(event.position, corners(candidate)):
-			editor.model.select(editor.model.clips[index].id, event.shift_pressed or event.ctrl_pressed)
-			begin_drag(&"position", scene_point(event.position))
+			var id:=editor.model.clips[index].id
+			if event.ctrl_pressed:editor.model.toggle_selection(id)
+			else:editor.model.select(id,event.shift_pressed or editor.model.is_selected(id))
+			if not event.ctrl_pressed and not event.shift_pressed:begin_drag(&"position", scene_point(event.position))
 			accept_event()
 			return
+	var hit:String=spatial.pick(event.position)
+	if not hit.is_empty():
+		if event.ctrl_pressed:editor.model.toggle_selection(hit)
+		else:editor.model.select(hit,event.shift_pressed or editor.model.is_selected(hit))
+		grab_focus();accept_event()
+	elif not event.ctrl_pressed and not event.shift_pressed and spatial.in_picture(event.position):
+		editor.model.select("");grab_focus();accept_event()

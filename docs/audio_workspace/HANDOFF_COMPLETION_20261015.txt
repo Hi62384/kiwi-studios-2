@@ -1,0 +1,344 @@
+KIWI STUDIOS 2 - LOCAL SOURCE COMPLETION AND VERIFICATION
+Date: 2026-10-15
+
+Delivery
+--------
+Changes are in the actual working project, not a patch ZIP. Unrelated existing
+changes were preserved. No commit, push or publication was performed.
+Application packaging was stopped at the user's instruction. No further
+application export is required to use these source changes in Godot.
+
+Scope and status
+----------------
+The explicit priority gaps in 02_KIWI_CODEX_PROMPT.txt were implemented or given
+bounded, explicitly described supported cases below. Existing Audio batches
+01-12 were extended, not replaced or recovered from obsolete snapshots.
+The original full Audio and Shader/Natural Materials specifications were not
+available in the supplied evidence or project. Consequently this is not an
+unqualified acceptance of every item in those unavailable specifications.
+
+Implemented audio work
+----------------------
+1. Audio Workspace recording writes bounded PCM blocks to disk on a worker.
+   Mic and timeline input have separate files; optional Windows loopback writes
+   its own source. WAV headers are checkpointed while capturing. Stop drains
+   writers and finalizes/mixes via the shared asynchronous encoder backend,
+   rather than constructing a whole-take AudioStreamWAV. Sources and recovery
+   journals are retained; Undo only changes document references.
+   Legacy Scene recording retains its compatible default API.
+2. Reviewed multi-clip silence cleanup with explicit clip-only/track-following
+   ripple, per-region choices, actual source-handle overlap crossfades,
+   revision guards and one Undo action. Unsupported outer fade combinations
+   are refused rather than silently reshaped.
+3. Edited/effected, routed isolated-clip RMS and processed alignment. This
+   uses actual renderer output and bounded cache entries instead of labeling
+   unprocessed source measurements as processed audio.
+4. Unified missing-media review/relink for clips, sampler layers, multisamples
+   and impulse responses, including identity/association preservation and
+   stale-document/frozen-source guards.
+5. Native preset import/export, folders/tags/search, non-generator auditions,
+   retained removal backups and recovery as a new independent preset.
+   Selected-layer bundles preserve required downstream routing, rebase local
+   automation and create fresh identities on insertion.
+6. Canonical linked drum definitions/instances, shared editing, make unique
+   and detach. Piano edits detach inside the same undoable operation. Preset
+   and document validation cap expansion and preserve saved compatibility.
+7. Explicit one-shot fitting of full note sources to the current step-tempo
+   conductor. Absolute clip starts and source beat positions remain intact;
+   lengths change only on applying this reviewed policy.
+8. Same-render numerical per-track/group meter envelopes for exact prepared
+   playback, rather than displaying unrelated native bus levels as route
+   levels. Unsupported routes are explicitly unavailable.
+9. Numeric waveform/sample amplitude editing; nine tailored routing templates;
+   closed routed-group freeze/unfreeze; a generalized editable modulation
+   matrix; real synth stereo pan modulation; Scene animated pan and render pan.
+10. Conservative offline room-decay suppression and manual possible-breath
+    review with audition and editable gain automation. These are real bounded
+    DSP/detection workflows, not neural restoration or speech recognition.
+11. Fast-process FFmpeg pipe/result handling fixed on Windows. Import scanning
+    now excludes historical delivery snapshots under tools, preventing duplicate
+    global classes. Fresh-install ProjectManager initialization and workspace
+    resource ownership were corrected during launch verification.
+12. Optional speech workflows now have actual implementations: local
+    whisper.cpp transcription, editable transcript review/save/reopen and cue
+    markers with Undo/Redo; an opt-in ElevenLabs speech adapter; and Windows
+    Credential Manager storage/read/removal. Secrets use stdin pipes, not
+    command-line arguments or project/settings serialization. Remote generation
+    requires explicit text transmission, unknown-cost and voice authorization
+    confirmations on each request. There are no automatic provider calls.
+13. Shutdown ownership is now fixed for filesystem UndoRedo, timeline histories,
+    filesystem scanning timers and pending inspector-state saves. Last pending
+    inspector-state changes flush to their originating project on close.
+
+Shader/material reconciliation
+------------------------------
+The existing architecture was retained: 142 complete shader samples plus 20
+separate templates, with previews/browser/application, and the shared versioned
+natural-material engine used across Image and Scene. Source-index identities,
+GPU compilation/rendering, material distinctness, exposed parameters, tiling,
+and representative existing integration tests were checked. No second shader
+library or procedural-material engine was introduced.
+
+Practical use
+-------------
+Open the project normally in Godot 4.6.1 and run it. Use a new Audio tab.
+The existing Commands/menu system exposes the new workflows, including:
+- Recover retained disk takes: preview/insert a mix OR separate sources;
+  importing both would intentionally double their audio.
+- Missing media review: choose replacements, review and confirm together.
+- Review selected dialogue clips: select clips, choose ripple/crossfade policy,
+  review detections, then apply. Merely analyzing does not edit the composition.
+- Match clip levels / Align two clips: processed measurements use the renderer.
+- Sample value editing: select a waveform sample/range and enter its amplitude.
+- Preset library: save, import/export, audition, manage folder/tags, recover
+  removed presets, and save/insert selected-layer bundles.
+- Linked pattern controls: shared edits, Make unique or Detach before free edits.
+- Fit selected note sources to conductor: full, forward, unlooped, normal-speed
+  note clips only. It is an explicit snapshot, not automatic future retiming.
+- Modulation matrix: add targets and replace their curves as one Undo action.
+- Freeze/unfreeze: closed upstream groups preserve the original source graph.
+- Review possible breaths: audition and check candidates; none are auto-accepted.
+- Room Decay Suppression: offline effect, rendered for exact preview/playback.
+- Commands > Optional Speech Tool Setup: select a trusted whisper.cpp CLI and
+  GGML model; optionally enter your own ElevenLabs voice ID and store its API
+  key in Windows Credential Manager. Saving paths never saves the API key.
+- Analysis > Transcribe locally / Commands > Transcribe Selected Clip Locally:
+  prepare the edited clip, run local recognition, review/correct text and save.
+  Review Saved Transcript reopens it. Cue markers are opt-in and Undo-compatible.
+- Commands > Generate Cloud Speech (Opt-in): confirm the three permissions,
+  generate, audition, then insert at the original playhead with safe provenance.
+- Cancel Job also cancels optional workers. Results are discarded after document
+  switches or edits. An already submitted remote request may still use quota.
+Recording files live beneath user://audio_workspace/takes, independently of
+document Undo history. Save/collect media for a portable composition.
+FFmpeg/FFprobe must be available through the existing configured tool paths or
+PATH for encoded media, exact rendering and multi-source finalization.
+
+Verification actually completed
+------------------------------
+Engine: Godot 4.6.1 stable; native Forward+ rendering on RTX 3060 / D3D12.
+- Full project regression run: 94/94 scripts passed (Scene/Image/Shader/Audio).
+  Machine-readable results: .godot/verification/handoff_full_project.json
+- Focused native regression passes: 13/13 and 4/4 scripts passed.
+  .godot/verification/handoff_native.json
+  .godot/verification/handoff_native_final.json
+- Final source-only follow-up: 7/7 scripts passed; disk capture, two-minute writer budget, media
+  repair, processed analysis, modular loading, handoff workflows and actual
+  application workspace switching. Results:
+  .godot/verification/handoff_source_final.json
+- Handoff workflow suite: 42 checks, zero failures; includes cleanup/crossfades,
+  Undo, routing bundles, linked drums, preset recovery, templates, group freeze,
+  modulation, pan, conductor fitting and restoration processing.
+- Two-minute equivalent 48 kHz stereo capture writer: zero failures;
+  peak queued bytes 32768, measured static-memory delta 34196 bytes. This is
+  synthetic writer coverage, not a two-minute physical device acceptance test.
+- Native WASAPI synthetic timeline capture: zero failures. No microphone or
+  system-audio source was opened for this synthetic-input test.
+- Native Audio workflow playback/seek/render/save/reopen: 17 checks passed.
+- Shader catalog: 142 samples + 20 templates, zero validation failures.
+- Full natural-material engine: 143 presets rendered with 143 distinct pixel
+  fingerprints; no inactive exposed parameters; seven tiling families had zero
+  pixel repeat difference. Five 256px maps: 92.63 ms; cached result: 0.34 ms
+  on the verification machine, not a general performance guarantee.
+- Windows loopback C# source compiled without opening capture devices.
+- git diff --check passed.
+- Closing pass: 96/96 scripts passed, zero failures:
+  .godot/verification/completion_final.json (full native suite),
+  .godot/verification/completion_followup.json (four native checks), and
+  .godot/verification/lifecycle_final.json (final lifecycle/scroll/tab checks).
+  Follow-up passes: 4/4 and 3/3 scripts respectively. The explicitly gated private
+  device check was added after the full-suite file list was captured and ran
+  separately with user permission, not as an ordinary automatic regression.
+- Optional tools: 29 checks passed including real Windows vault round-trip on
+  one uniquely named synthetic credential, subsequently removed; zero real
+  credentials accessed. Follow-up suites also cover native dialog screenshots,
+  consent rejection, invalid voice paths, cancellation, safe metadata and actual
+  MP3 response decoding using a mock transport (no paid/cloud requests).
+  Final vault rerun also passed a Unicode synthetic credential round-trip:
+  .godot/optional_tools_unicode_vault.log (29 checks, zero failures).
+- Local recognizer: official whisper.cpp b5454 CPU binary and GGML tiny.en model
+  correctly transcribed the public JFK sample end-to-end. Test dependencies
+  stay in ignored .godot/optional_speech_test, not shipped/bundled source.
+  GGML model SHA-256:
+  921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f
+  To use the retained local test dependency manually, select
+  .godot/optional_speech_test/bin/Release/whisper-cli.exe and
+  .godot/optional_speech_test/ggml-tiny.en.bin in Optional Speech Tool Setup.
+  These are English-only test weights; choose an appropriate multilingual
+  GGML model separately for other languages. The app never downloads weights.
+- Explicitly authorized physical capture: three seconds of default microphone
+  and Windows system loopback passed outside the sandbox. Separate sources
+  finalized; microphone peak 0.02353, RMS 0.001995; system test-tone amplitude
+  0.03472. Mic monitoring remained muted. Log: .godot/private_device_test_native.log
+  An initial sandbox attempt was denied microphone access and is not counted
+  as a microphone pass. No OS privacy/security setting was changed.
+- Accelerated thirty-minute 48 kHz stereo writer test: zero failures,
+  peak queue 557056 bytes, static-memory delta 559876 bytes. All synthetic audio
+  from this stress test was removed from its uniquely owned test directory.
+  Log: .godot/capture_stress.log. This is not thirty minutes of wall-clock device
+  stability or a perceptual listening acceptance test.
+- Native full-application closing test now has no leaked-object/resource-in-use
+  warnings and asserts that owned undo objects are released. Source/test launch
+  only; no further application packaging was performed.
+
+Remaining limitations / not verified
+------------------------------------
+- Default physical mic/system capture was checked as above. Human listening,
+  device round-trip latency, uninterrupted multi-hour sessions, other hardware
+  and device-switch behavior are not established by those checks. Device
+  restart is not guaranteed gapless loop recording.
+- Optional local transcription requires a trusted installed CLI/model, chosen
+  in settings. The optional cloud speech adapter requires the user's own
+  credential, authorized voice and quota; it was tested with mock responses,
+  not a billable live request. No paid service/account was used or configured.
+  Other optional provider tasks (music, transformation, extension, separation)
+  are not advertised by this adapter; existing local/offline tools remain usable.
+- Processed measurements describe an isolated rendered clip/route, not its
+  marginal contribution inside a simultaneous nonlinear mix. RMS rendering is
+  bounded to 300 seconds; alignment correlates the initial 20-second windows.
+- Dialogue batch review is capped at 64 clips. Unsupported transformed edits
+  are refused; render first where requested by the UI.
+- Route envelopes cover up to 32 routes and ten minutes per prepared render;
+  the master retains its live meter. These are prepared numerical envelopes,
+  not arbitrary live real-time meters for every unsupported effect path.
+- Linked drums: 256 definitions, 512 instances, 8192 expanded notes. Matrix:
+  32 targets/ten minutes; BPM sync uses the initial tempo, not tempo ramps.
+- Conductor fit supports stepped tempo, not arbitrary continuous tempo warp.
+  Smooth automation crossing a bundle origin is refused rather than distorted.
+- Group freeze rejects external branching that cannot be safely represented
+  by one replacement source; it does not pretend all routing graphs are safe.
+- Restoration is conservative six-band decay suppression, not recovery of a
+  clean dry source. Breath detection can include sibilance/noise and requires
+  review. Its analysis source window is limited to 60 seconds.
+- Capture queues/file limits are operation-specific (2 MiB queue, 2 GiB PCM
+  source/output limits), not a global RAM/disk quota for the entire application.
+- Godot reports a root-certificate-store diagnostic in this sandbox. Native
+  execution outside the sandbox did not report it. TLS validation was never
+  disabled; no certificate/security configuration was modified.
+- The desktop screenshot helper timed out, so manual desktop UI acceptance
+  is not claimed. Native in-engine screenshots/workspace tests did pass.
+
+Changed paths for this completion increment
+-------------------------------------------
+New production files:
+  tools/.gdignore
+  scripts/actors/core/audio_take_writer.gd (+ .uid)
+  Workspaces/AudioWorkspace/audio_take_finalize.gd
+  Workspaces/AudioWorkspace/audio_media_repair.gd
+  Workspaces/AudioWorkspace/audio_processed_analysis.gd
+  Workspaces/AudioWorkspace/audio_dialogue_batch.gd
+  Workspaces/AudioWorkspace/audio_preset_store.gd
+  Workspaces/AudioWorkspace/audio_layer_bundle.gd
+  Workspaces/AudioWorkspace/audio_linked_patterns.gd
+  Workspaces/AudioWorkspace/audio_route_meters.gd
+  Workspaces/AudioWorkspace/audio_group_freeze.gd
+  Workspaces/AudioWorkspace/audio_modulation_matrix.gd
+  Workspaces/AudioWorkspace/audio_restoration.gd
+  Workspaces/AudioWorkspace/audio_conductor_fit.gd
+  Corresponding Godot-generated .gd.uid identity sidecars.
+Modified production files (existing local source, including pre-existing
+untracked Audio Workspace files):
+  scripts/actors/core/actor_audio_recorder.gd
+  scripts/actors/core/windows_system_audio.gd
+  scripts/actors/core/audio_encoder_process.gd
+  scripts/actors/audio/windows_loopback.cs
+  Workspaces/AudioWorkspace/audio_workspace.gd
+  Workspaces/AudioWorkspace/audio_analysis.gd
+  Workspaces/AudioWorkspace/audio_region_edit.gd
+  Workspaces/AudioWorkspace/audio_edit_session.gd
+  Workspaces/AudioWorkspace/audio_renderer.gd
+  Workspaces/AudioWorkspace/audio_playback.gd
+  Workspaces/AudioWorkspace/audio_composer_controls.gd
+  Workspaces/AudioWorkspace/audio_pattern_canvas.gd
+  Workspaces/AudioWorkspace/audio_templates.gd
+  Workspaces/AudioWorkspace/audio_preset.gd
+  Workspaces/AudioWorkspace/audio_library.gd
+  Workspaces/AudioWorkspace/audio_instruments.gd
+  Workspaces/AudioWorkspace/audio_synthesis.gd
+  Workspaces/AudioWorkspace/audio_effects.gd
+  Workspaces/AudioWorkspace/audio_document.gd
+  scripts/actors/examples/audio_actor.tres
+  scripts/actors/core/actor_audio_system.gd
+  scripts/actors/core/actor_scene_exporter.gd
+  scenes/ProjectManager/project_manager.gd
+  scripts/Extra/scene_tabs.gd
+  Workspaces/ImageWorkspace/image_workspace.gd
+Added verification scripts under scripts/actors/tests/:
+  audio_disk_take_test.gd, audio_media_repair_test.gd,
+  audio_sample_value_test.gd, audio_processed_analysis_test.gd,
+  audio_handoff_workflows_test.gd, audio_disk_capture_native_test.gd,
+  audio_capture_budget_test.gd, application_handoff_smoke_test.gd (+ .uid files).
+Additional completion production files:
+  Workspaces/AudioWorkspace/audio_optional_process.gd
+  Workspaces/AudioWorkspace/audio_credential_vault.gd
+  Workspaces/AudioWorkspace/audio_elevenlabs_provider.gd
+  Workspaces/AudioWorkspace/audio_transcription.gd
+  Workspaces/AudioWorkspace/audio_optional_workflows.gd
+  scripts/actors/audio/windows_credentials.ps1
+  Corresponding Godot-generated .gd.uid identity sidecars.
+Additional modified lifecycle/service files:
+  CustomNodes/FileSystem/file_system_callable_actions.gd
+  scripts/Globals/local_project_filesystem.gd
+  scripts/actors/core/actor_timeline.gd
+  Workspaces/AudioWorkspace/audio_provider_service.gd
+Additional verification scripts:
+  scripts/actors/tests/audio_optional_tools_test.gd (+ .uid)
+  scripts/actors/tests/audio_private_device_test.gd (+ .uid)
+  Private-device tests skip unless KIWI_TEST_PRIVATE_CAPTURE=1 is explicitly
+  set after recording consent. Synthetic vault tests require KIWI_TEST_VAULT=1
+  and touch only their own unique test credential. Ordinary suites do not
+  capture private input or read the user's provider credential.
+Updated verification scripts under scripts/actors/tests/:
+  audio_workspace_extended_test.gd, audio_pattern_geometry_test.gd,
+  audio_examples_test.gd, audio_scene_links_test.gd, run_regressions.py.
+Earlier build verification added export_presets.cfg and ignored local build
+artifacts. They are not required for running this project, and no further
+application export was performed after the user instructed otherwise.
+
+Reproduce source checks without packaging
+-----------------------------------------
+python scripts/actors/tests/run_regressions.py --godot <Godot_console.exe>
+  --renderer forward_plus --report local_source_checks
+Optional trailing test script names limit the run. The runner isolates user
+settings and records per-script logs in .godot/verification. It never invokes
+application export. Shader index check: python
+scripts/tests/rebuild_shader_library_index.py (read-only unless explicitly
+given its write mode).
+
+Optional implementation references
+----------------------------------
+https://github.com/ggml-org/whisper.cpp/tree/master/examples/cli
+https://elevenlabs.io/docs/api-reference/text-to-speech/convert
+https://learn.microsoft.com/en-us/windows/win32/api/wincred/ns-wincred-credentialw
+
+2026-10-16 - Audio workspace organization update
+------------------------------------------------
+The dense toolbar/inspector layout was replaced with a presentation-only layout
+layer. File/Edit/Add/Tools/View menus retain the existing commands. The main
+transport is grouped into playback/recording, musical timing and edit controls.
+An empty project offers Import/Create actions on the timeline; waveform, notes,
+drums, effects, mixer and cleanup editors stay closed until requested. Open editor
+and Close editor operate next to the timeline; View can open any editor directly.
+
+The inspector separates Clip, Track and Project controls. Detailed clip timing,
+instrument settings, routing/track tools and preset management are collapsible.
+Library filters and folder-index controls start collapsed. Sound generators put
+Preview/Add first and their parameters under Customize sound. Waveform, note
+and cleanup actions are grouped rather than laid out as long button lists.
+Automation controls are revealed from View or when choosing an automation
+target. Closing active automation controls finishes its pass instead of hiding
+an active recording control. Track buttons say Mute/Solo/Lock with tooltips.
+
+All processing/session APIs remain the existing ones. Navigation is saved per
+tab (layout version 2), including editor visibility, inspector view/sections,
+library and automation visibility. Older saved layout state migrates to closed
+editors once; document audio/notes, zoom and scroll are not replaced.
+
+Changed: Workspaces/AudioWorkspace/audio_workspace.gd, audio_library.gd,
+audio_timeline_canvas.gd; new audio_workspace_layout.gd (+ .uid).
+New test: scripts/actors/tests/audio_workspace_layout_test.gd (+ .uid).
+Verification: native UI/workflow suite 7/7, navigation/geometry/module follow-up
+3/3, and final focused results in .godot/verification/audio_ui_final.json.
+Screenshots at .godot/verification/audio_layout cover an empty workspace at
+1440x900 and 960x720, clip selection and the audio editor. They were inspected
+for layout and clipping. No application export was performed.

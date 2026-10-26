@@ -1,0 +1,78 @@
+SUPER CLIPBOARD
+
+Press F8 from any Kiwi workspace. The floating browser is non-modal: move it by
+its title, resize its lower-right corner, and drag resources into compatible
+workspace targets. F8 toggles it; Escape closes it when it owns keyboard focus.
+The InputMap action is super_clipboard. The ordinary operating-system clipboard
+is not changed.
+
+Quick save: resource menus offer Copy to Super Clipboard; workspace File menus,
+Shader's Clipboard menu, Scene's menu and the floating browser's Save active
+action store editable snapshots. Supported Save As dialogs also have Save copy
+to Super Clipboard with a destination folder selector. Quick saves go to Default
+and make the new item the Default Slot without deleting previous saves. Saving a
+clipboard copy never redirects the original document's Save path or marks that
+original file as saved. Image documents keep layers, not just flattened pixels.
+
+Load: asset pickers have Project / Super Clipboard sources and a Default Slot
+shortcut. The existing type/extension checks still apply. Choosing a resource
+copies it and its necessary dependencies into the active project's
+Super Clipboard/<stable-ID>/ directory before returning a conventional project
+path. Repeated uses reuse that project copy. A project's edits never synchronize
+back into the stored snapshot. A single-resource slot rejects an entire multi-
+item drag rather than silently dropping the extras. Multi-item targets which
+already support the project_files payload keep their existing behavior.
+
+Library management: create nested folders; rename; use Organize or folder drops
+to move, duplicate, copy/cut/paste, or delete. Ctrl-drag duplicates. Ctrl+C/X/V,
+Ctrl+D, F2, Delete/Backspace and Ctrl+Z/Y work within the library, except inside
+ordinary text fields. Set Default Slot chooses any existing resource for quick
+access. Deleted entries go to persistent Trash and can be restored; clipboard
+history is independent of scene history. Default is the protected built-in folder.
+Renaming or moving only changes metadata, not active project files or stable IDs.
+There is intentionally no destructive automatic purge of stored bytes.
+
+Storage: user://super_clipboard/, normally
+%APPDATA%/Godot/app_userdata/KiwiStudios2/super_clipboard/ on Windows. This is
+application-wide, not inside a Kiwi project. Version-1 metadata uses checksummed
+temporary writes and a validated backup. Newer unknown formats are read-only;
+corrupted indexes are preserved and the last valid backup is recovered where
+possible. Payloads are immutable, dependencies are embedded or copied by content
+hash, and deleted/duplicated entries can share immutable payload bytes safely.
+Undo stores metadata, not repeated copies of large media. Display names never
+become trusted paths or identities. Original-path metadata is informational only.
+
+Supported: native editable Kiwi scenes/actors, image documents, model documents
+(including hierarchy and rigs), Transformation Image 2D, audio compositions and
+presets, ActorObjectData materials/images/noise/text settings, Godot materials,
+shaders, meshes, textures, animations and other serializable Resources using
+trusted application scripts. Embedded raster textures are losslessly packed;
+HDR texture formats retain their floating-point data. Noise/procedural resources
+remain editable. Shader includes are expanded into an independent snapshot.
+Raw images, common audio/video, MIDI, fonts and self-contained GLB files can also
+be stored. A raw file remains in its original format where applicable.
+
+Unsupported/missing dependencies produce an explicit failure, not a broken
+shortcut. External executable scripts and live callbacks/objects are rejected.
+GLTF/OBJ/FBX packages with external dependency layouts should first be imported
+and saved as an editable Kiwi model. GLBs with external image/buffer URIs are
+rejected. New file formats can register a snapshot adapter without replacing the
+browser. Future M2DO-specific editing/drop handlers are not claimed to exist.
+
+Previews are lazy. List mode uses type icons; grid mode generates visible
+thumbnails incrementally with a bounded cache; selection shows the existing Kiwi
+preview where supported. Native material previews require a loaded workspace's
+thumbnail renderer. Startup reads metadata only. Large files are streamed in
+bounded chunks, although very large copies/compression may briefly block the UI.
+Not every export job has a Clipboard destination before it produces a file:
+finished audio/video exports can be copied from the project filesystem instead.
+Native resources used in a project have project-local data, not personal-library
+dependencies. Absolute project media-path relocation follows Kiwi's existing
+project-path conventions; this feature is not a general project-rebasing system.
+
+Tests: super_clipboard_test (storage, dependency independence, management, undo,
+cross-project materialization and recovery), super_clipboard_restart_test (new
+Godot process), super_clipboard_resources_test (editable pixels/model hierarchy,
+shader/audio/noise formats), super_clipboard_ui_test (running inspector/picker/
+save/drop/F8 paths across all six workspaces), super_clipboard_scale_test (1,000
+entries with no eager asset loading). Reports: .godot/verification/.

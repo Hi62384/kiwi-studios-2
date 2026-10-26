@@ -1,0 +1,150 @@
+KIWI TIMELINE PHYSICS
+====================
+
+Getting started
+---------------
+Select a 3D actor, then open Actor > Physics and turn Physics on.
+The existing scene playhead controls every solver. Nothing advances while paused.
+No separate physics timeline, Engine.time_scale changes, or live rigid/soft body
+nodes are used.
+
+Falling objects: choose Rigid Body. For the floor, enable physics on a box or mesh
+and set Motion to Static collider. Extend the floor's clip across the simulation.
+An Animated collider follows its ordinary transform keys. Collision only hides
+the geometry without deleting its mesh or changing its saved visibility.
+
+Flexible objects: choose Soft Body or Cloth on a triangle mesh. For basic shapes,
+add subdivisions in Properties first. Stretch, bend, damping, wind and recovery
+control the deformation. Use an edge pin region, or expand Point pins and enable
+Pick pins in viewport. Click a simulation point to pin it; Ctrl-click removes a
+pin and Esc finishes picking. Pins can stay in world space or follow the chosen
+actor/bone attachment. The numeric point picker is also available.
+
+Rope: choose Rope on a Point 3D or mesh actor. Set length, visible radius and point
+count. Attach either or both ends to actors/bones, or leave them free. Explicit
+point pins can hold intermediate rope points. The source mesh supplies the rope
+material; a Point 3D uses the default tube appearance.
+
+Object secondary motion: Ragdoll / Jiggle follows an animated target with spring
+lag, or uses articulated Fixed, Hinge, Slider, Distance or Spring constraints.
+Attachment offset is in attachment space. Body pivot is local to the moving body.
+Hinge/slider axes are in the animated attachment's orientation.
+
+Skeletons: select the imported Skeleton Rig actor, choose Skeleton Ragdoll /
+Jiggle and check the affected bones. Other actor types offer shortcuts to select
+an available rig. Search, All, None, Selected, Children, Chain and Mirror help
+choose bones. Per-bone settings apply to highlighted tree rows, or to all checked
+bones if none are highlighted. Unchecked bones keep their animated local poses;
+they naturally inherit movement from a simulated ancestor. Jiggle springs toward
+the animation. Ragdoll releases the checked bones within their joint-angle limits.
+A checked root can fall in full-body ragdoll; partial chains stay attached to
+their animated parents. Influence blends the rendered pose with animation.
+
+Controls and animation
+----------------------
+Activation and Stop are SOURCE seconds, matching clip-local property keyframes.
+Start times, source offsets and clip speed participate in scene-time evaluation.
+Trimming into a clip replays the earlier source history instead of restarting it.
+Enable and scalar/vector controls expose ordinary keyframe diamonds. Animated
+targets are sampled at each fixed step. Initial velocity can inherit parent motion
+at release. Forces and impulses are undoable timed events in source seconds.
+
+The Advanced fixed-step setting requests 30-240 steps per scene second. All
+interacting actors share the highest requested rate; the default is 60. Clip speed
+scales that actor's source-time integration. Display frames interpolate between
+fixed samples and need not match the solver rate.
+
+Animated uses ordinary actor animation. Simulated integrates physics. Guided adds
+a spring toward the animated target (deformables use their pins/attachments).
+Freeze captures the current world-space transform, points and bone poses. Choosing
+Frozen in Control performs the same capture. Bake records a scene-time interval;
+Baked becomes available after a successful bake. Recalculate returns a baked actor
+to its source mode and replays it. Clear cache discards transient checkpoints but
+does not delete saved bake data.
+
+Undo/redo applies to authored configuration, bone selection, attachments, pins,
+events, freeze and bake. Simulation steps never enter the edit history. A numeric
+drag previews continuously and commits as one undo action.
+
+Saving and rendering
+--------------------
+Actor.values.physics is saved by the existing native scene resource system.
+It includes configuration, stable actor IDs, bone names, overrides, pins, events,
+frozen states and baked frames. Copy/instantiate operations remap attachment IDs.
+Transient checkpoint dictionaries and native physics RIDs are not saved.
+
+Bake validity fingerprints relevant transforms, geometry, clip timing, driving
+animation, attachments, physics settings and curve data. Actor names, selection
+and unrelated appearance changes do not invalidate caches. A stale bake produces
+a visible warning and live replay; it is never silently reused. Referenced actor
+and bone deletions also produce warnings. Editing mesh topology may require
+re-pinning simulation points, whose indices refer to the coarse simulation mesh.
+
+Video rendering waits for the same scene controller to finish a requested seek
+before capturing a frame. It does not advance physics by render duration. Native
+tests render the same rigid/baked-cloth scene twice and compare each sampled state
+with viewport seeking. This is a scene-video test, not an application export.
+
+Architecture and bounds
+-----------------------
+KiwiTimelinePhysics owns fixed-step states and periodic checkpoints. Each snapshot
+includes velocities, activation, sleep data, point arrays, bone endpoints and root
+motion. Backward seeks restore a prior checkpoint and replay. A 12 ms scheduling
+budget yields between steps during longer seeks, without changing the solver's
+mathematical timestep. Playback holds its requested time while catching up.
+
+PhysicsServer3D supplies native Jolt/Godot swept collision queries in an INACTIVE,
+isolated space. It never ticks with the game's real-time physics clock. Godot 4.6
+uses instant-updated static RIDs here strictly as query proxies: kinematic RID
+transforms would wait for an engine tick even in an inactive space. Actor motion
+modes and velocities are entirely controlled by Kiwi, not those native RID modes.
+Godot 4.6
+does not expose safe public per-world manual stepping/restoration for ordinary
+RigidBody3D, SoftBody3D, PhysicalBone or SpringBone simulation, so their live clocks
+are not used. Integration and constraints are implemented by this controller.
+
+Soft body/cloth meshes transfer coarse-point displacements to triangle vertices,
+preserve UVs and materials, and rebuild normals. Skinned cloth initializes using
+CPU skinning at its activation pose; disabling physics restores the original mesh
+and skin. Rope renders an eight-sided 3D tube. Bone physics runs after ordinary
+animation and before final skin/rigid-bone attachments are displayed.
+
+Limits: 256 soft/cloth points; 96 rope points; 30,000 render vertices per deforming
+actor; 96 checkpoints within an estimated 64 MiB budget. A bake is limited to 4,096
+fixed-step frames and 64 MiB per actor. Use shorter intervals or lower simulation
+resolution for larger scenes. Geometry is captured at activation, not continuously
+re-topologized while physics runs; animated actor scale and transforms remain
+supported. Static triangle collision is static-only; moving concave requests use
+a warning and a box fallback. An actor must have nonzero scale on every axis.
+
+Important solver limitations
+----------------------------
+This is a functional timeline-oriented constraint system, not the complete native
+Jolt dynamics engine. Rigid contacts use swept motion with bounded approximate
+isotropic angular response, not full inertia tensors/manifolds, robust vehicle
+dynamics or production-quality stacks of hundreds of bodies. Articulated joints
+are projected constraints, not native Jolt joints.
+
+Skeleton contacts use bone-tip spheres and angular constraints, not automatically
+fitted full anatomical collision capsules. Soft bodies use elastic distance/bend
+constraints and shape recovery, not volumetric finite-element physics. Cloth and
+rope collide against enabled rigid colliders; they do NOT push those rigid bodies
+back, collide with one another, or support self-collision, true knotting, frictional
+wrapping or automatic clothing/dressing. Those features need additional solver
+work. Physics influence blends the display; use Animated mode when a rigid body
+should instead act as an animation-controlled collider.
+
+Replay is tested with Godot 4.6.1/Jolt on the same machine. Bit-exact unbaked replay
+across different engines, physics backends or hardware is not promised. Keep saved
+bakes for important renders. Very dense/fast or ill-conditioned scenes may need
+more fixed steps, more constraint iterations and simpler collision geometry.
+
+Verification sources
+--------------------
+scripts/actors/tests/timeline_physics_test.gd
+scripts/actors/tests/physics_integration_test.gd
+scripts/actors/tests/physics_workspace_test.gd
+
+Run these with scripts/actors/tests/run_regressions.py and Godot 4.6.1, using the
+forward_plus renderer for native viewport and video checks. Reports and preview
+screenshots go to .godot/verification/. No application package is exported.

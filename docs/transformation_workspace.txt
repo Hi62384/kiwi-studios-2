@@ -1,0 +1,253 @@
+TRANSFORMATION IMAGE 2D
+=======================
+
+Getting started
+---------------
+Use the document tab bar's + button and choose Transformation Image 2D.
+The new document starts with one transparent drawing component and one state.
+Draw a mouth, choose + State under State Definition, rename the copy, and draw
+its next appearance. + Blank creates an empty state instead. Add another
+component with the + above Components to animate an eye independently.
+
+Choose a state, position the playhead, then press I / Insert state. Repeat for
+other states and components. Click the ruler to scrub, Space to play/pause.
+Scrubbing is explicitly Animation Preview; Edit state returns to the selected
+key's reusable drawing definition. Keys reference states, rather than containing
+copies of their images. Editing a definition updates every key that uses it.
+
+Examples opens a NEW document tab, preserving the current document. Available
+worked examples: Blinking eye, Talking mouth (four states), Bouncing ball,
+Layered face (six independent components), and Bleeding cut (cut, blood, drop).
+
+Drawing and components
+----------------------
+The canvas reuses KiwiImageCanvas and KiwiImageRenderer, not a separate paint
+engine. Tools: Move, Draw, Erase, Fill, Pick, Rectangle/Ellipse, Pixels, Pivot.
+Draw and Erase have size and opacity; Draw also offers Stroke correct.
+Hold Shift while drawing a line; Q and O temporarily draw curves and circles.
+Shift+wheel changes brush size or bucket threshold. Regular wheel zooms around
+the cursor; middle-drag / Space+drag pans. F / View > Fit canvas fits the view.
+
+Move uses the existing move/resize/rotation handles. Transparent interiors of
+selected drawings can also be dragged. P edits the pivot without shifting the
+artwork; rotations use that pivot. State position, scale, rotation, opacity,
+pivot and visibility also have numeric controls in the right panel.
+
+Ctrl/Shift-click or box-select components for multiple selection. Drag their
+rows to reorder the composition. Component visibility and locks are independent
+of each state's visibility. The component menu contains duplicate, copy, paste,
+delete, and image import. State menu: rename, delete, copy/paste, reorder.
+Deleting a state removes keys referencing it in the same undo action.
+
+Pixels has brush/erase/fill and box selection (hold Shift for lasso), selection
+clearing, and extraction into a new independent component. Selection changes and
+extraction are undoable. Selection masks are editing-session state, not native
+animation artwork. Other components remain visible as drawing references.
+
+Animation and morphs
+--------------------
+Each component owns its own state track. Click diamonds to select, Ctrl/Shift
+for multiple keys, drag to move, Ctrl+D to duplicate, Delete to remove. Key
+drags snap to 30 fps unless Ctrl is held. Wheel scrolls rows; Shift+wheel pans
+the timeline; Ctrl+wheel zooms time. Overlapping times on one track are rejected.
+Duration cannot be shortened past existing keys. Loop playback is optional.
+
+The bottom key controls edit time, referenced state and the OUTGOING transition
+to the next key. Modes: Auto Morph (default), Shape Morph, Guided Morph,
+Grow / Reveal, Step, and Crossfade. Older Smooth/Linear/Reveal keys still load.
+Extra turns adds full rotations; the normal rotation path is shortest-angle.
+Curve opens Kiwi's editable timing curve, with Linear, Smooth, Ease in, Ease out
+and reset tangents. Auto defaults to smooth timing; explicit Linear overrides it.
+Match points opens both drawings: click a feature on the left, then its partner
+on the right; drag numbered points or right-click to remove pairs. Unpair keeps
+the source point ready for a new partner. Reset automatic clears corrections;
+all these actions support undo. Overlays can be hidden for clean comparison.
+The slider shows the actual composited animation, not a fabricated preview.
+
+Morph opens a compact contextual dialog: duration to the next key, growth type,
+custom origin (or state pivot), direction. Advanced controls are collapsed:
+correspondence alignment, interior feature preservation, appearance transition,
+Fast/High preparation quality, and topology expansion bias. Bounds alignment
+normalizes shape comparisons; Local emphasizes original artwork coordinates.
+Neither setting changes the stored pivot or crops the source artwork.
+
+Empty-to-drawn states reveal from their pivot, rather than merely fading the
+entire image. Reveal path lets you click ordered points in the state canvas;
+path width is adjustable in key properties. Directional reveal and Shape
+expansion are also available. Shape expansion scales the artwork from the
+origin, rather than fading it. Nonempty Reveal progressively
+replaces the outgoing drawing, preserving it at the beginning of the transition.
+
+Morph implementation and limits
+-------------------------------
+The hybrid engine extracts alpha contours and connected regions / holes,
+resamples outlines by arc length, and searches cyclic correspondence using
+normalized geometry and curvature. Substantial polygon corners are retained;
+pixel-sized raster stair steps are not mistaken for meaningful corners.
+Dominant color-region centroids supply optional interior landmarks. Colors are
+not a limit: all raster colors, gradients and transparency travel with the mesh.
+
+Paired vertices are triangulated with Delaunay candidates. Triangle areas are
+quadratic in time and are checked over the entire interpolation interval, not
+just at its midpoint. Endpoint-only collinearity is supported for thin eyelids;
+interior inversions and unusable slivers are rejected. Source and target UVs
+warp both full-resolution original drawings onto a shared intermediate shape.
+Feature reveal handles newly appearing colors (e.g. teeth) regionally; Aligned
+blend is available for deliberate appearance blending. Premultiplied bilinear
+filtering prevents transparent RGB contaminating edges. Transform, opacity,
+rotation, affine residuals and pivot interpolation remain separate from local
+artwork deformation.
+
+Topology changes and unsafe mesh correspondences use interpolated signed
+distance fields, not stationary alpha crossfades. Occupancy includes holes and
+disconnected islands; nearest-ink coordinates supply colors for newly occupied
+pixels. A stable monotonic cage can align the fields. Expansion bias controls
+the occupancy boundary during the transition. Exact endpoints retain original
+artwork, and time evaluation is deterministic (no particle/fluid simulation).
+
+This is NOT semantic/AI reconstruction, optical flow or facial rigging. Color
+centroids cannot identify every anatomical feature. Very different drawings may
+still need corrections, intermediate states, or deliberate Crossfade/Step.
+Unsafe guides fall back to stable implicit topology and report that choice;
+invalid/unavailable data has a labeled crossfade fallback. The first preview can
+temporarily crossfade while the background worker prepares the pair.
+SDF topology is approximate, not an artistically guaranteed region assignment;
+sub-analysis-pixel holes/lines can be lost. Fast/High analysis is bounded to
+128/192 pixels per side, while mesh texture sampling uses original resolution.
+
+Analysis uses at most a 192-pixel side, runs on a background worker, and caches
+24 morph pairs with at most 8 queued requests. An additional eight-entry image
+analysis/field cache is shared across matching texture pairs, so editing guide
+points does not repeat distance transforms. Each displayed component retains
+its current prepared pair. Playback updates uniforms, not meshes or full images.
+Moving/rotating/scaling unchanged images does not invalidate correspondence.
+Up to 24 correspondence pairs and 64 reveal path points are supported.
+Canvas and state images are limited to 8192 pixels per side / 16 megapixels.
+Undo is copy-on-write, capped at 40 transactions and approximately 256 MiB of
+unique retained raster data (the latest action remains available).
+
+Timed component transfers
+-------------------------
+In Pixels, select a region on an exact state key, choose Edit state, then use
+Detach at playhead. It creates an independent component with the same initial
+pose and a persisted, non-destructive visibility/mask transfer. Source state
+drawings are not erased. Before the event, the source is intact; after it, the
+new component owns the region and can have independent states and animation.
+Fractional coverage conserves source-over appearance at the event, including
+transparent artwork and component opacity. Up to four disjoint region masks
+per source are supported; overlapping transfers are rejected explicitly.
+
+Choose adjacent components, then Components > Merge at playhead. Their actual
+rendered composite becomes a new editable raster component. Original components
+and animation remain visible before the merge and are hidden afterward.
+Non-adjacent merges are rejected to preserve unrelated compositing order.
+
+Events lists transfer visibility times and deletion. Removing an event hides
+its generated component but preserves all drawings; undo restores the transfer.
+Event times cannot precede source birth or extend past document duration.
+Changing an event time only retimes visibility: snapshots are NOT automatically
+re-baked. Recreate the event at another pose when an exact new snapshot is needed.
+Detached masks are component-local, not semantic feature attachments across
+arbitrary later redraws. Explicitly authored states may be needed for such cases.
+Merge captures are raster snapshots, not live links to source components.
+Large full-canvas detach/merge raster operations are heavier than playback.
+
+Native files and tabs
+---------------------
+Ctrl+S saves, prompting only for the first path. Ctrl+Shift+S saves an independent
+copy. Native .tres and .res documents preserve every component, stable ID,
+state drawing, transform, pivot, key, mode, curve, match point and reveal path.
+Advanced settings, split masks and merge/split event references also persist.
+They are not flattened exports. The project filesystem displays a preview /
+Transformation icon; double-click opens or selects the existing document tab.
+Unsaved edits, history, current state, canvas pan/zoom, and timeline view survive
+tab switching. Saved view state also survives closing and reopening the file.
+Dirty tabs offer Save / Discard / Keep editing. Invalid data shows an explanation
+without replacing the current document. Scene/Image/Shader views stay isolated.
+
+Shortcuts
+---------
+Ctrl+Z / Ctrl+Shift+Z or Ctrl+Y: undo / redo
+Ctrl+C / Ctrl+V: copy / paste components
+Ctrl+D: duplicate components, or selected keys when the timeline has focus
+Delete / Backspace: delete selected components, or keys when timeline-focused
+W / B: Draw; V: Move; E: Erase; G: Fill; P: Pivot; F: Fit canvas
+I: Insert state key; Space: Play/pause; Escape: cancel a current gesture
+Text and numeric editing retain their normal input handling.
+
+Verification
+------------
+New automated suites:
+  transformation_document_test.gd: serialization, exact state pixels, identity,
+    independence, curves, controls, transforms, morphs and invalid data.
+  transformation_workspace_test.gd: real mouse drawing, undo, independent state
+    edits, GPU output, caching, playback and native save/reopen.
+  transformation_interaction_test.gd: native shapes, pivot, rotation, selection,
+    extraction, key dragging, invalid key time and numeric transaction handling.
+  transformation_render_test.gd: real GPU morph versus crossfade, step holding,
+    transparent compositing, empty growth and nonempty path reveal.
+  transformation_tabs_test.gd: full Main.tscn launch, examples, filesystem open,
+    thumbnails, save/save-as, separate tabs, dirty closing and invalid files.
+  advanced_morph_test.gd: genuine contour/feature displacement, opaque internal
+    markings/teeth, blinking, implicit holes/splits, growth/path tracing, alpha
+    fringes, deterministic native reload and measured eight-component playback.
+  morph_transfer_test.gd: timed fractional-alpha detach, independent movement,
+    explicit merge, event persistence, undo/redo, birth ordering and cycles.
+  morph_editor_test.gd: compact settings, bounded advanced UI, actual easing,
+    pairing/dragging/unpairing/reset/overlays, conflict cancellation and history.
+
+Representative native benchmark (RTX 3060 Laptop GPU, Forward+, 640x400,
+eight simultaneously morphing components): roughly 0.5–0.6 ms average CPU
+submission per sync, with a roughly 16.7 ms median rendered frame interval.
+This interval includes normal frame scheduling/VSync; it is NOT a GPU timestamp
+or an unrestricted maximum-FPS claim. Correspondence counts did not increase
+during warm playback. First 128-pixel contour/feature preparation was roughly
+0.3–0.4 seconds on the worker; decoded-image resizing/upload is not part of that
+worker timer. Preparation depends on image complexity/quality. Actual reports
+and measured values are in morph_delivery*.log / morph_delivery_gl*.log.
+
+Tests use isolated temporary projects, never the user's current scene. Native
+GPU screenshots and JSON/log reports are under .godot/verification. Existing
+image, shader, scene, selection, model, rig and full-app smoke suites were also
+run. No application export, 3D transformation, physics, or cloud service added.
+
+SCENE ACTOR: TRANSFORM IMAGE 2D
+------------------------------
+Add Actor > Media > Transform Image 2D creates a screen-space actor from a saved
+Transformation Image 2D .tres/.res. Dropping that asset onto the scene timeline
+also creates it, initially using the asset's duration. Position, rotation, scale,
+size, selection bounds and viewport handles work like other 2D actors.
+
+The inspector puts the asset and its component states first. Each component has
+a named Current state selector, a diamond to display its scene keyframe track,
+and +diamond to insert a key at the playhead. Choose a different state later to
+automatically insert another key once that component is keyed. Independent
+component tracks use stable IDs, not state-list indices; renaming a state does
+not break animation. Keyframe details also use a named state selector.
+
+Between scene state keys, the existing morph engine interpolates the two states'
+artwork, geometry, transforms, pivots and opacity. The outgoing scene key's value
+curve controls progress. Step holds until the next key. Morph mode can retain
+the matching asset transition's authored settings or override them with Auto, Shape, Guided,
+Grow/Reveal, Step or Crossfade. Correspondence preparation stays cached and
+asynchronous, and the paused viewport refreshes when preparation completes.
+
+By default, components hold their chosen/default states. Play asset animation
+uses the asset's embedded animation for components without an explicit scene
+state choice or track. The per-component reset clears its manual choice;
+existing scene keys still take priority (remove them via the diamond menu).
+Timed detach/merge events retain their asset-local timing. Trimming uses the
+scene clip's source time, and the actor can hold its final state beyond the
+asset's original duration.
+
+State edits, key/curve edits, source changes and actor creation participate in
+scene undo/redo. Native scene save/load, duplication and scene tab switching
+retain component choices and tracks without modifying the source asset. Edit
+transformation opens the same asset in its existing workspace; saving refreshes
+scene actors and inspector state names. Removed/missing states fall back safely
+to the component default; missing assets render nothing and show an inspector
+message. Runtime correspondence remains approximate, as described above.
+
+transform_image_actor_test.gd launches the real application in a temporary
+project and checks state controls, morph rendering/seeking, curves, history,
+scene persistence, tab round trips, reloads and source clearing.

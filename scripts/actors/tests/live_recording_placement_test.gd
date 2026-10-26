@@ -43,6 +43,19 @@ func run() -> void:
 	canvas._notification(Control.NOTIFICATION_DRAG_END)
 	check(canvas._asset_paths.is_empty(), "Releasing an off-timeline drag clears the preview")
 	canvas._drop_data(position, {"paths": paths})
+	if DisplayServer.get_name() != "headless":
+		# Image drops now ask which scene dimension to create. Exercise the same
+		# explicit 3D choice as a user before checking the committed placement.
+		await process_frame
+		var chooser: ActorDimensionDialog
+		for child in editor.get_children():
+			if child is ActorDimensionDialog: chooser = child
+		check(chooser != null, "Dropping an image asks for its scene dimension")
+		if chooser != null:
+			var choose_3d := chooser.find_child("Choose3D", true, false) as Button
+			check(choose_3d != null, "The dimension chooser offers 3D")
+			if choose_3d != null: choose_3d.pressed.emit()
+		await process_frame
 	check(editor.model.clips.size() == 1 and editor.model.selected_actor().type_id == &"image_3d", "Dropping commits the preview as an actor")
 	editor.undo()
 	check(editor.model.clips.is_empty(), "Committed placement is undoable")

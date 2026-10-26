@@ -18,6 +18,8 @@ func key_at(time: float) -> ActorKeyframe:
 	return null
 
 func sample(time: float, fallback: Variant = null) -> Variant:
+	# State references must remain valid IDs, never partially typed strings.
+	if is_state_track(): return transition_at(time, fallback).from
 	if keys.is_empty():
 		return fallback
 	if time <= keys[0].time:
@@ -42,7 +44,10 @@ func sample(time: float, fallback: Variant = null) -> Variant:
 					return StringName(text) if left.value is StringName else text
 				TYPE_FLOAT: return lerpf(left.value, right.value, weight)
 				TYPE_INT: return int(round(lerpf(float(left.value), float(right.value), weight)))
-				TYPE_VECTOR2, TYPE_VECTOR3, TYPE_VECTOR4, TYPE_COLOR: return left.value.lerp(right.value, weight)
+				TYPE_VECTOR2, TYPE_VECTOR3, TYPE_VECTOR4, TYPE_COLOR:
+					if path.size()==3 and path[0]=="bone_poses" and path[2]=="rotation" and left.value is Vector3:
+						return Quaternion.from_euler(left.value*PI/180.).slerp(Quaternion.from_euler(right.value*PI/180.),weight).get_euler()*180./PI
+					return left.value.lerp(right.value, weight)
 				TYPE_VECTOR2I, TYPE_VECTOR3I, TYPE_VECTOR4I:
 					var vector: Variant = left.value
 					var count := 2 if vector is Vector2i else (3 if vector is Vector3i else 4)
@@ -51,6 +56,24 @@ func sample(time: float, fallback: Variant = null) -> Variant:
 					return vector
 			return left.value
 	return keys.back().value
+
+func is_state_track() -> bool:
+	return path.size() == 2 and path[0] == "component_states"
+
+## State animation needs both endpoints; the renderer morphs their artwork.
+func transition_at(time: float, fallback: Variant = null) -> Dictionary:
+	if keys.is_empty(): return {"from": fallback, "to": fallback, "weight": 0.0, "key": null}
+	var left := keys[0]
+	for right in keys:
+		if time < right.time:
+			if right == left: break
+			var weight := clampf((time - left.time) / maxf(.000001, right.time - left.time), 0.0, 1.0)
+			if left.interpolation == ActorKeyframe.Interpolation.STEP: weight = 0.0
+			elif left.value_curve != null: weight = left.value_curve.sample(weight)
+			elif left.interpolation == ActorKeyframe.Interpolation.EASE: weight = ease(weight, left.attenuation)
+			return {"from": left.value, "to": right.value, "weight": weight, "key": left}
+		left = right
+	return {"from": left.value, "to": left.value, "weight": 0.0, "key": left}
 
 static func interpolate_text(left: String, right: String, weight: float) -> String:
 	var prefix := 0

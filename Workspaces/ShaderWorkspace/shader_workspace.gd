@@ -19,8 +19,11 @@ var sky_material := ShaderMaterial.new()
 var canvas_material := ShaderMaterial.new()
 var fog_preview_material := ShaderMaterial.new()
 var fog_preview := FogVolume.new()
+var particle_preview := GPUParticles3D.new()
+var particle_material := ShaderMaterial.new()
 var fog_preview_guide := MeshInstance3D.new()
 var canvas_preview := TextureRect.new()
+var canvas_preview_background := TextureRect.new()
 var current_source: Variant
 var current_path := ""
 var shader_kind := "spatial"
@@ -31,9 +34,9 @@ var environment_group: VBoxContainer
 var canvas_image_group: VBoxContainer
 var canvas_image_label := Label.new()
 var shader_type_label := Label.new()
-var save_button := Button.new()
-var save_as_button := Button.new()
-var load_shader_button := Button.new()
+var save_button: Button
+var save_as_button: Button
+var load_shader_button: Button
 var status := Label.new()
 var parameters_panel := PanelContainer.new()
 var parameters_list := VBoxContainer.new()
@@ -64,6 +67,8 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_build_ui()
 	_build_preview()
+	visibility_changed.connect(_sync_preview_visibility)
+	_sync_preview_visibility()
 	set_process(true)
 
 
@@ -91,6 +96,10 @@ func _build_ui() -> void:
 	shader_type_label.text = "SPATIAL"
 	shader_type_label.add_theme_color_override("font_color", Color("9cb7c9"))
 	toolbar_row.add_child(shader_type_label)
+	var library_button := _button("Shader Library", false)
+	library_button.tooltip_text = "Browse rendered shader samples and starter templates"
+	library_button.pressed.connect(func(): editor.documentation.open_samples())
+	toolbar_row.add_child(library_button)
 	load_shader_button = _button("Load Shader…", false)
 	load_shader_button.tooltip_text = "Open a .gdshader file from the project"
 	load_shader_button.pressed.connect(_choose_shader_file)
@@ -103,6 +112,13 @@ func _build_ui() -> void:
 	save_as_button.tooltip_text = "Save a copy  ·  Ctrl+Shift+S"
 	save_as_button.pressed.connect(save_as)
 	toolbar_row.add_child(save_as_button)
+	var clipboard_button:=_button("Clipboard ▾",false); toolbar_row.add_child(clipboard_button)
+	var clipboard_menu:=PopupMenu.new(); clipboard_button.add_child(clipboard_menu); clipboard_menu.add_item("Save shader to Super Clipboard",0); clipboard_menu.add_item("Open Super Clipboard · F8",1)
+	clipboard_button.pressed.connect(func(): clipboard_menu.position=Vector2i(clipboard_button.get_screen_position()+Vector2(0,clipboard_button.size.y)); clipboard_menu.popup())
+	clipboard_menu.id_pressed.connect(func(id: int):
+		if id==0:
+			var shader:=Shader.new(); shader.code=editor.code.text; KiwiSuperClipboardService.instance.quick_save(shader,_document_title())
+		else: KiwiSuperClipboardService.instance.toggle())
 	var preview_tools := PanelContainer.new()
 	preview_tools.name = "PreviewSettings"
 	preview_tools.custom_minimum_size.y = 82
@@ -220,7 +236,7 @@ func _build_ui() -> void:
 	editor.save_shortcut_requested.connect(func(save_as_requested: bool):
 		if save_as_requested: save_as()
 		else: save())
-	editor.code.placeholder_text = "Write a spatial, canvas_item, or sky shader…"
+	editor.code.placeholder_text = "Write a spatial, canvas_item, sky, fog, or particles shader."
 
 
 func _build_preview() -> void:
@@ -233,6 +249,13 @@ func _build_preview() -> void:
 	viewport.msaa_3d = Viewport.MSAA_4X
 	add_child(viewport)
 	viewport.add_child(preview_root)
+	canvas_preview_background.name = "ScreenShaderInputImage"
+	canvas_preview_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	canvas_preview_background.stretch_mode = TextureRect.STRETCH_SCALE
+	canvas_preview_background.size = Vector2(viewport.size)
+	canvas_preview_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas_preview_background.hide()
+	viewport.add_child(canvas_preview_background)
 	canvas_preview.name = "CanvasPreviewImage"
 	canvas_preview.position = Vector2.ZERO
 	canvas_preview.size = Vector2(viewport.size)
@@ -247,6 +270,15 @@ func _build_preview() -> void:
 	fog_preview.size = Vector3(3.6, 3.6, 3.6)
 	fog_preview.visible = false
 	preview_root.add_child(fog_preview)
+	particle_preview.name = "ParticleShaderPreview"
+	particle_preview.amount = 180
+	particle_preview.lifetime = 3.0
+	particle_preview.preprocess = 1.8
+	particle_preview.visibility_aabb = AABB(Vector3(-8, -8, -8), Vector3(16, 16, 16))
+	particle_preview.draw_pass_1 = preload("res://Workspaces/ShaderWorkspace/shader_sample_preview.gd").particle_draw_mesh()
+	particle_preview.visible = false
+	particle_preview.emitting = false
+	preview_root.add_child(particle_preview)
 	var guide_mesh := ImmediateMesh.new()
 	var guide_paint := StandardMaterial3D.new()
 	guide_paint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -291,6 +323,7 @@ func _build_preview() -> void:
 	sky_material.shader = preview_shader
 	canvas_material.shader = preview_shader
 	fog_preview_material.shader = preview_shader
+	particle_material.shader = preview_shader
 	_update_canvas_texture()
 	_apply_environment()
 	_rebuild_mesh()
@@ -383,8 +416,9 @@ func _commit_linked_parameters() -> void:
 
 
 func save_as() -> void:
+	var clipboard_shader:=Shader.new(); clipboard_shader.code=editor.code.text
 	var result := await ActorProjectResourceSaveDialog.pick(self, "Save shader to project",
-		_document_title().get_basename(), "gdshader", false)
+		_document_title().get_basename(), "gdshader", false,PackedStringArray(),clipboard_shader)
 	if result.get("cancelled", true): return
 	# Save As creates a filesystem copy, but an actor-owned embedded shader must
 	# still receive the code the user just saved.
@@ -428,12 +462,15 @@ func _rebind_preview_materials() -> void:
 	canvas_material.shader = preview_shader
 	fog_preview_material = ShaderMaterial.new()
 	fog_preview_material.shader = preview_shader
+	particle_material = ShaderMaterial.new()
+	particle_material.shader = preview_shader
 	for name: Variant in parameter_values:
 		var value: Variant = _preview_parameter_value(parameter_values[name])
 		spatial_material.set_shader_parameter(StringName(name), value)
 		sky_material.set_shader_parameter(StringName(name), value)
 		canvas_material.set_shader_parameter(StringName(name), value)
 		fog_preview_material.set_shader_parameter(StringName(name), value)
+		particle_material.set_shader_parameter(StringName(name), value)
 
 
 func _preview_parameter_value(value: Variant) -> Variant:
@@ -464,23 +501,35 @@ func _apply_materials() -> void:
 		(node as MeshInstance3D).material_override = spatial_material if shader_kind == "spatial" else null
 	canvas_preview.material = canvas_material if shader_kind == "canvas_item" else null
 	fog_preview.material = fog_preview_material if shader_kind == "fog" else null
+	particle_preview.process_material = particle_material if shader_kind == "particles" else null
 
 
 func _update_preview_mode() -> void:
 	var canvas_mode := shader_kind == "canvas_item"
 	var fog_mode := shader_kind == "fog"
 	preview_root.visible = not canvas_mode
-	mesh_holder.visible = not canvas_mode and not fog_mode
+	mesh_holder.visible = shader_kind == "spatial"
+	particle_preview.visible = shader_kind == "particles"
+	particle_preview.emitting = shader_kind == "particles"
 	fog_preview.visible = fog_mode
 	fog_preview_guide.visible = fog_mode
 	canvas_preview.visible = canvas_mode
-	mesh_group.visible = not canvas_mode and not fog_mode
+	canvas_preview_background.visible = canvas_mode and editor.code.text.contains("hint_screen_texture")
+	mesh_group.visible = shader_kind == "spatial"
 	environment_group.visible = not canvas_mode
 	canvas_image_group.visible = canvas_mode
 	viewport_display.tooltip_text = "Canvas shader preview" if canvas_mode else "Fog volume preview · fly around its bounds" if fog_mode else "Right-drag to look · WASD move · Q/E down/up · wheel changes speed"
 	status.text = "CanvasItem preview · choose any project image above" if canvas_mode else "Fog volume preview · volumetric fog enabled" if fog_mode else _viewport_help()
 	if canvas_mode:
 		_update_canvas_texture()
+	elif shader_kind == "particles":
+		status.text = "Particle process shader preview - drag to inspect the simulated particles"
+	_sync_preview_visibility()
+
+
+func _sync_preview_visibility() -> void:
+	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if is_visible_in_tree() else SubViewport.UPDATE_DISABLED
+	particle_preview.speed_scale = 1.0 if is_visible_in_tree() else 0.0
 
 
 func _apply_environment() -> void:
@@ -630,12 +679,17 @@ func _update_canvas_texture() -> void:
 			if image != null and not image.is_empty():
 				texture = ImageTexture.create_from_image(image)
 	canvas_preview.texture = texture if texture != null else _default_canvas_texture()
+	canvas_preview_background.texture = canvas_preview.texture
 	_fit_canvas_preview()
 	canvas_image_label.text = "Project image · " + _canvas_image_path.get_file() if texture != null else "Built-in color test image"
 
 
 func _fit_canvas_preview() -> void:
 	if canvas_preview.texture == null:
+		return
+	if editor.code.text.contains("hint_screen_texture"):
+		canvas_preview.size = Vector2(viewport.size)
+		canvas_preview.position = Vector2.ZERO
 		return
 	var source_size := canvas_preview.texture.get_size()
 	if source_size.x <= 0.0 or source_size.y <= 0.0:
@@ -830,6 +884,7 @@ func _add_texture_parameter(parent: VBoxContainer, name: StringName, value: Vari
 	slot.add_child(menu)
 	menu.add_item("Create Noise Image", 0)
 	menu.add_item("Load from project…", 1)
+	menu.add_item("Load from Super Clipboard…",7); menu.add_item("Copy to Super Clipboard",6)
 	if value != null:
 		menu.add_separator()
 		menu.add_item("Clear", 2)
@@ -872,7 +927,8 @@ func _add_texture_parameter(parent: VBoxContainer, name: StringName, value: Vari
 					parameter_expanded[name] = true
 					_set_preview_parameter(name, ActorObjectReference.from_object(definition.create_object()))
 					_rebuild_parameters()
-			1: await _choose_parameter_texture(name)
+			1,7: await _choose_parameter_texture(name,id==7)
+			6: KiwiSuperClipboardService.instance.quick_save(parameter_values.get(name),str(name))
 			2:
 				parameter_expanded.erase(name)
 				_set_preview_parameter(name, null)
@@ -1154,6 +1210,7 @@ func _set_preview_parameter(name: StringName, value: Variant, mode: String = "ed
 	sky_material.set_shader_parameter(name, preview_value)
 	canvas_material.set_shader_parameter(name, preview_value)
 	fog_preview_material.set_shader_parameter(name, preview_value)
+	particle_material.set_shader_parameter(name, preview_value)
 	var reset := parameters_list.find_child(str(name) + "_reset", true, false) as Button
 	if reset != null:
 		reset.visible = value != _shader_uniform_default(name, typeof(value))
@@ -1220,7 +1277,7 @@ func _style_parameter_color(button: ColorPickerButton, value: Color) -> void:
 	button.add_theme_color_override("font_color", Color.WHITE if value.get_luminance() < 0.45 else Color("101820"))
 
 
-func _choose_parameter_texture(name: StringName) -> void:
+func _choose_parameter_texture(name: StringName,from_clipboard: bool=false) -> void:
 	var property := ActorProperty.new()
 	property.id = name
 	property.label = str(name)
@@ -1229,7 +1286,7 @@ func _choose_parameter_texture(name: StringName) -> void:
 		"raw_extensions": ["png", "jpg", "jpeg", "webp", "svg", "bmp", "tga", "hdr", "exr"],
 		"accepted_object_types": ["image", "noise_image"],
 		"native_resource_types": ["Texture2D"], "file_picker": true}
-	var path := await ActorProjectFilePicker.pick(self, property, "Choose preview texture")
+	var path := await ActorProjectFilePicker.pick(self, property, "Choose preview texture",from_clipboard)
 	if path==ActorProjectFilePicker.EMPTY_RESOURCE: _set_preview_parameter(name,null); return
 	if path.is_empty():
 		return

@@ -1,0 +1,72 @@
+[gd_resource type="Resource" script_class="ActorDefinition" load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://scripts/actors/core/actor_definition.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/actors/core/actor_property.gd" id="2"]
+[ext_resource type="PackedScene" path="res://scripts/actors/examples/transform_image_2d_actor.tscn" id="3"]
+[ext_resource type="Texture2D" path="res://resources/Images/ActorIcons/Transformation2D.svg" id="4"]
+
+[sub_resource type="Resource" id="position"]
+script = ExtResource("2")
+id = &"position"
+label = "Position"
+value_type = 5
+options = {"default": Vector2(0, 0), "group": "Transform", "suffix": " px"}
+
+[sub_resource type="Resource" id="rotation"]
+script = ExtResource("2")
+id = &"rotation"
+label = "Rotation"
+value_type = 3
+options = {"default": 0.0, "group": "Transform", "suffix": " °"}
+
+[sub_resource type="Resource" id="scale"]
+script = ExtResource("2")
+id = &"scale"
+label = "Scale"
+value_type = 5
+options = {"default": Vector2(1, 1), "group": "Transform"}
+
+[sub_resource type="Resource" id="size"]
+script = ExtResource("2")
+id = &"size"
+label = "Size"
+value_type = 5
+options = {"default": Vector2(640, 360), "group": "Layout", "suffix": " px"}
+
+[sub_resource type="Resource" id="source"]
+script = ExtResource("2")
+id = &"transformation"
+label = "Transformation Image"
+value_type = 4
+options = {"default": "", "group": "Transformation", "file_picker": true, "extensions": PackedStringArray("tres", "res"), "native_resource_types": PackedStringArray("KiwiTransformationImage2D"), "prompt_on_create": true, "transformation_image": true}
+
+[sub_resource type="Resource" id="states"]
+script = ExtResource("2")
+id = &"component_states"
+label = "Component states"
+value_type = 27
+options = {"default": {}, "group": "Transformation", "inspector_hidden": true}
+
+[sub_resource type="Resource" id="play"]
+script = ExtResource("2")
+id = &"play_asset_animation"
+label = "Play asset animation"
+value_type = 1
+options = {"default": false, "group": "Morphing", "tooltip": "Play embedded animation on components without a scene state override or scene state keys."}
+
+[sub_resource type="Resource" id="morph"]
+script = ExtResource("2")
+id = &"morph_mode"
+label = "Morph mode"
+value_type = 2
+options = {"default": 0, "group": "Morphing", "choices": PackedStringArray("Asset settings", "Auto Morph", "Shape Morph", "Guided Morph", "Grow / Reveal", "Step", "Crossfade")}
+
+[resource]
+script = ExtResource("1")
+type_id = &"transform_image_2d"
+display_name = "Transform Image 2D"
+category = "Media"
+description = "Animate a Transformation Image 2D asset with independently keyframed component states and morphs."
+icon = ExtResource("4")
+properties = Array[ExtResource("2")]([SubResource("source"), SubResource("states"), SubResource("play"), SubResource("morph"), SubResource("position"), SubResource("rotation"), SubResource("scale"), SubResource("size")])
+runtime_scene = ExtResource("3")

@@ -20,15 +20,23 @@ func tree_has_path(item: TreeItem, suffix: String) -> bool:
 func _initialize() -> void:
 	call_deferred("run")
 
+
+func wait_for_picker_scan(picker: ActorProjectFilePicker) -> void:
+	var deadline := Time.get_ticks_msec() + 20000
+	while not picker._scan_ready and Time.get_ticks_msec() < deadline:
+		await process_frame
+	check(picker._scan_ready, "Asynchronous project asset scan completes")
+
+
 func run() -> void:
 	var editor := load("res://Workspaces/SceneWorkspace/Timeline.tscn").instantiate() as ActorTimelineEditor
 	root.add_child(editor)
 	var definitions := editor.registry.get_definitions()
-	check(definitions.size() == 23, "Catalog includes the core actors and useful 2D/3D primitives")
+	check(definitions.size() == 26 and editor.registry.get_definition(&"fluid") != null and editor.registry.get_definition(&"skeleton_rig") != null and editor.registry.get_definition(&"transform_image_2d") != null, "Catalog includes Fluid, skeleton rig, Transform Image 2D and useful 2D/3D primitives")
 	check(editor.registry.get_object_definition(&"material") != null, "Material resource type is registered from catalog")
 	var shader_material_definition := editor.registry.get_object_definition(&"shader_material")
 	check(shader_material_definition != null and shader_material_definition.base_type == &"material", "ShaderMaterial is registered as a creation-compatible Material type")
-	check(editor.registry.object_definitions_for(&"material").size() == 2, "Material slots offer Material and ShaderMaterial creation")
+	check(editor.registry.object_definitions_for(&"material").size() == 3, "Material slots offer Material, Natural Material and ShaderMaterial creation")
 	var image_object_definition := editor.registry.get_object_definition(&"image")
 	var noise_image_definition := editor.registry.get_object_definition(&"noise_image")
 	check(image_object_definition != null and noise_image_definition != null and noise_image_definition.base_type == &"image",
@@ -38,7 +46,7 @@ func run() -> void:
 	var saved_catalog_path := "user://actor_catalog_test_" + ActorData.new_id() + ".tres"
 	check(ResourceSaver.save(BasicActors.CATALOG.duplicate(true), saved_catalog_path) == OK, "Save actor catalog resource")
 	var loaded_catalog := ResourceLoader.load(saved_catalog_path, "", ResourceLoader.CACHE_MODE_IGNORE) as ActorCatalog
-	check(loaded_catalog != null and loaded_catalog.definitions.size() == definitions.size(), "Reload actor catalog resource")
+	check(loaded_catalog != null and loaded_catalog.definitions.size() == BasicActors.CATALOG.definitions.size(), "Reload actor catalog resource (procedural definitions register separately)")
 	DirAccess.remove_absolute(saved_catalog_path)
 	var icon_paths: Dictionary = {}
 	var image_test_path := "user://image_actor_test_" + ActorData.new_id() + ".png"
@@ -123,7 +131,7 @@ func run() -> void:
 			check(selected_material.get_value(&"tint") == Color.BLUE, "Nested Material edit changes actor resource")
 			editor.model.undo()
 			check(selected_material.get_value(&"tint") == Color.WHITE, "Nested Material edit participates in actor undo")
-		elif definition.type_id == &"image_2d":
+		elif definition.type_id in [&"image_2d", &"transform_image_2d"]:
 			editor.model.create_actor(definition, 0.0)
 		else:
 			editor.actor_picker.choose(index)
@@ -139,6 +147,7 @@ func run() -> void:
 	var asset_picker := ActorProjectFilePicker.new()
 	root.add_child(asset_picker)
 	asset_picker._build(source_property, "Choose asset")
+	await wait_for_picker_scan(asset_picker)
 	check(tree_has_path(asset_picker.folders.get_root(), "Image3D.svg"), "Filtered folder tree includes matching files")
 	for item_index in asset_picker.files.item_count:
 		if not asset_picker.files.is_item_disabled(item_index):
@@ -148,6 +157,11 @@ func run() -> void:
 	await process_frame
 	check(asset_picker.files.size_flags_horizontal == Control.SIZE_EXPAND_FILL, "Asset file grid receives the available browser width")
 	check(asset_picker.files.item_count == 1 and str(asset_picker.files.get_item_metadata(0)).ends_with("Image3D.svg"), "Asset picker shows matching filtered project files")
+	var thumbnail_deadline := Time.get_ticks_msec() + 20000
+	while asset_picker.files.item_count > 0 \
+			and asset_picker.files.get_item_icon(0) == FileOperations.FILE_COLORED_TEXTURE \
+			and Time.get_ticks_msec() < thumbnail_deadline:
+		await process_frame
 	check(asset_picker.files.get_item_icon(0) != FileOperations.FILE_COLORED_TEXTURE, "Asset picker generates a file thumbnail")
 	check(ActorProjectFilePicker.is_allowed_path(ActorProjectFilePicker.root_directory(), ProjectSettings.globalize_path("res://project.godot"), PackedStringArray()), "Empty extension filter supports any project file type")
 	asset_picker.free()
@@ -227,6 +241,7 @@ func run() -> void:
 	root.add_child(mixed_image_picker)
 	mixed_image_picker._build(resource_inspector._object_picker_property(ui_image_definition.find_property(&"image_path")),
 		"Choose Image")
+	await wait_for_picker_scan(mixed_image_picker)
 	check(tree_has_path(mixed_image_picker.folders.get_root(), "Image3D.svg")
 		and tree_has_path(mixed_image_picker.folders.get_root(), saved_noise_path.get_file())
 		and not tree_has_path(mixed_image_picker.folders.get_root(), dropped_material_path.get_file()),
@@ -350,7 +365,7 @@ func run() -> void:
 	material_slot.button_pressed = true
 	check(material_editor.visible, "Material resource slot expands nested properties")
 	var resource_menu := material_slot.get_child(0) as PopupMenu
-	check(resource_menu != null and resource_menu.get_item_text(resource_menu.get_item_index(100)) == "New Material" and resource_menu.get_item_text(resource_menu.get_item_index(101)) == "New ShaderMaterial" and resource_menu.get_item_text(resource_menu.get_item_index(1)) == "Load from project…" and resource_menu.get_item_text(resource_menu.get_item_index(2)) == "Make Unique" and resource_menu.get_item_text(resource_menu.get_item_index(3)) == "Save As…" and resource_menu.get_item_text(resource_menu.get_item_index(4)) == "Clear", "Material context menu provides both compatible creation types and resource actions")
+	check(resource_menu != null and resource_menu.get_item_text(resource_menu.get_item_index(100)) == "New Material" and resource_menu.get_item_text(resource_menu.get_item_index(101)) == "New Natural Material" and resource_menu.get_item_text(resource_menu.get_item_index(102)) == "New ShaderMaterial" and resource_menu.get_item_text(resource_menu.get_item_index(1)) == "Load from project…" and resource_menu.get_item_text(resource_menu.get_item_index(2)) == "Make Unique" and resource_menu.get_item_text(resource_menu.get_item_index(3)) == "Save As…" and resource_menu.get_item_text(resource_menu.get_item_index(4)) == "Clear", "Material context menu provides all three compatible creation types and resource actions")
 	var ui_actor := ui_model.selected_actor()
 	var material_property := ui_image_definition.find_property(&"material")
 	check(material_property.accepts(null), "Editable resource property can be cleared")

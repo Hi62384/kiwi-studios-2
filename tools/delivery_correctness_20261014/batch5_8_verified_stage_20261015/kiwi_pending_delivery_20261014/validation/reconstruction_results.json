@@ -1,0 +1,58 @@
+{
+  "pass": true,
+  "timestamp_utc": "2026-10-15T00:00:09.697599+00:00",
+  "states": 9,
+  "source_files_per_state": 76,
+  "source_edits": false,
+  "method": "Fresh cloud copy of original snapshot; each original immutable package diff applied with fuzz=0; all76 hashes checked before/after every batch.",
+  "steps": [
+    {
+      "batch": 1,
+      "all76_before_after_exact": true,
+      "patch_output": "patching file Workspaces/AudioWorkspace/audio_conductor.gd\npatching file Workspaces/AudioWorkspace/audio_workspace.gd",
+      "archive_sha256": "1897f9cce5378a2ea124ae15a16d526159ab050b80cd8e81a735a0e88b5e1530"
+    },
+    {
+      "batch": 2,
+      "all76_before_after_exact": true,
+      "patch_output": "patching file Workspaces/AudioWorkspace/audio_renderer.gd\npatching file Workspaces/AudioWorkspace/audio_workspace.gd",
+      "archive_sha256": "d9ebe0682793fcd3070e6a361b36dc9183c4cb73963c713f6a28a70f48970e73"
+    },
+    {
+      "batch": 3,
+      "all76_before_after_exact": true,
+      "patch_output": "patching file Workspaces/AudioWorkspace/audio_edit_session.gd\npatching file Workspaces/AudioWorkspace/audio_workspace.gd",
+      "archive_sha256": "c8b6bb340dea9984d2743fa831cbbc39475a8721c9ff44ad38953674cd674eb3"
+    },
+    {
+      "batch": 4,
+      "all76_before_after_exact": true,
+      "patch_output": "patching file Workspaces/AudioWorkspace/audio_automation_canvas.gd\npatching file Workspaces/AudioWorkspace/audio_edit_session.gd\npatching file Workspaces/AudioWorkspace/audio_pattern_canvas.gd\npatching file Workspaces/AudioWorkspace/audio_timeline_canvas.gd\npatching file Workspaces/AudioWorkspace/audio_workspace.gd",
+      "archive_sha256": "5b0cc96ef6ec9e07cfd86dfecb509a430ed76666a277158dc07443996652304e"
+    },
+    {
+      "batch": 5,
+      "all76_before_after_exact": true,
+      "patch_output": "patching file Workspaces/AudioWorkspace/audio_edit_session.gd\npatching file Workspaces/AudioWorkspace/audio_workspace.gd",
+      "archive_sha256": "327a76b877334d3177c7172e1cf3c4277a7cf4cb299ee54821bd543338f9e8cf"
+    },
+    {
+      "batch": 6,
+      "all76_before_after_exact": true,
+      "patch_output": "patching file Workspaces/AudioWorkspace/audio_file_preview.gd\npatching file Workspaces/AudioWorkspace/audio_playback.gd\npatching file Workspaces/AudioWorkspace/audio_recording_prepare.gd\npatching file Workspaces/AudioWorkspace/audio_workspace.gd",
+      "archive_sha256": "d10ff8d1abbe52cefe12e9b0488c349c45893ea4ffdc565a72798d79f71f1255"
+    },
+    {
+      "batch": 7,
+      "all76_before_after_exact": true,
+      "patch_output": "patching file Workspaces/AudioWorkspace/audio_analysis.gd\npatching file Workspaces/AudioWorkspace/audio_edit_session.gd\npatching file Workspaces/AudioWorkspace/audio_workspace.gd",
+      "archive_sha256": "bc0b9399fbfd3f6ae104d373700e0418ad6408e9dac0830dea89681642b7d4e3"
+    },
+    {
+      "batch": 8,
+      "all76_before_after_exact": true,
+      "patch_output": "patching file Workspaces/AudioWorkspace/audio_document.gd\npatching file Workspaces/AudioWorkspace/audio_workspace.gd",
+      "archive_sha256": "63ecf2d92fa35a47fa742b2d195021140f1fd8118b2749519d2c3f8db7cf6215"
+    }
+  ]
+}

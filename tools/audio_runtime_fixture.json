@@ -1,0 +1,195 @@
+{
+  "scope": "Copies actual prepared production audio modules and six tests; substitutes unrelated application/device/provider integration classes. Runtime class index is generated from the copied source declarations, not imported from another Godot version. No editor, full GUI, external codecs or real recording devices are exercised.",
+  "tests": [
+    "audio_workspace_modules_test",
+    "audio_document_test",
+    "audio_history_budget_test",
+    "audio_synthesis_test",
+    "audio_music_test",
+    "audio_midi_test"
+  ],
+  "source_files": [
+    {
+      "path": "Workspaces/AudioWorkspace/audio_analysis.gd",
+      "sha256": "6f9b106da15aee6f33e5b870cfac5a302df2e7c3f5b16e67a2b414f21544d34e"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_automation_canvas.gd",
+      "sha256": "1e682e630d18c84c71276825beefc21c37413c302bb04a9f926d5173df8fa960"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_composer.gd",
+      "sha256": "56207a4d5ff4004cd1852c027eecbf9b9ad666db11e4681f39e03537d6726f7a"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_document.gd",
+      "sha256": "37a9c6ea2747dee2084b2902f01bd2d0f2b6d9c80bc37c5a993ca4a0eedcc495"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_edit_session.gd",
+      "sha256": "209743c98893ecaed4a05097ac8700127ea3c17a765d372e035c6b7331158b96"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_effects.gd",
+      "sha256": "91e04049bf470d1d73ba86c3019dff80ade2727b3ac5ebfd002e175a56ea0df1"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_impulse.gd",
+      "sha256": "df39ecf6338318649c9763fc7cee59b472d991de2a9adcc975c48970d28c09fd"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_instruments.gd",
+      "sha256": "8340ee7242babcf88fcb742f43b490cb84a5731ae70e9463bb147157b5019283"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_jobs.gd",
+      "sha256": "d2decb27d2804e92a0f755dddf8ad9a88915dde1a38ebc62c8ebdf56bc1d8093"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_library.gd",
+      "sha256": "87cea8da5a238dc348a462dc6301c55d85a0fde96c6c9d0dc920946f526cbf48"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_midi.gd",
+      "sha256": "5cfa8ed172b998097941b9ff007a020fbc1b3ed8415be6e903aed56e54285ab0"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_pattern_canvas.gd",
+      "sha256": "81214ed9b351f764d5361aa0dc5e623e636811b74bb528841df80f329e2acf72"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_playback.gd",
+      "sha256": "62ee5d3a8c022083aa138af043f8b26620703c219c1d777ce367e6f2e009f170"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_preset.gd",
+      "sha256": "44a5f6c1b63d388166c2f6593420edc455d533756ed038a11fbe653490265893"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_provider.gd",
+      "sha256": "3ee6dcc69dbe9bfc6e486a97cf8e520b1edb97fd8eeeb7c67eb648a3bf56ad3f"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_provider_service.gd",
+      "sha256": "6ea885ccad3c50ff186eeefe9596f3258fd5dd18212b1fab686c65b0609ace25"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_renderer.gd",
+      "sha256": "8d7854d56193e3bc4b5e9bff1770371e0e26151628699c4f9982eacf0a3f0e4d"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_source_cache.gd",
+      "sha256": "02e63ad480af501a97f7e5986e2170475fb08395d1de07231ce2cd86f4b017f6"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_synthesis.gd",
+      "sha256": "e9589c58aa0290f62914c02c78940fc73976585a6d5492e9a06f1f4310b6a4a8"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_templates.gd",
+      "sha256": "6d76752b0b3c4847e74564f0c65e3893b8ff30f9eeef262b9ea00dbd79ac3b28"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_timeline_canvas.gd",
+      "sha256": "e5bc4eb149005c7ab7859e0d8a0d4f352110fde58bd1a8e4bda4240128c1b8e0"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_waveform_canvas.gd",
+      "sha256": "9afe2b58948f17ffb63ee27762ee6e4c22cca93b05478d80b8a2c98c204a35d1"
+    },
+    {
+      "path": "Workspaces/AudioWorkspace/audio_workspace.gd",
+      "sha256": "0d09d0eacf2c1c5c66ce1450cb5e50b8e73cca66f96048b87c368e8b670522ad"
+    },
+    {
+      "path": "scripts/actors/core/actor_audio.gd",
+      "sha256": "5dcb0d447a335efd933cf49dc21a77d735e17c72a4d31bf818f33828787d39a7"
+    },
+    {
+      "path": "scripts/actors/core/actor_audio_system.gd",
+      "sha256": "3ab86204357d7e48f227c3d3e0616ec5d0bc7a2e52f16f1972496f31804d699e"
+    },
+    {
+      "path": "scripts/actors/core/actor_clip.gd",
+      "sha256": "dba367eda75df9e6178ab72577738f4e572c3f71a9d2eb09d48a223cf0969707"
+    },
+    {
+      "path": "scripts/actors/tests/audio_document_test.gd",
+      "sha256": "d47d5966b8f49d36f8e1288043b60e2e392ecf9a32371b698ed70451e20427e4"
+    },
+    {
+      "path": "scripts/actors/tests/audio_history_budget_test.gd",
+      "sha256": "ed5860dc8d854d4f69577a995c5cdbeca79516890c1fcd39d3f1874b15e753b4"
+    },
+    {
+      "path": "scripts/actors/tests/audio_midi_test.gd",
+      "sha256": "082a5a22cb0d65985937bec790131ec42c82a3cf07a717163286c6392a441aa4"
+    },
+    {
+      "path": "scripts/actors/tests/audio_music_test.gd",
+      "sha256": "bd4e519d8c10809a6747018ca7e8b02775c684ad0814f4d44be279f33c00f51d"
+    },
+    {
+      "path": "scripts/actors/tests/audio_synthesis_test.gd",
+      "sha256": "11369c44bb79ca86c607bb05d2b572b0665ef7434343008a6401c25e318dc6e7"
+    },
+    {
+      "path": "scripts/actors/tests/audio_workspace_modules_test.gd",
+      "sha256": "ead32975213660f4924c85de2a139471eb84f95224d78accb5fba19054869036"
+    }
+  ],
+  "support_files": [
+    {
+      "path": "stubs/actor_audio_recorder.gd",
+      "content": "class_name ActorAudioRecorder\nextends Node\nvar recording:=false\nvar record_timeline:=false\nvar timeline_bus_name:=\"\"\nfunc start()->String:\n return \"Microphone and system capture require Windows integration verification.\"\nfunc stop()->AudioStreamWAV:\n return null\n"
+    },
+    {
+      "path": "stubs/actor_data.gd",
+      "content": "class_name ActorData\nextends Resource\n@export var id: String = \"\"\n@export var type_id: StringName = &\"audio\"\n@export var display_name: String = \"\"\n@export var values: Dictionary = {}\n@export var animation_tracks: Array[Resource] = []\nstatic func new_id() -> String:\n return Crypto.new().generate_random_bytes(16).hex_encode()\nfunc get_value(key: StringName, fallback: Variant = null) -> Variant:\n return values.get(key, fallback)\n"
+    },
+    {
+      "path": "stubs/actor_media_export.gd",
+      "content": "class_name ActorMediaExport\nextends RefCounted\nstatic func write(_stream:AudioStream,_path:String,_property:ActorProperty)->bool:\n return false\n"
+    },
+    {
+      "path": "stubs/actor_project_file_picker.gd",
+      "content": "class_name ActorProjectFilePicker\nextends RefCounted\nconst EMPTY_RESOURCE=\"__empty__\"\nstatic func pick(_owner:Node,_property:ActorProperty,_title:String)->String:\n return \"\"\n"
+    },
+    {
+      "path": "stubs/actor_project_resource_save_dialog.gd",
+      "content": "class_name ActorProjectResourceSaveDialog\nextends RefCounted\nstatic func pick(_owner:Node,_title:String,_name:String,_ext:String,_folder:bool,_extensions:PackedStringArray)->Dictionary:\n return {}\n"
+    },
+    {
+      "path": "stubs/actor_property.gd",
+      "content": "class_name ActorProperty\nextends Resource\nvar options:Dictionary={}\n"
+    },
+    {
+      "path": "stubs/actor_timeline.gd",
+      "content": "class_name ActorTimeline\nextends RefCounted\nvar actors: Array[ActorData] = []\nvar clips: Array[ActorClip] = []\n"
+    },
+    {
+      "path": "stubs/actor_video.gd",
+      "content": "class_name ActorVideo\nextends RefCounted\nstatic func executable(_tool:String)->String:\n return \"\"\nstatic func length(_actor:ActorData)->float:\n return 0.0\n"
+    },
+    {
+      "path": "stubs/local_project_filesystem.gd",
+      "content": "class_name LocalProjectFilesystem\nextends RefCounted\nstatic var node:Node\nstatic func update_root_folder()->void:\n pass\n"
+    },
+    {
+      "path": "bootstrap.gd",
+      "content": "extends SceneTree\n# Runtime-only fixture bootstrap. Writes a class-name index in this copied test\n# directory; does not start an editor, load production scenes, or alter sources.\nfunc _initialize()->void:\n var classes:Array[Dictionary]=[]\n var pending:Array[String]=[\"res://Workspaces/AudioWorkspace\",\"res://scripts/actors/core\",\"res://stubs\"]\n var class_pattern:=RegEx.new();class_pattern.compile(\"(?m)^class_name\\\\s+([A-Za-z_][A-Za-z0-9_]*)\")\n var base_pattern:=RegEx.new();base_pattern.compile(\"(?m)^extends\\\\s+([A-Za-z_][A-Za-z0-9_]*)\")\n for directory in pending:\n  for name in DirAccess.get_files_at(directory):\n   if not name.ends_with(\".gd\"):continue\n   var path:=directory.path_join(name);var source:=FileAccess.get_file_as_string(path)\n   var class_match:=class_pattern.search(source);var base_match:=base_pattern.search(source)\n   if class_match==null:continue\n   if base_match==null:push_error(\"Missing explicit native base in \"+path);quit(1);return\n   classes.append({\"base\":StringName(base_match.get_string(1)),\"class\":StringName(class_match.get_string(1)),\"icon\":\"\",\"is_abstract\":false,\"is_tool\":false,\"language\":&\"GDScript\",\"path\":path})\n classes.sort_custom(func(a:Dictionary,b:Dictionary):return str(a[\"class\"])<str(b[\"class\"]))\n DirAccess.make_dir_recursive_absolute(\"res://.godot\")\n var index:=FileAccess.open(\"res://.godot/global_script_class_cache.cfg\",FileAccess.WRITE)\n if index==null:push_error(\"Could not write fixture class index\");quit(1);return\n index.store_string(\"list=\"+var_to_str(classes)+\"\\n\");index.close()\n print(\"FIXTURE_BOOTSTRAP \",classes.size(),\" source-derived classes; Godot \",Engine.get_version_info().string)\n quit(0)\n"
+    },
+    {
+      "path": "scripts/Extra/editor_settings_button.gd",
+      "content": "extends Button\n"
+    },
+    {
+      "path": "project.godot",
+      "content": "config_version=5\n[application]\nconfig/name=\"Kiwi Audio runtime verification fixture\"\n[rendering]\nrenderer/rendering_method=\"gl_compatibility\"\n"
+    },
+    {
+      "path": "exit_capture_probe.gd",
+      "content": "extends SceneTree\nfunc _initialize()->void:\n print(\"EXIT_CAPTURE_PROBE expected_exit=7\")\n quit(7)\n"
+    }
+  ]
+}

@@ -1,0 +1,563 @@
+--- a/Workspaces/AudioWorkspace/audio_analysis.gd
++++ b/Workspaces/AudioWorkspace/audio_analysis.gd
+@@ -2,6 +2,10 @@
+ extends RefCounted
+ ## Lightweight deterministic analysis. Estimates are labeled and editable.
+ static func analyze(stream: AudioStream, threshold_db: float = -42, minimum_silence: float = 0.25, job: RefCounted = null) -> Dictionary:
++ if not is_finite(threshold_db) or threshold_db < -120 or threshold_db > 0 or not is_finite(minimum_silence) or minimum_silence <= 0 or minimum_silence > 600: return {"error": "Invalid silence detector settings."}
++ if job != null and job.is_cancelled(): return {"error": "Cancelled."}
++ var problem := silence_source_error(stream)
++ if not problem.is_empty(): return {"error": problem}
+  var result := KiwiAudioSourceCache.decode(stream, 12000, 0, -1, 600)
+  if not str(result.error).is_empty(): return result
+  var samples: PackedVector2Array = result.samples
+@@ -274,3 +278,42 @@
+   for profile in profiles:value+=float(profile[i])
+   bands.append(value/profiles.size())
+  return {"error":"","noise_profile":bands,"floor":clampf(linear_to_db(rms),-80,-20),"rms_db":linear_to_db(rms),"seconds":measured_seconds,"start":start}
++
++# Short, isolated source-join audition only. No timeline render or source write.
++# The player uses speed; these source-rate fades match the new seam envelopes.
++static func silence_boundary_audio(stream: AudioStream, boundary: Dictionary, job: RefCounted = null) -> Dictionary:
++ if stream == null: return {"error": "The source is unavailable for audition."}
++ var speed := float(boundary.get("speed", 0.0))
++ if not is_finite(speed) or speed <= 0 or speed > 16: return {"error": "Unsupported audition speed."}
++ var output := PackedVector2Array(); var rate := 12000
++ for side in ["left", "right"]:
++  var interval: Vector2 = boundary.get(side, Vector2.ZERO)
++  if not is_finite(interval.x) or not is_finite(interval.y) or interval.x < 0 or interval.y < interval.x or interval.y - interval.x > 0.35 * speed + 0.000001:
++   return {"error": "Invalid audition window."}
++  if interval.y <= interval.x: continue
++  if job != null and job.is_cancelled(): return {"error": "Cancelled."}
++  var decoded := KiwiAudioSourceCache.decode(stream, rate, interval.x, interval.y - interval.x, 6.0)
++  if not str(decoded.get("error", "")).is_empty(): return decoded
++  var samples: PackedVector2Array = decoded.samples
++  if samples.size() != int(round((interval.y - interval.x) * rate)): return {"error": "The source ended before the audition boundary."}
++  var fade := float(boundary.get("fade_out" if side == "left" else "fade_in", 0.0)) * speed * rate
++  if not is_finite(fade) or fade < 0 or fade > rate: return {"error": "Invalid audition fade."}
++  for i in samples.size():
++   var distance := float(samples.size() - 1 - i) if side == "left" else float(i)
++   if fade > 0 and distance < fade:
++    var gain := clampf(distance / fade, 0.0, 1.0)
++    samples[i] *= sin(gain * PI * 0.5) if str(boundary.get("fade_curve", "linear")) == "equal_power" else gain
++  output.append_array(samples)
++ if output.is_empty(): return {"error": "No retained audio borders this removal."}
++ return {"error": "", "stream": KiwiAudioSourceCache.to_wav(output, rate, true), "speed": speed, "seconds": float(output.size()) / rate / speed}
++
++static func silence_source_error(value: Variant) -> String:
++ if value is AudioStream:
++  if not is_finite(value.get_length()) or value.get_length() <= 0 or value.get_length() > 600.0: return "Dialogue analysis requires a nonempty source of at most 600 seconds. Render or split it to a shorter source first."
++  return ""
++ if not value is String or value.is_empty(): return "Missing audio source."
++ var file := FileAccess.open(value, FileAccess.READ)
++ if file == null: return "Missing or unreadable audio source."
++ var bytes := file.get_length(); file.close()
++ if bytes <= 0 or bytes > 64 * 1024 * 1024: return "Dialogue analysis is limited to source files of 64 MiB and whole-source decoding of 600 seconds. Long-source streaming analysis is not available."
++ return ""
+--- a/Workspaces/AudioWorkspace/audio_edit_session.gd
++++ b/Workspaces/AudioWorkspace/audio_edit_session.gd
+@@ -840,3 +840,170 @@
+ 			actor.values.erase(&"transients")
+ 			actor.values.erase(&"transients_source_identity"))
+ 	return ""
++
++# Detection geometry is immutable. Review choices live outside the plan; applying
++# consumes it only after every source, scope and piece has passed preflight.
++class SilencePlan extends RefCounted:
++	var _owner: WeakRef
++	var _document: WeakRef
++	var _revision: int
++	var _clip_id: String
++	var _identity: String
++	var _geometry: Array
++	var _values: Dictionary
++	var _regions: Array[Dictionary] = []
++	var _cuts: Array[Dictionary] = []
++	var _source_duration: float
++	var _closed := false
++	func cancel() -> void: _closed = true
++	func regions() -> Array[Dictionary]: return _regions.duplicate(true)
++	func cuts() -> Array[Dictionary]: return _cuts.duplicate(true)
++	func clip_id() -> String: return _clip_id
++	func current(session: KiwiAudioEditSession) -> bool:
++		if _closed or _owner.get_ref() != session or _document.get_ref() != session.document or _revision != session.revision or session._before != null: return false
++		var clip := session.document.clip_for_id(_clip_id)
++		var actor := session.document.actor_for_clip(_clip_id)
++		return clip != null and actor != null and _geometry == KiwiAudioEditSession._silence_geometry(clip, actor) and _values == actor.values and _identity == KiwiAudioEditSession.silence_source_identity(actor)
++
++static func silence_source_identity(actor: ActorData) -> String:
++	if actor == null: return ""
++	var value: Variant = actor.values.get(&"audio")
++	if value is AudioStream: return actor.id + ":" + str(value.get_instance_id())
++	if not value is String or value.is_empty(): return ""
++	var file := FileAccess.open(value, FileAccess.READ)
++	if file == null: return ""
++	var size := file.get_length(); file.close()
++	return actor.id + ":" + str(value) + ":" + str(FileAccess.get_modified_time(value)) + ":" + str(size)
++
++static func _silence_geometry(clip: ActorClip, actor: ActorData) -> Array:
++	return [clip.id, clip.actor_id, clip.start_time, clip.duration, clip.source_offset, clip.playback_speed, clip.layer,
++		actor.id, actor.type_id, actor.display_name, actor.parent_id, actor.section_id, actor.show_timeline_children, actor.link_timeline_children, actor.schema_version]
++
++func _silence_reason(id: String) -> String:
++	var clip := document.clip_for_id(id); var actor := document.actor_for_clip(id)
++	if clip == null or actor == null: return "The selected clip no longer exists."
++	var track := document.track_for_clip(id)
++	if not can_edit(id) or track.has("frozen_track") or track.has("frozen_source"): return "The selected clip is locked or frozen."
++	var reason := KiwiAudioRegionEdit.unsupported_reason(clip, actor, "cut")
++	if not reason.is_empty(): return reason
++	for take in document.takes:
++		if str(take.get("clip_id", "")) == id: return "This clip belongs to a recording take. Duplicate it to an ordinary audio clip before silence cleanup so take controls remain intact."
++	for lane in document.tracks:
++		var target: Dictionary = lane.get("automation_target", {})
++		if str(target.get("owner_kind", "")) == "clip" and str(target.get("owner_id", "")) == id: return "Remove this clip's automation-lane binding before silence cleanup; a lane cannot target several resulting pieces."
++	return ""
++
++func create_silence_plan(id: String, silences: Array, source_duration: float, keep: float, identity: String) -> Dictionary:
++	if _before != null: return {"error": "Finish the current adjustment before reviewing silence cleanup."}
++	var reason := _silence_reason(id)
++	if not reason.is_empty(): return {"error": reason}
++	if not is_finite(source_duration) or source_duration <= 0 or source_duration > 600.001 or not is_finite(keep) or keep < 0 or keep > 10:
++		return {"error": "Invalid silence settings. Whole-source analysis is limited to 600 seconds."}
++	if silences.size() > 2048: return {"error": "More than 2048 quiet regions were detected. Increase the minimum pause duration and analyze again."}
++	var clip := document.clip_for_id(id); var actor := document.actor_for_clip(id)
++	if identity.is_empty() or identity != silence_source_identity(actor): return {"error": "The analyzed source changed or is missing. Analyze it again."}
++	var end := clip.source_offset + clip.duration * clip.playback_speed
++	if end > source_duration + 0.0001: return {"error": "The clip extends beyond the analyzed source. Trim or render it before silence cleanup."}
++	var plan := SilencePlan.new()
++	plan._owner = weakref(self); plan._document = weakref(document); plan._revision = revision
++	plan._clip_id = id; plan._identity = identity; plan._source_duration = source_duration
++	plan._geometry = _silence_geometry(clip, actor); plan._geometry.make_read_only()
++	plan._values = actor.values.duplicate(true)
++	var previous := -1.0
++	for region: Variant in silences:
++		if not region is Dictionary or not region.get("start") is float and not region.get("start") is int or not region.get("end") is float and not region.get("end") is int:
++			return {"error": "Invalid quiet-region data. Analyze again."}
++		var first := float(region.start); var last := float(region.end)
++		if not is_finite(first) or not is_finite(last) or first < 0 or first < previous or last <= first or last > source_duration + 0.0001:
++			return {"error": "Quiet regions overlap or have invalid boundaries. Analyze again."}
++		previous = last
++		var a := maxf(first, clip.source_offset); var b := minf(last, end)
++		if b <= a: continue
++		var retained := minf(keep * clip.playback_speed, b - a)
++		var quiet := {"start": a, "end": b}; quiet.make_read_only()
++		plan._regions.append(quiet)
++		var cut := {"start": a + retained * 0.5, "end": b - retained * 0.5}; cut.make_read_only()
++		plan._cuts.append(cut)
++	plan._regions.make_read_only(); plan._cuts.make_read_only()
++	return {"error": "", "plan": plan}
++
++func preview_silence_plan(plan: SilencePlan, remove: Array, scope: String = "clip") -> Dictionary:
++	if plan == null or not plan.current(self): return {"error": "This cleanup plan is stale or cancelled. Analyze and review again."}
++	var reason := _silence_reason(plan._clip_id)
++	if not reason.is_empty(): return {"error": reason}
++	if scope not in ["clip", "track_following"]: return {"error": "Choose an explicit cleanup scope."}
++	var clip := document.clip_for_id(plan._clip_id); var actor := document.actor_for_clip(plan._clip_id)
++	var chosen := {}; var cuts: Array[Dictionary] = []
++	for index: Variant in remove:
++		if not index is int or index < 0 or index >= plan._cuts.size() or chosen.has(index): return {"error": "Invalid or duplicate review choice."}
++		chosen[index] = true
++	for i in plan._cuts.size():
++		if chosen.has(i) and plan._cuts[i].end - plan._cuts[i].start > 0.000001: cuts.append(plan._cuts[i])
++	var ranges: Array[Dictionary] = []; var cursor := clip.source_offset
++	var end := clip.source_offset + clip.duration * clip.playback_speed; var removed := 0.0
++	var fade_in := float(actor.values.get(&"fade_in", 0.0)); var fade_out := float(actor.values.get(&"fade_out", 0.0))
++	if not is_finite(fade_in) or not is_finite(fade_out) or fade_in < 0 or fade_out < 0: return {"error": "Invalid clip fades."}
++	for cut in cuts:
++		if fade_in > 0 and cut.start < clip.source_offset + fade_in * clip.playback_speed - 0.000001 or fade_out > 0 and cut.end > end - fade_out * clip.playback_speed + 0.000001:
++			return {"error": "A chosen removal intersects an existing clip fade. Keep that region or render the fade first."}
++		if cut.start > cursor + 0.000001: ranges.append({"start": cursor, "end": cut.start})
++		cursor = cut.end; removed += (cut.end - cut.start) / clip.playback_speed
++	if cursor < end - 0.000001: ranges.append({"start": cursor, "end": end})
++	if ranges.is_empty(): return {"error": "The entire clip would be removed. Keep at least one region, retain a pause, or delete the clip manually."}
++	var moved: Array[String] = []; var old_end := clip.start_time + clip.duration
++	var track_id := str(actor.values.get(&"track_id", ""))
++	if scope == "track_following" and removed > 0:
++		for other in document.clips:
++			if other.id == clip.id or str(document.track_for_clip(other.id).get("id", "")) != track_id: continue
++			if other.start_time < old_end - 0.000001 and other.start_time + other.duration > clip.start_time + 0.000001:
++				return {"error": "Another clip overlaps this clip on the same track. Use selected-clip-only scope or resolve the overlap first."}
++			if other.start_time >= old_end - 0.000001:
++				var track := document.track_for_clip(other.id)
++				if not can_edit(other.id) or track.has("frozen_track") or track.has("frozen_source"): return {"error": "A following clip is locked or frozen. No clips were changed."}
++				moved.append(other.id)
++	return {"error": "", "ranges": ranges, "cuts": cuts, "removed": removed, "remaining": clip.duration - removed, "moved_ids": moved, "scope": scope}
++
++func apply_silence_plan(plan: SilencePlan, remove: Array, scope: String = "clip") -> Dictionary:
++	var review := preview_silence_plan(plan, remove, scope)
++	if not str(review.get("error", "")).is_empty(): return review
++	if float(review.removed) <= 0.000001: return {"error": "", "changed": false, "removed": 0.0}
++	var clip := document.clip_for_id(plan._clip_id); var actor := document.actor_for_clip(plan._clip_id)
++	var index := document.clips.find(clip); var at := clip.start_time; var parts: Array[Dictionary] = []
++	var end := clip.source_offset + clip.duration * clip.playback_speed
++	for interval: Dictionary in review.ranges:
++		var part := KiwiAudioRegionEdit._piece(actor, clip, at, interval.start, (interval.end - interval.start) / clip.playback_speed)
++		# Preserve the original stable IDs on the first piece, all metadata and the
++		# unmodified source reference. New boundaries get short non-overlap fades.
++		if parts.is_empty(): part.actor.id = actor.id; part.clip.id = clip.id; part.clip.actor_id = actor.id
++		part.actor.values[&"fade_in"] = float(actor.values.get(&"fade_in", 0.0)) if absf(interval.start - clip.source_offset) < 0.000001 else minf(0.003, part.clip.duration * 0.1)
++		part.actor.values[&"fade_out"] = float(actor.values.get(&"fade_out", 0.0)) if absf(interval.end - end) < 0.000001 else minf(0.005, part.clip.duration * 0.1)
++		parts.append(part); at += part.clip.duration
++	plan.cancel() # Synchronous changed callbacks cannot apply it twice.
++	action("Reviewed silence cleanup", func():
++		document.clips.remove_at(index); document.actors.remove_at(index)
++		selected_ids.clear()
++		for i in parts.size():
++			document.clips.insert(index + i, parts[i].clip); document.actors.insert(index + i, parts[i].actor)
++			selected_ids.append(parts[i].clip.id)
++		for id: String in review.moved_ids: document.clip_for_id(id).start_time -= float(review.removed))
++	selection_changed.emit()
++	return {"error": "", "changed": true, "removed": review.removed, "clip_ids": selected_ids.duplicate(), "moved_ids": review.moved_ids}
++
++func silence_boundary(plan: SilencePlan, remove: Array, region: int) -> Dictionary:
++	var review := preview_silence_plan(plan, remove)
++	if not str(review.get("error", "")).is_empty(): return review
++	if region < 0 or region >= plan._cuts.size() or not remove.has(region): return {"error": "Select a region marked Remove to audition its proposed boundary."}
++	var cut := plan._cuts[region]
++	if cut.end - cut.start <= 0.000001: return {"error": "This region removes no time with the retained-pause setting."}
++	var clip := document.clip_for_id(plan._clip_id)
++	var left := Vector2.ZERO; var right := Vector2.ZERO; var fade_out := 0.0; var fade_in := 0.0
++	for interval: Dictionary in review.ranges:
++		if absf(interval.end - cut.start) < 0.000001:
++			left = Vector2(maxf(interval.start, interval.end - 0.35 * clip.playback_speed), interval.end)
++			fade_out = minf(0.005, (interval.end - interval.start) / clip.playback_speed * 0.1)
++		if absf(interval.start - cut.end) < 0.000001:
++			right = Vector2(interval.start, minf(interval.end, interval.start + 0.35 * clip.playback_speed))
++			fade_in = minf(0.003, (interval.end - interval.start) / clip.playback_speed * 0.1)
++	if left == Vector2.ZERO and right == Vector2.ZERO: return {"error": "This boundary joins another removal. Audition an outside boundary instead."}
++	return {"error": "", "left": left, "right": right, "speed": clip.playback_speed, "fade_in": fade_in, "fade_out": fade_out,
++		"source": document.actor_for_clip(plan._clip_id).values.get(&"audio"), "fade_curve": str(document.actor_for_clip(plan._clip_id).values.get(&"fade_curve", "linear"))}
+--- a/Workspaces/AudioWorkspace/audio_workspace.gd
++++ b/Workspaces/AudioWorkspace/audio_workspace.gd
+@@ -75,6 +75,12 @@
+ var _wave_clipboard := PackedVector2Array()
+ var _wave_clipboard_rate: int = 44100
+ var _analysis_result: Dictionary = {}
++var _silence_threshold := -42.0
++var _silence_minimum := 0.25
++var _silence_keep := 0.12
++var _silence_generation := 0
++var _silence_review: Dictionary = {}
++var _silence_check_at := 0
+ var _record_start: float = 0
+ var _record_track := ""
+ var _record_elapsed: float = 0
+@@ -338,6 +344,7 @@
+  pattern.session=session;pattern.mode="steps" if sequencer else "piano";pattern.row_height=23 if sequencer else 16;pattern.size_flags_vertical=Control.SIZE_EXPAND_FILL;tab.add_child(pattern)
+  pattern.notes_changed.connect(_render_dirty_notes);pattern.audition.connect(audition_note)
+ func _session_changed()->void:
++ _close_silence_review()
+  if not _parameter_gesture.valid(session):_discard_parameter_handle()
+  automation_recording.document_changed()
+  canvas.queue_redraw();piano.queue_redraw();steps.queue_redraw()
+@@ -376,6 +383,8 @@
+   pattern.pattern_beats=beats
+   if _pattern_lengths.has(pattern):(_pattern_lengths[pattern] as SpinBox).set_value_no_signal(beats)
+ func _selection_changed()->void:
++ _close_silence_review()
++ _refresh_analysis()
+  _finish_control_edits()
+  _finish_automation_pass("Selection changed")
+  _sync_pattern_lengths()
+@@ -402,6 +411,7 @@
+   var resolved:=resolve_document(value)
+   if not str(resolved.get("error","")).is_empty():notice(str(resolved.error));return
+   document=resolved.document
++ _close_silence_review()
+  _finish_control_edits();_controls_generation+=1
+  _finish_automation_pass("Composition changed")
+  canvas.finish_automation_edit()
+@@ -441,6 +451,7 @@
+  return {"session":session,"source":source,"path":path,"document_path":document_path,"ui":ui}
+ func _notification(what:int)->void:
+  if what==NOTIFICATION_VISIBILITY_CHANGED and is_inside_tree() and not is_visible_in_tree():
++  _close_silence_review()
+   _relink_generation+=1;jobs.cancel_kind("relink_probe")
+   for child in get_children():
+    if child is Window and child.has_meta("audio_relink_window"):child.queue_free()
+@@ -455,6 +466,7 @@
+  playback.play()
+ 
+ func stop()->void:
++ if not _silence_review.is_empty():_stop_silence_audition(int(_silence_review.token))
+  _finish_automation_pass("Transport stopped")
+  _record_cancel_requested=true
+  _record_loop_preview=null;_record_loop_signature=""
+@@ -670,6 +682,9 @@
+    _check(strip,"Solo",bool(track.get("solo",false)),func(value:bool):_finish_automation_pass("Mixer solo changed");session.action("Solo track",func():track.solo=value)).disabled=locked
+   _button(strip,"Effects",func():_finish_automation_pass("Effects selected");session.selected_ids.clear();session.selected_track="" if master else str(track.id);bottom.current_tab=3;_refresh_effects())
+ func _process(delta:float)->void:
++ if not _silence_review.is_empty() and Time.get_ticks_msec()>=_silence_check_at:
++  _silence_check_at=Time.get_ticks_msec()+250
++  if not _silence_review_current(int(_silence_review.token)):_close_silence_review()
+  if not is_visible_in_tree():return
+  automation_recording.tick(playback.position,playback.playing)
+  _update_automation_readouts()
+@@ -1372,52 +1387,152 @@
+  var stream:=waveform.stream;var start:=float(waveform.selection.x)/waveform.rate;var seconds:=float(waveform.selection.y-waveform.selection.x)/waveform.rate;var clip_id:=_wave_clip_id
+  jobs.request("noise_profile",func(job:RefCounted):var result:=KiwiAudioAnalysis.noise_profile(stream,start,seconds,job);result.clip_id=clip_id;return result,session.revision)
+ func analyze_clip()->void:
++ if recorder.recording or _record_busy:notice("Stop recording before analyzing dialogue.");return
+  var actor:=session.primary_actor();if actor==null:return
+- var stream:=_workspace_source(actor.values.get(&"audio"));var clip_id:=session.primary_clip().id;var identity:=_analysis_identity(actor)
+- jobs.request("analysis",func(job:RefCounted):var result:=KiwiAudioAnalysis.analyze(stream,-42,0.25,job);result.clip_id=clip_id;result.source_identity=identity;return result,session.revision)
++ _close_silence_review()
++ var problem:=KiwiAudioAnalysis.silence_source_error(actor.values.get(&"audio"))
++ if not problem.is_empty():notice(problem);return
++ var identity:=_analysis_identity(actor);var value:Variant=actor.values.get(&"audio")
++ if value is String:ActorAudio.invalidate(value)
++ var stream:=_workspace_source(value);var clip_id:=session.primary_clip().id
++ if identity.is_empty() or identity!=_analysis_identity(actor):notice("The source changed while opening it. Analyze again.");return
++ var owner_id:=session.get_instance_id();var document_id:=session.document.get_instance_id();var revision:=session.revision
++ var threshold:=_silence_threshold;var minimum:=_silence_minimum
++ jobs.request("analysis",func(job:RefCounted):
++  var result:=KiwiAudioAnalysis.analyze(stream,threshold,minimum,job)
++  result.clip_id=clip_id;result.source_identity=identity;result.owner_id=owner_id;result.document_id=document_id;result.revision=revision;result.threshold=threshold;result.minimum=minimum
++  return result,revision)
+  bottom.visible=true;bottom.current_tab=5
+ func _refresh_analysis()->void:
+  if not _analysis_result.is_empty() and not _analysis_current():_analysis_result={}
+  _clear(analysis_panel)
+  var row:=HFlowContainer.new();analysis_panel.add_child(row)
++ _number(analysis_panel,"Quiet threshold (dBFS)",_silence_threshold,-90,-6,1,func(value:float):_silence_threshold=value;_close_silence_review())
++ _number(analysis_panel,"Minimum quiet (source s)",_silence_minimum,0.05,10,0.05,func(value:float):_silence_minimum=value;_close_silence_review())
++ _number(analysis_panel,"Retained pause (timeline s)",_silence_keep,0,10,0.01,func(value:float):_silence_keep=value;_close_silence_review())
++ _label(analysis_panel,"Analysis decodes the entire source: at most 600 seconds and a 64 MiB source file, within existing decoder memory limits. Quiet detection is not speech or breath recognition.")
+  _button(row,"Analyze selected clip",analyze_clip);_button(row,"Measure LUFS",measure_loudness);_button(row,"Align two clips",align_selected);_button(row,"Match clip levels",match_levels);_button(row,"Dialogue ducking",ducking_dialog)
+  if _analysis_result.has("integrated_lufs"):
+   _label(analysis_panel,"Integrated %.1f LUFS · True peak %.1f dBTP · Loudness range %.1f LU (%s)"%[float(_analysis_result.integrated_lufs),float(_analysis_result.true_peak_db),float(_analysis_result.loudness_range),str(_analysis_result.get("method",""))])
+  if _analysis_result.is_empty():_label(analysis_panel,"Analyze audio to review transient and silence detections, an estimated tempo, peak level and RMS level. Automatic edits remain undoable.");return
+  if not str(_analysis_result.get("error","")).is_empty():_label(analysis_panel,str(_analysis_result.error));return
++ var analyzed:=session.document.actor_for_clip(str(_analysis_result.get("clip_id","")))
++ _label(analysis_panel,"Analyzed clip: "+(analyzed.display_name if analyzed!=null else "Unavailable"))
+  _label(analysis_panel,"Peak %.1f dBFS  ·  RMS %.1f dBFS  ·  Tempo estimate %.1f BPM (confidence %.0f%%)"%[float(_analysis_result.get("peak_db",-120)),float(_analysis_result.get("rms_db",-120)),float(_analysis_result.get("tempo",0)),float(_analysis_result.get("confidence",0))*100])
+  _label(analysis_panel,"RMS is not integrated LUFS. Tempo estimates may have half/double-time ambiguity; review before applying.")
+  _label(analysis_panel,"%d attacks · %d quiet regions"%[(_analysis_result.get("transients",[]) as Array).size(),(_analysis_result.get("silences",[]) as Array).size()])
+  var actions:=HFlowContainer.new();analysis_panel.add_child(actions)
+  _button(actions,"Add attack markers",_add_attack_markers)
+  _button(actions,"Use estimated tempo",func():if float(_analysis_result.get("tempo",0))>0:session.change_tempo(float(_analysis_result.tempo)))
+- _button(actions,"Remove silences",func():_apply_silences(0.0))
+- _button(actions,"Shorten pauses",func():_apply_silences(0.12))
++ _button(actions,"Review silence cleanup",func():_apply_silences(_silence_keep))
+  _button(actions,"Learn selected noise profile",sample_noise_profile)
+- for region in (_analysis_result.get("silences",[]) as Array).slice(0,30):_label(analysis_panel,"Quiet: %.3f–%.3f s"%[float(region.start),float(region.end)])
++ _label(analysis_panel,"Open Review to keep/remove individual quiet regions and choose ripple scope. No edits happen during analysis.")
+ func _apply_silences(keep:float)->void:
+- if not _analysis_current():status.text="The analyzed source changed. Analyze it again.";return
+- var id:=str(_analysis_result.get("clip_id",""));var clip:=session.document.clip_for_id(id);var actor:=session.document.actor_for_clip(id)
+- if clip==null or actor==null or not session.can_edit(id):return
+- if bool(actor.values.get(&"loop",false)):notice("Render the loop in place before automatic silence removal.");return
+- var ranges:Array=[];var cursor:=clip.source_offset;var end:=clip.source_offset+clip.duration*clip.playback_speed
+- for region in _analysis_result.get("silences",[]):
+-  var a:=clampf(float(region.start),cursor,end);var b:=clampf(float(region.end)-keep*clip.playback_speed,a,end)
+-  if a>cursor:ranges.append(Vector2(cursor,a))
+-  cursor=maxf(cursor,b)
+- if cursor<end:ranges.append(Vector2(cursor,end))
+- if ranges.is_empty():notice("The entire selected clip is quiet. Delete it manually if that is intended.");return
+- session.action("Shorten pauses" if keep>0 else "Remove silences",func():
+-  var old_end:=clip.start_time+clip.duration;var at:=clip.start_time;var index:=session.document.clips.find(clip);var track_id:=str(actor.values.get(&"track_id",""))
+-  session.document.clips.remove_at(index);session.document.actors.remove_at(index);session.selected_ids.clear()
+-  for interval in ranges:
+-   var copy:=ActorData.new();copy.id=ActorData.new_id();copy.type_id=&"audio";copy.display_name=actor.display_name;copy.values=actor.values.duplicate(true);KiwiAudioEditSession.shift_owner_automation(copy.values,(interval.x-clip.source_offset)/clip.playback_speed);copy.values[&"fade_in"]=0.003;copy.values[&"fade_out"]=0.005
+-   var part:=ActorClip.create(copy,at,(interval.y-interval.x)/clip.playback_speed);part.source_offset=interval.x;part.playback_speed=clip.playback_speed;part.layer=clip.layer
+-   session.document.actors.append(copy);session.document.clips.append(part);session.selected_ids.append(part.id);at+=part.duration
+-  var removed:=old_end-at
+-  for other in session.document.clips:
+-   if not session.selected_ids.has(other.id) and str(session.document.track_for_clip(other.id).get("id",""))==track_id and other.start_time>=old_end:other.start_time-=removed)
+- _analysis_result={}
++ if automation_recording.active or automation_recording.has_pending():notice("Stop and save or cancel the automation pass before reviewing silence cleanup.");return
++ if recorder.recording or _record_busy:notice("Stop recording before reviewing silence cleanup.");return
++ if not _analysis_current() or not _analysis_result.has("silences"):notice("Analyze this source before reviewing quiet regions.");return
++ if float(_analysis_result.get("threshold",INF))!=_silence_threshold or float(_analysis_result.get("minimum",INF))!=_silence_minimum:notice("Detection settings changed. Analyze again before reviewing.");return
++ var prepared:=session.create_silence_plan(str(_analysis_result.clip_id),_analysis_result.silences,float(_analysis_result.get("duration",0)),keep,str(_analysis_result.source_identity))
++ if not str(prepared.get("error","")).is_empty():notice(str(prepared.error));return
++ var plan:KiwiAudioEditSession.SilencePlan=prepared.plan
++ if plan.regions().is_empty():notice("No quiet regions overlap the selected source window.");return
++ _close_silence_review()
++ _silence_generation+=1;var token:=_silence_generation
++ var dialog:=_window("Review dialogue silence cleanup",Vector2i(820,620));var window:Window=dialog.window;var host:VBoxContainer=dialog.host
++ window.set_meta("audio_silence_window",true)
++ var player:=AudioStreamPlayer.new();window.add_child(player);player.volume_db=-6
++ var reviewed_actor:=session.document.actor_for_clip(plan.clip_id());var reviewed_track:=session.document.track_for_clip(plan.clip_id())
++ _label(host,"Clip: %s · Track: %s"%[reviewed_actor.display_name,str(reviewed_track.get("name",""))])
++ _label(host,"Source quiet threshold %.1f dBFS · minimum %.2f source s · retained pause %.2f timeline s (half on each side)."%[_silence_threshold,_silence_minimum,keep])
++ _label(host,"Checked = remove/shorten; unchecked = keep unchanged. Source files stay intact. New interior boundaries receive up to 3 ms fade-in / 5 ms fade-out; existing outer fades remain.")
++ var tree:=Tree.new();tree.columns=2;tree.hide_root=true;tree.column_titles_visible=true;tree.set_column_title(0,"Remove");tree.set_column_title(1,"Quiet source interval / time removed");tree.set_column_expand(0,false);tree.set_column_custom_minimum_width(0,80);tree.size_flags_vertical=Control.SIZE_EXPAND_FILL;host.add_child(tree)
++ var root:=tree.create_item();var regions:=plan.regions();var cuts:=plan.cuts();var clip:=session.document.clip_for_id(plan.clip_id())
++ for i in regions.size():
++  var item:=tree.create_item(root);item.set_cell_mode(0,TreeItem.CELL_MODE_CHECK);item.set_editable(0,true);item.set_checked(0,true);item.set_metadata(0,i)
++  item.set_text(1,"%d. %.3f–%.3f s / %.3f timeline s"%[i+1,regions[i].start,regions[i].end,(float(cuts[i].end)-float(cuts[i].start))/clip.playback_speed])
++ var scope:=OptionButton.new();scope.add_item("Selected clip only; following clips stay fixed");scope.add_item("Ripple following clips on this track after the original end");host.add_child(scope)
++ _label(host,"Other tracks, markers, loop ranges, conductor, sections and absolute automation stay fixed in both scopes. Overlapping clips block track ripple.")
++ var summary:=_label(host,"");var row:=HFlowContainer.new();host.add_child(row)
++ var apply:=_button(row,"Apply reviewed cleanup",_apply_silence_review.bind(token))
++ _button(row,"Audition selected raw join",_audition_silence_review.bind(token))
++ _button(row,"Stop audition",_stop_silence_audition.bind(token))
++ _button(row,"Keep all",func():_set_silence_choices(token,false))
++ _button(row,"Remove all",func():_set_silence_choices(token,true))
++ _button(row,"Cancel",_close_silence_review.bind(token))
++ _label(host,"Audition is an isolated, up-to-0.7-second source join at clip speed, bypassing clip gain/pan, track/master effects and pitch correction. It is not an exact mix preview.")
++ _silence_review={"token":token,"plan":plan,"window":window,"tree":tree,"scope":scope,"summary":summary,"apply":apply,"player":player,"audition":0}
++ tree.item_edited.connect(_refresh_silence_review.bind(token));scope.item_selected.connect(func(_index:int):_refresh_silence_review(token))
++ window.tree_exiting.connect(_close_silence_review.bind(token))
++ window.window_input.connect(func(event:InputEvent):if event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:_close_silence_review(token))
++ _refresh_silence_review(token)
++
++func _silence_review_current(token:int)->bool:
++ return not _silence_review.is_empty() and int(_silence_review.get("token",-1))==token and is_inside_tree() and is_visible_in_tree() and not recorder.recording and not _record_busy and not automation_recording.active and not automation_recording.has_pending() and session.primary_clip()!=null and session.primary_clip().id==_silence_review.plan.clip_id() and is_instance_valid(_silence_review.window) and not _silence_review.window.is_queued_for_deletion() and _silence_review.plan.current(session)
++
++func _silence_choices()->Array:
++ var result:Array=[]
++ if _silence_review.is_empty():return result
++ var row:TreeItem=_silence_review.tree.get_root().get_first_child()
++ while row!=null:
++  if row.is_checked(0):result.append(int(row.get_metadata(0)))
++  row=row.get_next()
++ return result
++
++func _set_silence_choices(token:int,value:bool)->void:
++ if not _silence_review_current(token):_close_silence_review(token);return
++ var row:TreeItem=_silence_review.tree.get_root().get_first_child()
++ while row!=null:row.set_checked(0,value);row=row.get_next()
++ _refresh_silence_review(token)
++
++func _refresh_silence_review(token:int)->void:
++ if not _silence_review_current(token):_close_silence_review(token);return
++ _stop_silence_audition(token)
++ var scope:="track_following" if _silence_review.scope.selected==1 else "clip"
++ var review:=session.preview_silence_plan(_silence_review.plan,_silence_choices(),scope)
++ var error:=str(review.get("error",""));_silence_review.apply.disabled=not error.is_empty() or float(review.get("removed",0))<=0.000001
++ _silence_review.summary.text=error if not error.is_empty() else "Remove %.3f s · keep %.3f s · move %d following clip(s). Apply creates one Undo action."%[float(review.removed),float(review.remaining),(review.moved_ids as Array).size()]
++
++func _apply_silence_review(token:int)->void:
++ if not _silence_review_current(token):_close_silence_review(token);notice("The cleanup plan changed or was cancelled. Review again.");return
++ var scope:="track_following" if _silence_review.scope.selected==1 else "clip"
++ var result:=session.apply_silence_plan(_silence_review.plan,_silence_choices(),scope)
++ if not str(result.get("error","")).is_empty():_silence_review.summary.text=str(result.error);return
++ _close_silence_review(token)
++ if bool(result.get("changed",false)):_analysis_result={};status.text="Removed %.3f seconds with one Undo action; original sources are preserved."%float(result.removed)
++
++func _audition_silence_review(token:int)->void:
++ if not _silence_review_current(token):_close_silence_review(token);return
++ var row:TreeItem=_silence_review.tree.get_selected()
++ if row==null:_silence_review.summary.text="Select a checked region to audition its proposed join.";return
++ var boundary:=session.silence_boundary(_silence_review.plan,_silence_choices(),int(row.get_metadata(0)))
++ if not str(boundary.get("error","")).is_empty():_silence_review.summary.text=str(boundary.error);return
++ _silence_review.audition=int(_silence_review.audition)+1;var audition:=int(_silence_review.audition)
++ _silence_review.player.stop();_silence_review.player.stream=null
++ _cancel_exact_playback();playback.stop(false);preview_player.stop();asset_file_preview.close_file()
++ if not _silence_review_current(token):return
++ jobs.request("silence_audition",func(job:RefCounted):
++  var problem:=KiwiAudioAnalysis.silence_source_error(boundary.source)
++  if not problem.is_empty():return {"error":problem,"audition":audition}
++  if boundary.source is String:ActorAudio.invalidate(boundary.source)
++  var stream:=ActorAudio.source(boundary.source,job);var result:=KiwiAudioAnalysis.silence_boundary_audio(stream,boundary,job);result.audition=audition;return result,token)
++
++func _silence_audition_completed(token:int,result:Dictionary)->void:
++ if not _silence_review_current(token) or int(result.get("audition",-1))!=int(_silence_review.get("audition",-2)):return
++ if not str(result.get("error","")).is_empty():_silence_review.summary.text=str(result.error);return
++ var player:AudioStreamPlayer=_silence_review.player;player.stream=result.get("stream");player.pitch_scale=float(result.get("speed",1));player.play()
++
++func _stop_silence_audition(token:int)->void:
++ if _silence_review.is_empty() or int(_silence_review.get("token",-1))!=token:return
++ _silence_review.audition=int(_silence_review.audition)+1;jobs.cancel_kind("silence_audition")
++ _silence_review.player.stop();_silence_review.player.stream=null
++
++func _close_silence_review(token:int=-1)->void:
++ if _silence_review.is_empty() or token>=0 and int(_silence_review.get("token",-1))!=token:return
++ var context:=_silence_review;_silence_review={};_silence_generation+=1
++ context.plan.cancel();jobs.cancel_kind("silence_audition")
++ if is_instance_valid(context.player):context.player.stop();context.player.stream=null
++ if is_instance_valid(context.window) and not context.window.is_queued_for_deletion():context.window.queue_free()
++
+ func align_selected()->void:
+  if session.selected_ids.size()!=2:notice("Select two clips. The second will be aligned to the first.");return
+  var first:=session.document.clip_for_id(session.selected_ids[0]);var second:=session.document.clip_for_id(session.selected_ids[1]);var a:=_workspace_source(session.document.actor_for_clip(first.id).values.get(&"audio"));var b:=_workspace_source(session.document.actor_for_clip(second.id).values.get(&"audio"))
+@@ -1536,6 +1651,7 @@
+  _label(dialog.host,"Offline-processed backing is streamed from a private PCM file (512 MiB disk limit) and buffered before opening capture devices. Captured takes still use memory; this does not make long device captures memory-bounded. Edits during preparation cancel startup; edits during processed capture affect the next take. Stop or press Record again to cancel preparation/countdown. Timeline-mix takes start muted so loop passes do not recapture the preceding mix; use Takes to preview or choose them. Device restarts between takes are not gapless.")
+  _button(dialog.host,"Show takes",func():dialog.window.queue_free();take_dialog())
+ func toggle_recording(restart_next:bool=false)->void:
++ _close_silence_review()
+  _finish_automation_pass("Audio recording requested")
+  if _record_busy:
+   _cancel_record_preparation()
+@@ -1778,6 +1894,8 @@
+   if session!=data.get("owner_session") or session.revision!=int(data.get("revision",-1)):notice("The composition changed while mapping MIDI. Repeat this action in the intended document.");return
+   _save_midi_export(data.get("midi",{}),true);return
+  if kind=="record_prepare":_record_preparation_finished(generation,data);return
++ if kind=="silence_audition":_silence_audition_completed(generation,data);return
++ if kind in ["analysis","loudness"] and not _analysis_provenance_current(data,generation):return
+  if kind=="wave_edit" and int(data.get("owner_id",0))!=session.get_instance_id():return
+  if kind=="render" and str(data.get("action",""))=="preview":
+   if int(data.get("transport_token",-1))!=_transport_token or int(data.get("owner_id",0))!=session.get_instance_id() or not _transport_requested:
+@@ -1847,17 +1965,8 @@
+     var effect:=KiwiAudioEffects.create("noise_reduce");effect.parameters.noise_profile=data.noise_profile;effect.parameters.floor=data.floor
+     var stack:Array=actor.values.get(&"effects",[]);stack.append(effect);actor.values[&"effects"]=stack)
+    status.text="Learned a 15-band spectral profile from %.3f seconds. Render preview and adjust reduction/floor; noise overlapping speech cannot be perfectly removed."%float(data.seconds)
+-  "loudness":
+-   if generation!=session.revision:return
+-   _analysis_result.merge(data,true);_refresh_analysis()
+-  "analysis":
+-   if generation!=session.revision:return
+-   var analyzed:=session.document.actor_for_clip(str(data.get("clip_id","")))
+-   if analyzed==null or str(data.get("source_identity",""))!=_analysis_identity(analyzed):return
+-   _analysis_result=data
+-   var actor:=session.document.actor_for_clip(str(data.get("clip_id","")))
+-   if actor!=null:actor.values[&"transients"]=data.get("transients",[]);actor.values[&"transients_source_identity"]=data.source_identity
+-   _refresh_analysis()
++  "loudness":_accept_analysis_result(data,generation,true)
++  "analysis":_accept_analysis_result(data,generation)
+   "alignment":
+    if generation!=session.revision:return
+    if float(data.get("confidence",0))<0.25:notice("No confident alignment was found. Adjust manually.");return
+@@ -2144,7 +2253,10 @@
+  if actor==null:return
+  var value:Variant=actor.values.get(&"audio")
+  var identity:=_analysis_identity(actor);var clip_id:=session.primary_clip().id
+- jobs.request("loudness",func(job:RefCounted):var result:=KiwiAudioAnalysis.loudness(value,job);result.source_identity=identity;result.clip_id=clip_id;return result,session.revision)
++ var owner_id:=session.get_instance_id();var document_id:=session.document.get_instance_id();var revision:=session.revision
++ jobs.request("loudness",func(job:RefCounted):
++  var result:=KiwiAudioAnalysis.loudness(value,job);result.source_identity=identity;result.clip_id=clip_id;result.owner_id=owner_id;result.document_id=document_id;result.revision=revision
++  return result,revision)
+  bottom.visible=true;bottom.current_tab=5
+ 
+ func effect_automation_dialog(index:int)->void:
+@@ -2268,16 +2380,22 @@
+    owner.ab_enabled_mask=mask)
+ 
+ func _analysis_identity(actor:ActorData)->String:
+- if actor==null:return ""
+- var value:Variant=actor.values.get(&"audio")
+- if value is Resource:return actor.id+":"+str(value.get_instance_id())
+- var path:=str(value);var length:=-1;var file:=FileAccess.open(path,FileAccess.READ)
+- if file!=null:length=file.get_length();file.close()
+- return actor.id+":"+path+":"+str(FileAccess.get_modified_time(path))+":"+str(length)
++ return KiwiAudioEditSession.silence_source_identity(actor)
++
++func _analysis_provenance_current(data:Dictionary,generation:int)->bool:
++ var actor:=session.document.actor_for_clip(str(data.get("clip_id","")))
++ return generation==session.revision and int(data.get("revision",-1))==session.revision and int(data.get("owner_id",0))==session.get_instance_id() and int(data.get("document_id",0))==session.document.get_instance_id() and session._before==null and session.primary_clip()!=null and session.primary_clip().id==str(data.get("clip_id","")) and actor!=null and not str(data.get("source_identity","")).is_empty() and str(data.get("source_identity",""))==_analysis_identity(actor)
++
++func _accept_analysis_result(data:Dictionary,generation:int,loudness:bool=false)->void:
++ if not _analysis_provenance_current(data,generation):return
++ if loudness and _analysis_current() and str(_analysis_result.get("clip_id",""))==str(data.get("clip_id","")):
++  _analysis_result.merge(data,true)
++ else:_analysis_result=data.duplicate(true)
++ # Detection caches stay outside the composition until an explicit edit.
++ _refresh_analysis()
+ 
+ func _analysis_current()->bool:
+- var actor:=session.document.actor_for_clip(str(_analysis_result.get("clip_id","")))
+- return actor!=null and str(_analysis_result.get("source_identity",""))==_analysis_identity(actor)
++ return _analysis_provenance_current(_analysis_result,int(_analysis_result.get("revision",-1)))
+ 
+ func _add_attack_markers()->void:
+  if not _analysis_current():status.text="The analyzed source changed. Analyze it again.";return
+@@ -2481,6 +2599,7 @@
+   entry.control.set_value_no_signal(value)
+ 
+ func _exit_tree()->void:
++ _close_silence_review()
+  _record_cancel_requested=true;_record_generation+=1
+  _record_prepared=null;_record_loop_preview=null;_record_loop_signature=""
+  jobs.cancel_kind("record_prepare")

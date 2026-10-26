@@ -8,7 +8,11 @@ class TestStudio extends KiwiImageWorkspace:
 func check(ok: bool,message: String) -> void:
 	if not ok: failures+=1; push_error(message)
 
-func _initialize() -> void: run.call_deferred()
+func _initialize() -> void: execute.call_deferred()
+func execute() -> void:
+	await run()
+	for frame in 10: await process_frame
+	quit(failures)
 
 func fixture(tool: String="brush") -> KiwiImageLayer:
 	studio.canvas.cancel_gesture()
@@ -38,7 +42,12 @@ func run() -> void:
 	var layer:=fixture(); studio._refresh_context()
 	var scale:=studio.context.find_child("CorrectionScale",true,false) as DragNumber
 	check(scale!=null,"Stroke correction exposes a scale control")
-	check(scale.get_parent().get_parent().get_parent().get_index()==2,"Stroke correction stays beside the tool title before other toolbar groups")
+	var settings:=studio.context.find_child("StrokeSettings",true,false) as Button
+	var toolbar:=studio.context.find_child("BrushToolbarRow",true,false)
+	var settings_group: Node=settings
+	while settings_group!=null and settings_group.get_parent()!=toolbar: settings_group=settings_group.get_parent()
+	check(settings!=null and settings.visible and settings_group!=null and settings_group.get_index()==2,"Stroke correction settings remain beside the tool title before other toolbar groups")
+	check(scale.get_parent().get_parent() is PopupPanel,"Detailed correction controls remain available in the compact settings popup")
 	check(studio.context.find_child("BrushToolbarRow",true,false) is HBoxContainer,"Brush controls use a single non-wrapping toolbar row")
 	scale.value=2.5; check(is_equal_approx(studio.canvas.correction_scale,2.5),"The scale field changes correction scale")
 	var zoom:=studio.canvas.zoom
@@ -50,10 +59,10 @@ func run() -> void:
 	check(is_equal_approx(studio.canvas.correction_scale,2.5),"Alt+wheel down reverses the scale adjustment")
 	wheel.alt_pressed=false; wheel.shift_pressed=true; wheel.button_index=MOUSE_BUTTON_WHEEL_UP
 	studio.canvas._input_canvas(wheel)
-	check(is_equal_approx(studio.canvas.brush_size,10) and is_equal_approx(studio.canvas.correction_scale,2.5),"Shift+wheel changes brush size without changing correction scale")
+	check(is_equal_approx(studio.canvas.brush_size,9) and is_equal_approx(studio.canvas.correction_scale,2.5),"Shift+wheel changes brush size without changing correction scale")
 	check(is_equal_approx(studio.canvas.zoom,zoom),"Shift+wheel brush size does not zoom the canvas")
 	wheel.button_index=MOUSE_BUTTON_WHEEL_DOWN; studio.canvas._input_canvas(wheel)
-	check(is_equal_approx(studio.canvas.brush_size,8),"Shift+wheel down decreases brush size")
+	check(is_equal_approx(studio.canvas.brush_size,7.92),"Shift+wheel down preserves the existing proportional size adjustment")
 	for active_tool in ["fill","pixel_select"]:
 		studio.canvas.tool=active_tool; studio.canvas.pixel_mode="fill"
 		wheel.button_index=MOUSE_BUTTON_WHEEL_UP; studio.canvas._input_canvas(wheel)
@@ -62,7 +71,7 @@ func run() -> void:
 		check(is_equal_approx(studio.canvas.fill_threshold,.01),"Shift+wheel decreases threshold for "+active_tool)
 	studio.canvas.tool="brush"
 	wheel.shift_pressed=false; wheel.ctrl_pressed=true; studio.canvas._input_canvas(wheel)
-	check(is_equal_approx(studio.canvas.brush_size,8) and is_equal_approx(studio.canvas.fill_threshold,.01),"Ctrl+wheel no longer changes brush size or threshold")
+	check(is_equal_approx(studio.canvas.brush_size,7.92) and is_equal_approx(studio.canvas.fill_threshold,.01),"Ctrl+wheel no longer changes brush size or threshold")
 	var state:=studio.capture_state(); studio.canvas.correction_scale=1; studio.open_source(null,state)
 	check(is_equal_approx(studio.canvas.correction_scale,2.5),"Correction scale survives image workspace switching")
 	layer=fixture(); studio.canvas.paint_new_layer=true
@@ -93,6 +102,11 @@ func run() -> void:
 	check(studio.context.find_child("PixelBoxSelect",true,false)!=null,"Pixel selection keeps its Box Select toggle")
 	for control in studio.context.find_children("*","Button",true,false):
 		check(control.tooltip_text not in ["Box crop · C","Lasso crop · L"],"Pixel selection does not show standalone box/lasso crop icons")
-	studio.free(); studio=null; scale=null; layer=null; state.clear()
+	# Undo and selection changes launch asynchronous source captures. Let those
+	# finish while their owning workspace still exists, before deleting fixtures.
+	for frame in 24: await RenderingServer.frame_post_draw
+	# The legacy workspace color-state control is deliberately not parented.
+	# Tests own this orphan too; release it before the rendering server shuts down.
+	studio.color_picker.queue_free(); studio.queue_free(); studio=null; scale=null; layer=null; state.clear()
 	await process_frame; await process_frame
-	print("Stroke control / modifier checks: %d failures" % failures); quit(failures)
+	print("Stroke control / modifier checks: %d failures" % failures)

@@ -77,9 +77,9 @@ func _ready() -> void:
 	title.add_theme_font_size_override("font_size", 13)
 	header.add_child(title)
 	documentation_button.name = "ShaderDocumentationButton"
-	documentation_button.text = "◇  Shader docs"
+	documentation_button.text = "Shader docs & library"
 	documentation_button.custom_minimum_size = Vector2(138, 32)
-	documentation_button.tooltip_text = "Open shader concepts, reference, and copyable examples"
+	documentation_button.tooltip_text = "Documentation, rendered samples, and shader templates"
 	documentation_button.add_theme_color_override("font_color", Color("9ce8d5"))
 	var docs_normal := StyleBoxFlat.new()
 	docs_normal.bg_color = Color("172b35")
@@ -98,6 +98,7 @@ func _ready() -> void:
 	documentation = ShaderDocumentationPopup.new()
 	add_child(documentation)
 	documentation_button.pressed.connect(documentation.open)
+	documentation.sample_open_requested.connect(_open_library_sample)
 	code.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	code.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	code.gutters_draw_line_numbers = true
@@ -141,6 +142,32 @@ func _connect_filesystem() -> void:
 	var filesystem := get_parent().get_node_or_null("FileSystem")
 	if filesystem != null and filesystem.has_signal("shader_file_opened"):
 		filesystem.shader_file_opened.connect(open_shader)
+
+
+func _open_library_sample(entry: Dictionary) -> void:
+	var shader := Shader.new()
+	shader.resource_name = str(entry.get("name", "Shader Sample")) + " Copy"
+	shader.code = str(entry.get("source", ""))
+	var tabs := get_tree().get_first_node_in_group("actor_scene_tabs")
+	if tabs != null and tabs.has_method("open_shader"):
+		# Each fresh resource opens a new document, preserving unsaved tab state.
+		if tabs.open_shader(shader):
+			documentation.hide()
+			if tabs.shader_workspace != null:
+				tabs.shader_workspace.requires_path = true
+				tabs.shader_workspace.load_shader_button.show()
+			return
+	var confirm := ConfirmationDialog.new()
+	confirm.title = "Open shader sample copy"
+	confirm.dialog_text = "This standalone editor has no document tabs. Save the current shader and open a separate embedded copy of '%s'?" % entry.get("name", "sample")
+	confirm.confirmed.connect(func():
+		if not current_path.is_empty() or current_shader != null: save()
+		open_shader(shader)
+		documentation.hide()
+		confirm.queue_free())
+	confirm.canceled.connect(confirm.queue_free)
+	add_child(confirm)
+	confirm.popup_centered()
 
 
 func _connect_timeline() -> void:
@@ -309,13 +336,34 @@ func _validate_syntax() -> void:
 		type_pattern += "|" + struct_name
 	var declaration_regex := RegEx.create_from_string("(?:^|[,(;{}])\\s*(?:uniform\\s+|varying\\s+|const\\s+|in\\s+|out\\s+|inout\\s+)?(?:lowp\\s+|mediump\\s+|highp\\s+)?(?:" + type_pattern + ")\\s+([A-Za-z_][A-Za-z0-9_]*)")
 	var declarations: Dictionary = {}
+	# GLSL permits comma-separated declarators (vec2 cell=floor(p), f=fract(p)).
+	# Track commas outside initializer calls so valid shared helper functions are
+	# not reported as assigning undeclared variables in the sample editor.
+	var multiple_declaration_regex := RegEx.create_from_string("(?:^|[;{}])\\s*(?:const\\s+)?(?:lowp\\s+|mediump\\s+|highp\\s+)?(?:" + type_pattern + ")\\s+([^;{}]+);")
 	var shader_builtins := PackedStringArray(["VERTEX", "NORMAL", "TANGENT", "BINORMAL", "POSITION", "UV", "UV2", "COLOR", "POINT_SIZE", "MODEL_MATRIX", "MODELVIEW_MATRIX", "VIEW_MATRIX", "PROJECTION_MATRIX", "INV_VIEW_MATRIX", "INV_PROJECTION_MATRIX", "MODEL_NORMAL_MATRIX", "CAMERA_POSITION_WORLD", "NODE_POSITION_WORLD", "VIEW", "ALBEDO", "ALPHA", "ALPHA_SCISSOR_THRESHOLD", "METALLIC", "SPECULAR", "ROUGHNESS", "RIM", "RIM_TINT", "CLEARCOAT", "CLEARCOAT_GLOSS", "ANISOTROPY", "ANISOTROPY_FLOW", "SSS_STRENGTH", "SSS_TRANSMITTANCE_COLOR", "SSS_TRANSMITTANCE_DEPTH", "SSS_TRANSMITTANCE_BOOST", "BACKLIGHT", "AO", "AO_LIGHT_AFFECT", "EMISSION", "NORMAL_MAP", "NORMAL_MAP_DEPTH", "DEPTH", "TIME", "PI", "TAU", "E"])
+	shader_builtins.append_array(PackedStringArray(["CLEARCOAT_ROUGHNESS", "DIFFUSE_LIGHT", "SPECULAR_LIGHT", "LIGHT", "LIGHT_COLOR", "ATTENUATION", "LIGHT_IS_DIRECTIONAL"]))
 	if RegEx.create_from_string("(?m)^\\s*shader_type\\s+fog\\s*;").search(source) != null:
 		shader_builtins.append_array(PackedStringArray(["DENSITY", "WORLD_POSITION", "OBJECT_POSITION", "UVW", "SIZE", "SDF"]))
+	elif RegEx.create_from_string("(?m)^\\s*shader_type\\s+particles\\s*;").search(source) != null:
+		shader_builtins.append_array(PackedStringArray(["ACTIVE", "CUSTOM", "TRANSFORM", "VELOCITY", "MASS", "RESTART", "RESTART_POSITION", "RESTART_ROT_SCALE", "RESTART_VELOCITY", "RESTART_COLOR", "RESTART_CUSTOM", "DELTA", "LIFETIME", "NUMBER", "INDEX", "RANDOM_SEED", "EMISSION_TRANSFORM", "COLLIDED", "COLLISION_NORMAL", "COLLISION_DEPTH", "ATTRACTOR_FORCE"]))
+	elif RegEx.create_from_string("(?m)^\\s*shader_type\\s+sky\\s*;").search(source) != null:
+		shader_builtins.append_array(PackedStringArray(["EYEDIR", "SKY_COORDS", "SCREEN_UV", "FOG", "RADIANCE", "HALF_RES_COLOR", "QUARTER_RES_COLOR"]))
+	elif RegEx.create_from_string("(?m)^\\s*shader_type\\s+canvas_item\\s*;").search(source) != null:
+		shader_builtins.append_array(PackedStringArray(["TEXTURE", "TEXTURE_PIXEL_SIZE", "SCREEN_UV", "SCREEN_PIXEL_SIZE", "FRAGCOORD", "LIGHT", "SHADOW_MODULATE", "LIGHT_VERTEX", "SHADOW_VERTEX", "NORMAL_TEXTURE", "SPECULAR_SHININESS", "SPECULAR_SHININESS_TEXTURE"]))
 	var declaration_scopes: Array[Dictionary] = [{}]
 	var function_regex := RegEx.create_from_string("^\\s*(?:void|" + type_pattern + ")\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(")
 	for line_index in syntax_lines.size():
 		var semantic_line := syntax_lines[line_index]
+		for multiple in multiple_declaration_regex.search_all(semantic_line):
+			var declaration_body := multiple.get_string(1)
+			var depth := 0
+			for character_index in declaration_body.length():
+				var token := declaration_body.substr(character_index, 1)
+				if token in ["(", "["]: depth += 1
+				elif token in [")", "]"]: depth -= 1
+				elif token == "," and depth == 0:
+					var next_name := RegEx.create_from_string("^\\s*([A-Za-z_][A-Za-z0-9_]*)").search(declaration_body.substr(character_index + 1))
+					if next_name != null: declarations[next_name.get_string(1)] = line_index
 		var trimmed_left := semantic_line.lstrip(" \t")
 		var leading_closes := 0
 		while leading_closes < trimmed_left.length() and trimmed_left.substr(leading_closes, 1) == "}":

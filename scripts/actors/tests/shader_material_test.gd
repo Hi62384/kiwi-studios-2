@@ -140,8 +140,10 @@ func run() -> void:
 	shader_object.set_value(&"shader_path", recovery_path)
 	runtime.evaluate_clip(ActorClip.create(actor), 0.0)
 	editor.open_shader(recovery_path)
+	print("EXPECTED_SHADER_COMPILER_ERROR_BEGIN")
 	editor.code.text = "shader_type spatial;\nvoid fragment() { BROKEN_SHADER }\n"
 	editor.save()
+	print("EXPECTED_SHADER_COMPILER_ERROR_END")
 	var failed_file_material := mesh.material_override as ShaderMaterial
 	editor.code.text = "shader_type spatial;\nuniform float file_recovered = 0.6;\nvoid fragment() { ALBEDO = vec3(file_recovered); }\n"
 	editor.save()

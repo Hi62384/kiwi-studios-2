@@ -1,0 +1,48 @@
+{
+  "suites": {
+    "1_import": {
+      "exit_code": 0,
+      "errors": 0,
+      "warnings": 0,
+      "result_lines": []
+    },
+    "1_conductor_test.gd": {
+      "exit_code": 0,
+      "errors": 0,
+      "warnings": 0,
+      "result_lines": [
+        "CHECKS=986 FAILURES=0"
+      ]
+    },
+    "1_save_test.gd": {
+      "exit_code": 0,
+      "errors": 0,
+      "warnings": 0,
+      "result_lines": [
+        "SAVE_GUARD_CHECKS=22 FAILURES=0"
+      ]
+    },
+    "2_import": {
+      "exit_code": 0,
+      "errors": 0,
+      "warnings": 0,
+      "result_lines": []
+    },
+    "2_run.gd": {
+      "exit_code": 0,
+      "errors": 0,
+      "warnings": 0,
+      "result_lines": [
+        "EXPORT_SCOPE_CHECKS=100 FAILURES=0"
+      ]
+    }
+  },
+  "immutable_functions": {
+    "save_document": "8664801a88306a5bccbc614626d44778190567a906fdba5bf9a74601fc0800e1",
+    "render_preview": "6a35a74dd3be9761420811caf42a994554188826fac90e52c30d66e5787d88e8",
+    "_choose_export": "21439d6ef63bed85581f432f76c6ff1b4155ea8cc4d0578e56e2581c91431aed",
+    "bounce_track": "69203d21e56ddbf36b6416c93b21805bdcb39a9493e354cce7940f9cabe41e6d",
+    "_stem_destination": "547384208feddbbe068f283fd8f875a9b106f2e05c8b8c9f804d3e19c23e3e37"
+  },
+  "pass": true
+}

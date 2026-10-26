@@ -1,0 +1,8 @@
+{
+  "pass": true,
+  "checks": 25,
+  "steps": 5,
+  "all76_before_after_exact": true,
+  "cloud_fixture_only": true,
+  "max_payload_bytes": 66339
+}

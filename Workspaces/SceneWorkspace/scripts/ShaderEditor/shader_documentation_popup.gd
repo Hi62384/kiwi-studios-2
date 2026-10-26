@@ -2,6 +2,13 @@ class_name ShaderDocumentationPopup
 extends PopupPanel
 ## Searchable shader reference with copyable, ready-to-use examples.
 
+signal sample_open_requested(entry: Dictionary)
+const SampleBrowser = preload("res://Workspaces/ShaderWorkspace/shader_sample_browser.gd")
+var sections := TabBar.new()
+var documentation_body: Control
+var sample_browser: Control
+var _page_root: VBoxContainer
+
 const ACCENT := Color("62e6c7")
 const ACCENT_SOFT := Color("203f42")
 const TEXT := Color("e8f0f5")
@@ -20,7 +27,7 @@ const TOPICS: Array[Dictionary] = [
 	{
 		"category": "PROCESSORS", "title": "Spatial fragment()", "tag": "SPATIAL",
 		"summary": "Runs for each covered fragment and defines the material values consumed by Godot's lighting pipeline.",
-		"body": "Inputs include FRAGCOORD, FRONT_FACING, VIEW, UV/UV2, COLOR, NORMAL, TANGENT, BINORMAL, VERTEX, SCREEN_UV and POINT_COORD. The main outputs are ALBEDO, ALPHA, METALLIC, SPECULAR, ROUGHNESS, EMISSION, NORMAL_MAP, NORMAL_MAP_DEPTH, AO, AO_LIGHT_AFFECT, RIM, RIM_TINT, CLEARCOAT, CLEARCOAT_GLOSS, ANISOTROPY, ANISOTROPY_FLOW and DEPTH. Writing ALPHA moves the material into the transparent pipeline; ALPHA_SCISSOR_THRESHOLD performs opaque cutout instead.",
+		"body": "Inputs include FRAGCOORD, FRONT_FACING, VIEW, UV/UV2, COLOR, NORMAL, TANGENT, BINORMAL, VERTEX, SCREEN_UV and POINT_COORD. The main outputs are ALBEDO, ALPHA, METALLIC, SPECULAR, ROUGHNESS, EMISSION, NORMAL_MAP, NORMAL_MAP_DEPTH, AO, AO_LIGHT_AFFECT, RIM, RIM_TINT, CLEARCOAT, CLEARCOAT_ROUGHNESS, ANISOTROPY, ANISOTROPY_FLOW and DEPTH. Writing ALPHA moves the material into the transparent pipeline; ALPHA_SCISSOR_THRESHOLD performs opaque cutout instead.",
 		"code": "void fragment() {\n    ALBEDO = vec3(0.18, 0.55, 0.82);\n    METALLIC = 0.0;\n    ROUGHNESS = 0.65;\n    SPECULAR = 0.5;\n    EMISSION = vec3(0.0);\n}"
 	},
 	{
@@ -221,7 +228,7 @@ func _ready() -> void:
 	min_size = Vector2i(720, 500)
 	transparent_bg = false
 	borderless = false
-	title = "Shader Documentation"
+	title = "Shader Documentation, Samples & Templates"
 	add_theme_stylebox_override("panel", _style(SURFACE, BORDER, 1, 12, 0))
 
 	var margin := MarginContainer.new()
@@ -232,17 +239,42 @@ func _ready() -> void:
 	add_child(margin)
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var root := VBoxContainer.new()
+	_page_root = root
 	root.add_theme_constant_override("separation", 14)
 	margin.add_child(root)
 	root.add_child(_build_header())
-	root.add_child(_build_body())
+	sections.add_tab("Documentation")
+	sections.add_tab("Shader Samples")
+	sections.add_tab("Shader Templates")
+	sections.tab_changed.connect(_section_changed)
+	root.add_child(sections)
+	documentation_body = _build_body()
+	root.add_child(documentation_body)
 	search.text_changed.connect(_filter_topics)
 	_filter_topics("")
+	if not _filtered_indices.is_empty(): _select_topic(_filtered_indices[0])
 
 
 func open() -> void:
-	popup_centered_clamped(Vector2i(980, 700), 0.92)
+	popup_centered_clamped(Vector2i(1300, 850), 0.94)
 	search.grab_focus()
+
+
+func open_samples(templates: bool = false) -> void:
+	open()
+	sections.current_tab = 2 if templates else 1
+
+
+func _section_changed(index: int) -> void:
+	documentation_body.visible = index == 0
+	if index > 0 and sample_browser == null:
+		sample_browser = SampleBrowser.new()
+		sample_browser.templates_only = index == 2
+		sample_browser.open_requested.connect(func(entry: Dictionary): sample_open_requested.emit(entry))
+		_page_root.add_child(sample_browser)
+	if sample_browser != null:
+		sample_browser.visible = index > 0
+		if index > 0: sample_browser.set_templates(index == 2)
 
 
 func _build_header() -> Control:
@@ -498,7 +530,7 @@ func _show_empty_state(query: String) -> void:
 	heading.add_theme_color_override("font_color", TEXT)
 	content.add_child(heading)
 	var help := Label.new()
-	help.text = "Try a broader search than “%s”." % query
+	help.text = "Try a broader search than %s." % query
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	help.add_theme_color_override("font_color", MUTED)
 	content.add_child(help)

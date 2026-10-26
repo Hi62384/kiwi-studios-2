@@ -38,6 +38,10 @@ static func capture_local_mask(workspace: KiwiImageWorkspace,layer: KiwiImageLay
 	material.set_shader_parameter("row1",Vector3(inverse.x.y,inverse.y.y,inverse.z.y))
 	material.set_shader_parameter("row2",Vector3(inverse.x.z,inverse.y.z,inverse.z.z))
 	material.set_shader_parameter("mask_texture",ImageTexture.create_from_image(canvas.selection))
+	if layer.warp != null and layer.warp.enabled:
+		material.set_shader_parameter("warped", true)
+		material.set_shader_parameter("deformation", layer.warp.texture())
+		material.set_shader_parameter("field_size", Vector2(layer.warp.grid_size))
 	var extent:=layer.content_dimensions(); extent*=minf(1,2048/maxf(1,maxf(extent.x,extent.y)))
 	var target:=SubViewport.new(); target.disable_3d=true; target.transparent_bg=true; target.size=Vector2i(extent.ceil()).max(Vector2i.ONE); target.render_target_update_mode=SubViewport.UPDATE_ALWAYS; workspace.add_child(target)
 	var white:=Image.create(1,1,false,Image.FORMAT_RGBA8); white.fill(Color.WHITE)

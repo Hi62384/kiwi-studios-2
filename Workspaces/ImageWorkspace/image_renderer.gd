@@ -151,6 +151,7 @@ void fragment() {
 """
 
 class LayerDrawing extends Node2D:
+	signal source_changed
 	var layer: KiwiImageLayer
 	var text_detail:=1.0
 	var font: Font
@@ -234,6 +235,7 @@ class LayerDrawing extends Node2D:
 					noise=NoiseTexture2D.new()
 					noise.width=512; noise.height=512
 					noise.changed.connect(queue_redraw)
+					noise.changed.connect(func(): source_changed.emit())
 				if noise_key != p.hash():
 					noise_key=p.hash()
 					var generator:=FastNoiseLite.new()
@@ -262,12 +264,21 @@ var _export_display := TextureRect.new()
 var document: KiwiImageDocument
 var views: Dictionary = {}
 var _topology := ""
+var _live_signatures: Dictionary = {}
+var _dirty_layers: Dictionary = {}
+var _enabled := true
+var _settling_frames := 10
 var _shader := Shader.new()
 var _straight_shader := Shader.new()
 var render_scale := 1.0
 var exporting := false
 var preview_size:=Vector2i.ZERO
 var preview_transform:=Transform2D.IDENTITY
+var preview_interactive_limit := 2048
+var _preview_zoom := 1.0
+var _preview_origin := Vector2.ZERO
+var _interactive_preview := false
+var _refine_at_usec := 0
 
 
 func _ready() -> void:
@@ -292,6 +303,8 @@ func _ready() -> void:
 	composition_viewport.world_2d=viewport.world_2d
 	composition_viewport.render_target_update_mode=SubViewport.UPDATE_DISABLED
 	add_child(composition_viewport)
+	RenderingServer.frame_post_draw.connect(_settle_cached_layers)
+	set_process(false)
 
 
 func _surface(dimensions: Vector2i) -> SubViewport:
@@ -307,6 +320,10 @@ func _surface(dimensions: Vector2i) -> SubViewport:
 
 func sync(value: KiwiImageDocument) -> void:
 	document = value
+	if preview_size != Vector2i.ZERO and not exporting:
+		render_scale = _requested_preview_resolution()
+		preview_transform = Transform2D(0, _preview_origin).scaled_local(Vector2.ONE*_preview_zoom/render_scale)
+	_live_signatures.clear()
 	viewport.size = preview_size if preview_size!=Vector2i.ZERO and not exporting else Vector2i((Vector2(document.canvas_size)*render_scale).round().max(Vector2.ONE))
 	viewport.canvas_transform=preview_transform if not exporting else Transform2D.IDENTITY
 	export_viewport.size = viewport.size
@@ -315,6 +332,7 @@ func sync(value: KiwiImageDocument) -> void:
 	var topology := ""
 	for layer in document.layers:
 		topology += layer.id + layer.parent_id + layer.kind + str(layer.properties.get("effects_selection_only",false))+str(layer.warp!=null)
+		for region in layer.live_paint: topology += region.id + str(region.is_live())
 		for effect in layer.effects: topology += str(effect.get("id", "")) + str(effect.get("type", "")) + str(effect.get("shader", ""))
 	if topology != _topology:
 		_topology = topology
@@ -325,6 +343,7 @@ func sync(value: KiwiImageDocument) -> void:
 		for layer in document.children(): _build_layer(layer, viewport)
 	for layer in document.layers:
 		if views.has(layer.id): _update_layer(layer, views[layer.id])
+	_schedule_cached_layers()
 
 
 func _effect_stages(layer: KiwiImageLayer) -> Array:
@@ -343,7 +362,17 @@ func _effect_stages(layer: KiwiImageLayer) -> Array:
 func _build_layer(layer: KiwiImageLayer, parent: Node) -> void:
 	var target_size := Vector2i((_content_dimensions(layer)*render_scale).ceil()) + Vector2i.ONE * PAD * 2
 	var base := _surface(target_size)
+	var live_root := Node2D.new()
+	live_root.position = Vector2.ONE * PAD
+	base.add_child(live_root)
+	var live_views: Dictionary = {}
+	for region in layer.live_paint:
+		var display := Sprite2D.new()
+		display.centered = false
+		live_root.add_child(display)
+		live_views[region.id] = {"display":display,"signature":0}
 	var drawing := LayerDrawing.new()
+	drawing.source_changed.connect(invalidate_layer.bind(layer.id))
 	drawing.layer = layer
 	drawing.position = Vector2.ONE * PAD
 	base.add_child(drawing)
@@ -390,8 +419,17 @@ func _build_layer(layer: KiwiImageLayer, parent: Node) -> void:
 	root.add_child(direct_text)
 	var blending := CanvasItemMaterial.new()
 	output.material = blending
-	views[layer.id] = {"root":root,"output":output,"direct_text":direct_text,"base":base,"drawing":drawing,"stages":stages,"blend":blending,"signature":0,"allocated_dimensions":layer.dimensions}
-	for child in document.children(layer.id): _build_layer(child,root)
+	views[layer.id] = {"root":root,"output":output,"direct_text":direct_text,"base":base,"drawing":drawing,"stages":stages,"blend":blending,"signature":0,"allocated_dimensions":layer.dimensions,"live_root":live_root,"live_views":live_views}
+	# A group is composited before applying its mask, effects and opacity. Drawing
+	# each child directly under the output would apply group alpha per child and
+	# produce darker/less-transparent overlaps instead of a single group result.
+	if layer.kind == "group":
+		var content := Node2D.new()
+		content.position = Vector2.ONE * PAD
+		base.add_child(content)
+		for child in document.children(layer.id): _build_layer(child, content)
+	else:
+		for child in document.children(layer.id): _build_layer(child, root)
 
 
 func _update_layer(layer: KiwiImageLayer, view: Dictionary) -> void:
@@ -422,10 +460,12 @@ func _update_layer(layer: KiwiImageLayer, view: Dictionary) -> void:
 	view.base.size = target_size.max(Vector2i.ONE)
 	var raster_scale:=Vector2(target_size-Vector2i.ONE*PAD*2)/_content_dimensions(layer).max(Vector2.ONE)
 	view.drawing.layer = layer
+	_update_live_paint(layer, view)
 	if layer.properties.get("texture_material") is KiwiTextureMaterial:
 		view.drawing.material=preload("res://Workspaces/ImageWorkspace/texture_material_renderer.gd").material(layer.properties.texture_material,layer.dimensions,document.world_transform(layer))
 	else: view.drawing.material=null
 	view.drawing.scale = raster_scale if stable else Vector2.ONE * (1.0 if layer.kind=="group" else render_scale)
+	view.live_root.scale = view.drawing.scale
 	if stable:
 		view.output.scale=Vector2.ONE*render_scale/raster_scale
 		view.output.position=-Vector2.ONE*PAD*view.output.scale
@@ -520,8 +560,185 @@ func _update_layer(layer: KiwiImageLayer, view: Dictionary) -> void:
 	view.allocated_dimensions=layer.dimensions
 
 
+func invalidate_layer(layer_id: String) -> void:
+	# ImageTexture.update() may retain its identity during a brush gesture. The
+	# painter calls this explicitly; Resource.changed also covers other producers.
+	if document == null or not views.has(layer_id): return
+	_dirty_layers[layer_id] = true
+	var affected: Dictionary = {layer_id:true}
+	_propagate_render_dependencies(affected)
+	for id in affected:
+		if not views.has(id): continue
+		var view: Dictionary = views[id]
+		view.frames_left = _settling_frames
+		if _enabled: _set_layer_update_mode(view, SubViewport.UPDATE_ALWAYS)
+
+
+func _watch_source(resource: Resource, layer_id: String) -> void:
+	if resource == null: return
+	var callback := invalidate_layer.bind(layer_id)
+	if not resource.changed.is_connected(callback): resource.changed.connect(callback)
+
+
+func _source_stamp(value: Variant, layer_id: String) -> Variant:
+	if value is Dictionary:
+		var parts: Array = []
+		for key in value: parts.append(key); parts.append(_source_stamp(value[key], layer_id))
+		return hash(parts)
+	if value is Array:
+		var parts: Array = []
+		for item in value: parts.append(_source_stamp(item, layer_id))
+		return hash(parts)
+	if value is Resource:
+		_watch_source(value, layer_id)
+		if value is Shader: return hash(value.code)
+		if value is ActorObjectData: return _source_stamp(value.values, layer_id)
+		if value is KiwiTextureMaterial:
+			_watch_source(value.image, layer_id); _watch_source(value.mix_mask, layer_id)
+			if value.secondary != null: _source_stamp(value.secondary, layer_id)
+			return _live_material_signature(value)
+		if value is Curve:
+			var points: Array = [value.min_value, value.max_value]
+			for index in value.point_count:
+				points.append([value.get_point_position(index), value.get_point_left_tangent(index), value.get_point_right_tangent(index), value.get_point_left_mode(index), value.get_point_right_mode(index)])
+			return hash(points)
+	return value
+
+
+func _layer_source_stamp(layer: KiwiImageLayer) -> int:
+	var parts: Array = [layer.kind, layer.dimensions, layer.position, layer.rotation,
+		layer.opacity, layer.blend, layer.visible, layer.isolated, layer.clip_to_below,
+		document.isolation_allows(layer), document.world_transform(layer), render_scale,
+		_source_stamp(layer.texture, layer.id), _source_stamp(layer.mask, layer.id),
+		_source_stamp(layer.properties, layer.id), _source_stamp(layer.effects, layer.id)]
+	if layer.warp != null: parts.append([layer.warp, layer.warp.enabled, layer.warp.revision])
+	for region in layer.live_paint:
+		parts.append([region.id, region.template_id, region.mapping, region.opacity, region.coordinate_rect,
+			_source_stamp(region.coverage, layer.id), _source_stamp(region.coordinates, layer.id), _source_stamp(region.raster, layer.id)])
+		var template := document.live_material_for_id(region.template_id)
+		if template != null:
+			parts.append([template.visible, _source_stamp(template.material, layer.id)])
+	return hash(parts)
+
+
+func _animated_source(value: Variant) -> bool:
+	if value is KiwiTextureMaterial:
+		return _animated_source(value.image) or _animated_source(value.mix_mask) or _animated_source(value.secondary)
+	if value is AtlasTexture: return _animated_source(value.atlas)
+	if value is Texture2D:
+		return value is ViewportTexture or value.get_class() in ["AnimatedTexture", "CameraTexture", "ExternalTexture"]
+	if value is Dictionary:
+		for item in value.values():
+			if _animated_source(item): return true
+	if value is Array:
+		for item in value:
+			if _animated_source(item): return true
+	return false
+
+
+func _layer_needs_time(layer: KiwiImageLayer) -> bool:
+	if _animated_source(layer.texture) or _animated_source(layer.mask) or _animated_source(layer.properties): return true
+	for effect in layer.effects:
+		if not bool(effect.get("enabled", true)): continue
+		if _animated_source(effect.get("uniforms", {})): return true
+		if effect.get("shader") is Shader:
+			var code: String = effect.shader.code
+			# Includes may contain TIME or animated resources, so remain conservative.
+			if code.contains("TIME") or code.contains("#include") or code.contains("global uniform"): return true
+	for region in layer.live_paint:
+		if _animated_source(region.coverage) or _animated_source(region.raster) or _animated_source(region.coordinates): return true
+		var template := document.live_material_for_id(region.template_id)
+		if template != null and _animated_source(template.material): return true
+	return false
+
+
+func _propagate_render_dependencies(affected: Dictionary) -> void:
+	# Sources feed ancestor groups and clip-to-below siblings. Repeat because a
+	# clipped sibling can feed another clipped sibling or a containing group.
+	var changed := true
+	while changed:
+		changed = false
+		for layer in document.layers:
+			if not affected.has(layer.id): continue
+			var parent := document.layer_for_id(layer.parent_id)
+			var seen: Dictionary = {}
+			while parent != null and not seen.has(parent.id):
+				seen[parent.id] = true
+				if parent.kind == "group" and not affected.has(parent.id):
+					affected[parent.id] = true; changed = true
+				parent = document.layer_for_id(parent.parent_id)
+			var siblings := document.children(layer.parent_id)
+			var next := siblings.find(layer) + 1
+			if next > 0 and next < siblings.size() and siblings[next].clip_to_below and not affected.has(siblings[next].id):
+				affected[siblings[next].id] = true; changed = true
+
+
+func _schedule_cached_layers() -> void:
+	var dynamic: Dictionary = {}
+	_settling_frames = 8
+	var dependency_frames: Dictionary = {}
+	for layer in document.layers:
+		if not views.has(layer.id): continue
+		var view: Dictionary = views[layer.id]
+		var signature := _layer_source_stamp(layer)
+		if int(view.get("cache_signature", -1)) != signature:
+			view.cache_signature = signature; _dirty_layers[layer.id] = true
+		if _layer_needs_time(layer): dynamic[layer.id] = true
+		_settling_frames = maxi(_settling_frames, _render_dependency_frames(layer, dependency_frames, {}) + 3)
+	_propagate_render_dependencies(_dirty_layers)
+	_propagate_render_dependencies(dynamic)
+	for id in views:
+		var view: Dictionary = views[id]
+		view.dynamic = dynamic.has(id)
+		if _dirty_layers.has(id): view.frames_left = _settling_frames
+		var render: bool = _enabled and (exporting or bool(view.dynamic) or int(view.get("frames_left", 0)) > 0)
+		_set_layer_update_mode(view, SubViewport.UPDATE_ALWAYS if render else SubViewport.UPDATE_DISABLED)
+	_dirty_layers.clear()
+
+
+func _render_dependency_frames(layer: KiwiImageLayer, memo: Dictionary, seen: Dictionary) -> int:
+	if memo.has(layer.id): return int(memo[layer.id])
+	if seen.has(layer.id) or not views.has(layer.id): return 0
+	seen = seen.duplicate(); seen[layer.id] = true
+	var view: Dictionary = views[layer.id]
+	var passes: int = view.stages.size() + 1
+	for stage in view.stages:
+		if stage.input_viewport != null: passes += 1
+	var dependency := 0
+	if layer.kind == "group":
+		for child in document.children(layer.id):
+			dependency = maxi(dependency, _render_dependency_frames(child, memo, seen))
+	if layer.clip_to_below:
+		var siblings := document.children(layer.parent_id)
+		var previous := siblings.find(layer) - 1
+		if previous >= 0: dependency = maxi(dependency, _render_dependency_frames(siblings[previous], memo, seen))
+	memo[layer.id] = passes + dependency
+	return passes + dependency
+
+
+func _set_layer_update_mode(view: Dictionary, mode: int) -> void:
+	view.base.render_target_update_mode = mode
+	for stage in view.stages:
+		stage.viewport.render_target_update_mode = mode
+		if stage.input_viewport != null: stage.input_viewport.render_target_update_mode = mode
+
+
+func _settle_cached_layers() -> void:
+	if not _enabled: return
+	for view in views.values():
+		if view.base.render_target_update_mode != SubViewport.UPDATE_DISABLED:
+			view.frames_rendered = int(view.get("frames_rendered", 0)) + 1
+		if exporting: continue
+		if bool(view.get("dynamic", false)): continue
+		var frames := int(view.get("frames_left", 0))
+		if frames <= 0: continue
+		view.frames_left = frames - 1
+		if frames == 1: _set_layer_update_mode(view, SubViewport.UPDATE_DISABLED)
+
+
 func sync_transforms(value: KiwiImageDocument) -> void:
 	document=value
+	_live_signatures.clear()
 	for layer in document.layers:
 		if not views.has(layer.id): continue
 		var view: Dictionary=views[layer.id]
@@ -529,12 +746,18 @@ func sync_transforms(value: KiwiImageDocument) -> void:
 			view.stable_text_surface=true
 			_update_layer(layer,view)
 			continue
+		if layer.kind == "group":
+			# Group resize already resizes its children in the document. Resize the
+			# containing source without scaling its composed output a second time.
+			_update_layer(layer, view)
+			continue
 		var transform:=layer.local_transform(); transform.origin*=render_scale; view.root.transform=transform
 		var allocated: Vector2=view.get("allocated_dimensions",layer.dimensions)
 		var preview_scale:=layer.dimensions/allocated.max(Vector2.ONE)
 		view.output.scale=preview_scale
 		view.output.position=-Vector2.ONE*PAD*preview_scale
 		view.output.modulate=Color(layer.opacity,layer.opacity,layer.opacity,layer.opacity) if layer.blend==0 else Color(1,1,1,layer.opacity)
+	_schedule_cached_layers()
 
 
 func texture() -> Texture2D:
@@ -551,9 +774,188 @@ func _content_dimensions(layer: KiwiImageLayer) -> Vector2:
 	return layer.content_dimensions()
 
 
+func _update_live_paint(layer: KiwiImageLayer, view: Dictionary) -> void:
+	for region in layer.live_paint:
+		var region_view: Dictionary = view.live_views.get(region.id, {})
+		if region_view.is_empty(): continue
+		var display: Sprite2D = region_view.display
+		display.modulate = Color(1, 1, 1, region.opacity)
+		if not region.is_live():
+			display.texture = region.raster
+			display.material = null
+			display.visible = region.raster != null
+		else:
+			var template := document.live_material_for_id(region.template_id)
+			display.visible = template != null and template.visible and template.material != null and region.coverage != null
+			if not display.visible: continue
+			display.texture = region.coverage
+			# Template mutations replace the independent instance; an unchanged
+			# template reuses the compiled shader and its material across frames.
+			if not _live_signatures.has(template.id): _live_signatures[template.id] = _live_material_signature(template.material)
+			var signature := hash([_live_signatures[template.id], region.coverage, region.coordinates, region.coordinate_rect, region.mapping, region.opacity, layer.dimensions])
+			if int(region_view.signature) != signature:
+				region_view.signature = signature
+				var material := template.material.copy_material()
+				material.coverage = region.coverage
+				if material.alignment == "stroke": material.alignment = "canvas"
+				display.material = preload("res://Workspaces/ImageWorkspace/texture_material_renderer.gd").material(material, layer.dimensions, region.mapping)
+				(display.material as ShaderMaterial).set_shader_parameter("coverage_opacity", region.opacity)
+				(display.material as ShaderMaterial).set_shader_parameter("has_coordinate_map", region.coordinates != null)
+				(display.material as ShaderMaterial).set_shader_parameter("coordinate_map", region.coordinates)
+				(display.material as ShaderMaterial).set_shader_parameter("coordinate_rect", Vector4(region.coordinate_rect.position.x, region.coordinate_rect.position.y, region.coordinate_rect.size.x, region.coordinate_rect.size.y))
+			display.modulate = Color.WHITE
+		if display.texture != null:
+			display.scale = layer.dimensions / display.texture.get_size().max(Vector2.ONE)
+
+
+func _live_material_signature(material: KiwiTextureMaterial) -> int:
+	# Also tolerate scripts/inspectors editing an instance in place. The active UI
+	# usually replaces it for undo, but a Resource identity alone misses such edits.
+	return hash([material.material_id, material.parameters, material.image,
+		material.texture_size, material.rotation, material.alignment,
+		material.mapping_origin, material.tint_strength, material.tiling,
+		material.blending, material.mix_amount, material.mix_distribution,
+		material.mix_mask, material.relief, material.relief_softness,
+		material.light_direction, material.highlight, material.shadow,
+		_live_material_signature(material.secondary) if material.secondary != null else 0])
+
+
+func source_image(layer: KiwiImageLayer) -> Image:
+	# Bucket detection needs the entire ordered source, not the transparent top
+	# raster left available for subsequent Color strokes. Effects remain external.
+	if document == null or layer == null: return null
+	if layer.live_paint.is_empty():
+		return layer.texture.get_image() if layer.texture != null else null
+	if not is_equal_approx(render_scale, 1.0):
+		# Bucket tolerance must inspect native pixels, not a resampled screen
+		# preview. Isolate this source so other large layers need no full-size pass.
+		var native_document := KiwiImageDocument.new()
+		native_document.canvas_size = Vector2i(layer.dimensions.ceil())
+		native_document.live_materials = document.live_materials
+		var native_layer := layer.copy_layer()
+		native_layer.parent_id = ""
+		var source_frame := document.world_transform(layer)
+		var half := layer.dimensions*.5
+		native_layer.position = source_frame.origin-half+source_frame.basis_xform(half)
+		native_layer.rotation = 0.0
+		native_layer.properties.basis_x = source_frame.x
+		native_layer.properties.basis_y = source_frame.y
+		native_layer.properties.flip_x = false
+		native_layer.properties.flip_y = false
+		native_layer.effects.clear()
+		native_layer.mask = null
+		native_layer.clip_to_below = false
+		native_document.layers.append(native_layer)
+		var native_renderer := KiwiImageRenderer.new()
+		get_tree().root.add_child(native_renderer)
+		native_renderer.sync(native_document)
+		var native_pixels: Image = await native_renderer.source_image(native_layer)
+		native_renderer.queue_free()
+		return native_pixels
+	var source_document := document
+	sync(document)
+	if not views.has(layer.id): return null
+	for frame in 3: await RenderingServer.frame_post_draw
+	if document != source_document or not views.has(layer.id) or document.layer_for_id(layer.id) != layer: return null
+	var base: SubViewport = views[layer.id].base
+	var pixels := base.get_texture().get_image()
+	if pixels == null or pixels.is_empty(): return null
+	pixels = pixels.get_region(Rect2i(Vector2i.ONE * PAD, base.size - Vector2i.ONE * PAD * 2))
+	var native_size := Vector2i(layer.texture.get_size()) if layer.texture != null else Vector2i(layer.dimensions.ceil())
+	if pixels.get_size() != native_size:
+		pixels.resize(native_size.x, native_size.y, Image.INTERPOLATE_BILINEAR)
+	pixels.convert(Image.FORMAT_RGBA8)
+	var bytes := pixels.get_data()
+	for index in range(0, bytes.size(), 4):
+		var alpha := int(bytes[index + 3])
+		if alpha == 0: continue
+		for channel in 3: bytes[index + channel] = clampi(roundi(float(bytes[index + channel]) * 255.0 / alpha), 0, 255)
+	pixels.set_data(native_size.x, native_size.y, false, Image.FORMAT_RGBA8, bytes)
+	return pixels
+
+
+func bake_live_material(template_id: String) -> bool:
+	# Render all replacements before mutating the document. A failed GPU readback
+	# leaves every live region intact and the caller's undo transaction can cancel.
+	if document == null: return false
+	var target_document := document
+	var template := target_document.live_material_for_id(template_id)
+	if template == null or template.material == null: return false
+	# Visibility belongs to the live template, not to the containing raster layer.
+	# Refuse to silently discard hidden coverage while converting ownership.
+	if not template.visible: return false
+	var expected_material := _live_material_signature(template.material)
+	var replacements: Array[Dictionary] = []
+	for layer in target_document.layers:
+		for region in layer.live_paint:
+			if region.template_id != template_id or region.coverage == null: continue
+			var material := template.material.copy_material()
+			material.coverage = region.coverage
+			if material.alignment == "stroke": material.alignment = "canvas"
+			var pixels: Image = await preload("res://Workspaces/ImageWorkspace/texture_material_renderer.gd").preview(self, material, Vector2i(region.coverage.get_size()), layer.dimensions, region.mapping, region.coordinates, region.coordinate_rect)
+			if pixels == null or pixels.is_empty() or document != target_document: return false
+			# A GPU compilation/allocation failure can yield a valid but blank image.
+			# Do not discard nonempty, visibly colored coverage in that case.
+			if material.image == null and not pixels.get_used_rect().has_area():
+				var primary: Color = material.parameters.get("primary", Color.WHITE)
+				var secondary: Color = material.parameters.get("secondary", Color.WHITE)
+				var mask_image := region.coverage.get_image()
+				if maxf(primary.a, secondary.a) > 0.0 and mask_image != null and mask_image.get_used_rect().has_area(): return false
+			replacements.append({"layer":layer,"region":region,"texture":ImageTexture.create_from_image(pixels)})
+	# Async rendering can span UI events. Never bake stale settings or resurrect a
+	# region deleted while the GPU was working, even when the document is the same.
+	if target_document.live_material_for_id(template_id) != template or _live_material_signature(template.material) != expected_material: return false
+	for replacement in replacements:
+		if not target_document.layers.has(replacement.layer) or not replacement.layer.live_paint.has(replacement.region): return false
+	for replacement in replacements:
+		var region: KiwiLivePaintRegion = replacement.region
+		region.raster = replacement.texture
+		region.coverage = null
+		region.coordinates = null
+		region.template_id = ""
+	# There are no linked regions left, so removal cannot delete the baked pixels.
+	target_document.delete_live_material(template_id)
+	for layer in target_document.layers: _collapse_baked_paint(layer)
+	sync(target_document)
+	return true
+
+
+func _collapse_baked_paint(layer: KiwiImageLayer) -> void:
+	# Once a layer contains only raster segments, restore a normal editable bitmap.
+	# With another live template present, retain segment order around its coverage.
+	if layer.live_paint.is_empty(): return
+	for region in layer.live_paint:
+		if region.is_live(): return
+	var size := Vector2i(layer.texture.get_size()) if layer.texture != null else Vector2i(layer.dimensions.ceil())
+	var pixels := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
+	pixels.fill(Color(0, 0, 0, 0))
+	for region in layer.live_paint:
+		if region.raster == null: continue
+		var source := region.raster.get_image()
+		if source == null: continue
+		source = source.duplicate()
+		if source.get_size() != size: source.resize(size.x, size.y, Image.INTERPOLATE_BILINEAR)
+		source.convert(Image.FORMAT_RGBA8)
+		if not is_equal_approx(region.opacity, 1.0):
+			var data := source.get_data()
+			for index in range(3, data.size(), 4): data[index] = roundi(float(data[index]) * region.opacity)
+			source.set_data(size.x, size.y, false, Image.FORMAT_RGBA8, data)
+		pixels.blend_rect(source, Rect2i(Vector2i.ZERO, size), Vector2i.ZERO)
+	if layer.texture != null:
+		var top := layer.texture.get_image()
+		if top != null: pixels.blend_rect(top, Rect2i(Vector2i.ZERO, size), Vector2i.ZERO)
+	layer.texture = ImageTexture.create_from_image(pixels)
+	layer.paint_base = layer.texture
+	layer.live_paint.clear()
+
+
 func set_enabled(enabled: bool) -> void:
-	for child in get_children():
-		if child is SubViewport: child.render_target_update_mode = SubViewport.UPDATE_ALWAYS if enabled else SubViewport.UPDATE_DISABLED
+	_enabled = enabled
+	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if enabled else SubViewport.UPDATE_DISABLED
+	export_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if enabled else SubViewport.UPDATE_DISABLED
+	for view in views.values():
+		var render: bool = enabled and (exporting or bool(view.get("dynamic", false)) or int(view.get("frames_left", 0)) > 0)
+		_set_layer_update_mode(view, SubViewport.UPDATE_ALWAYS if render else SubViewport.UPDATE_DISABLED)
 	composition_viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS if enabled and _composition_enabled else SubViewport.UPDATE_DISABLED
 
 
@@ -592,12 +994,61 @@ func set_preview_scale(requested: float) -> void:
 		var world:=document.world_transform(layer)
 		var detail:=maxf(1,requested*maxf(world.x.length(),world.y.length()))
 		if not is_equal_approx(drawing.text_detail,detail): drawing.text_detail=detail; drawing.queue_redraw()
+	_apply_preview_resolution()
+
+
+func set_interactive_preview(active: bool) -> void:
+	if _interactive_preview == active: return
+	_interactive_preview = active
+	if active:
+		_refine_at_usec = 0
+		set_process(false)
+		_apply_preview_resolution()
+	else:
+		# Keep the economical resolution through rapid slider edits, then refine
+		# only when the user pauses. Native coverage/resources are never resized.
+		_refine_at_usec = Time.get_ticks_usec() + 350000
+		set_process(true)
+
+
+func _process(_delta: float) -> void:
+	if _refine_at_usec == 0 or _interactive_preview: set_process(false); return
+	if exporting or Time.get_ticks_usec() < _refine_at_usec: return
+	_refine_at_usec = 0
+	set_process(false)
+	_apply_preview_resolution()
+
+
+func _apply_preview_resolution() -> void:
+	if exporting or document == null or preview_size == Vector2i.ZERO: return
+	var desired := _requested_preview_resolution()
+	if is_equal_approx(desired, render_scale): return
+	render_scale = desired
+	preview_transform = Transform2D(0, _preview_origin).scaled_local(Vector2.ONE*_preview_zoom/render_scale)
+	sync(document)
+
+
+func _requested_preview_resolution() -> float:
+	# Power-of-two tiers avoid reallocating render targets at every wheel tick.
+	var desired := clampf(pow(2.0, ceil(log(maxf(.0625, _preview_zoom))/log(2.0))), .0625, 1.0)
+	if _interactive_preview or _refine_at_usec != 0:
+		var extent := maxf(document.canvas_size.x, document.canvas_size.y)
+		for layer in document.layers:
+			var size := _content_dimensions(layer)
+			extent = maxf(extent, maxf(size.x, size.y))
+		desired = minf(desired, float(preview_interactive_limit)/maxf(1.0, extent))
+	return desired
 
 
 func set_preview_camera(dimensions: Vector2, origin: Vector2, zoom: float) -> void:
 	if exporting: return
+	if preview_size == Vector2i.ZERO or not is_equal_approx(_preview_zoom, zoom):
+		_refine_at_usec = Time.get_ticks_usec() + 350000
+		set_process(true)
 	preview_size=Vector2i(dimensions.ceil()).max(Vector2i.ONE)
-	preview_transform=Transform2D(0,origin).scaled_local(Vector2.ONE*zoom)
+	_preview_zoom = maxf(.001, zoom)
+	_preview_origin = origin
+	preview_transform=Transform2D(0,origin).scaled_local(Vector2.ONE*_preview_zoom/render_scale)
 	viewport.size=preview_size
 	viewport.canvas_transform=preview_transform
 	set_preview_scale(zoom)

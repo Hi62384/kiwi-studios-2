@@ -1,0 +1,389 @@
+﻿{
+    "format":  "kiwi-fixed-source-snapshot.v1",
+    "project":  "kiwi-studios-2",
+    "created_utc":  "2026-10-14T20:26:08.6601144Z",
+    "file_count":  76,
+    "total_size_bytes":  959215,
+    "files":  [
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_analysis.gd",
+                      "size_bytes":  16900,
+                      "sha256":  "f2cd58ddf6dc5764f6ccb4ef3ecac5f518ad0babd661c8b45791a4ed333609da"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_asset_index.gd",
+                      "size_bytes":  13962,
+                      "sha256":  "d89f20a8e67871111b0a971a9217677e4b59b3819d2cb271d4cae773044aa051"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_automation_canvas.gd",
+                      "size_bytes":  7465,
+                      "sha256":  "b1a0ff719df3bc403e0f639a1ecb4ad5eb6ff9a6a05ad6d16b532c79ad52d353"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_automation_lane.gd",
+                      "size_bytes":  7084,
+                      "sha256":  "6a6b0d15c7714cfa55124242fd5f79eb804c3adbc363a04e21fbd27a0d79b277"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_automation_recording.gd",
+                      "size_bytes":  15276,
+                      "sha256":  "234206401f886269742f5be204c088de229eff7c58d052a22fe2173aaf8de04b"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_composer.gd",
+                      "size_bytes":  29114,
+                      "sha256":  "3fab23906d70ca0948af6a217bcba89d22b11092a965ad35c9b23c3b678b0af3"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_composer_controls.gd",
+                      "size_bytes":  11942,
+                      "sha256":  "25a256bf8ccd1f3842c0ce434575c878c3f482e4c03db7baaa8bb731b4aee718"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_conductor.gd",
+                      "size_bytes":  6701,
+                      "sha256":  "89cecfd1ffa18cc632d182f9e3871054fa83f62dd629754c154b45bd5bead601"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_conductor_controls.gd",
+                      "size_bytes":  8760,
+                      "sha256":  "8bea7989adf3dc6712531c048db84091aaaa3f9456e2d669c15014aa72353a5e"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_document.gd",
+                      "size_bytes":  16136,
+                      "sha256":  "35cd8906dd0fc4e3679a5071892161d3de1024d140173a467011574283b9ae99"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_doppler.gd",
+                      "size_bytes":  13897,
+                      "sha256":  "ca124e87f11f2f18484e1f9bf5ec9335d552c7b9186b9bc275c85875c0a273cd"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_edit_session.gd",
+                      "size_bytes":  32054,
+                      "sha256":  "00839e99a7c24db48470f78706a079bea11d7e6a14c16a375ab7831966811109"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_effects.gd",
+                      "size_bytes":  31356,
+                      "sha256":  "4e943f1b112732a0de28129850a12febdf92032a8d027687b2a452a7a05a0d87"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_file_preview.gd",
+                      "size_bytes":  9232,
+                      "sha256":  "6486addf63a94bf7ec29c812c1604d13d5bd0034c490a941c9f49adeac766a07"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_impulse.gd",
+                      "size_bytes":  3710,
+                      "sha256":  "df39ecf6338318649c9763fc7cee59b472d991de2a9adcc975c48970d28c09fd"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_instruments.gd",
+                      "size_bytes":  20189,
+                      "sha256":  "c83face77954fbfb35930313af1c9b6bf6513074ce3e7391ad60cadd57fb61f1"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_jobs.gd",
+                      "size_bytes":  2427,
+                      "sha256":  "250325cc0192b23ca06dd639765032d692865c323c33190b2ef57153cc23ad44"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_library.gd",
+                      "size_bytes":  19194,
+                      "sha256":  "ebd2bf516c9a6e6cabef0c5ca8979e74878d15e26d98d5d8db427533643bc012"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_midi.gd",
+                      "size_bytes":  25126,
+                      "sha256":  "f02c78ae849e023f7ed497c8051d002d9ca450b2dc5c2c8989b62fce1af9909c"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_midi_timeline.gd",
+                      "size_bytes":  10704,
+                      "sha256":  "c7ac8bffb077e4e83ea177f26c04d21908e185d49e971c9a086a6c6b8e3c83a5"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_pattern_canvas.gd",
+                      "size_bytes":  11388,
+                      "sha256":  "1fc4b397c6f7d2ae8dcf4189b0924e43a0731b2d3945e76841dc752d3132678a"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_pcm_file.gd",
+                      "size_bytes":  3990,
+                      "sha256":  "68902ff97f8608015680c29298f50c3937d6c93fef2dfad27ce75162dbeeecc5"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_playback.gd",
+                      "size_bytes":  13559,
+                      "sha256":  "2c68d3c36d13d21642e05127ab007930a1ef995b0a8244248907f6ce063f0d96"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_preset.gd",
+                      "size_bytes":  14422,
+                      "sha256":  "f083ebf4e8f550752d8e09d05c03321ff394ab0e5d77e3cd7016f912b79d3a37"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_provider.gd",
+                      "size_bytes":  796,
+                      "sha256":  "3ee6dcc69dbe9bfc6e486a97cf8e520b1edb97fd8eeeb7c67eb648a3bf56ad3f"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_provider_service.gd",
+                      "size_bytes":  3211,
+                      "sha256":  "6ea885ccad3c50ff186eeefe9596f3258fd5dd18212b1fab686c65b0609ace25"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_recording_prepare.gd",
+                      "size_bytes":  4979,
+                      "sha256":  "3f4871dbc7f9ae024be1b9ce6d74db64ab85339b39dbfc137b408144c0750aee"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_region_edit.gd",
+                      "size_bytes":  13855,
+                      "sha256":  "b9711c5bf8ae447ccb2388f22f17f37b8c94c50e2c957495ec84730009ad7cb0"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_renderer.gd",
+                      "size_bytes":  39771,
+                      "sha256":  "6f42c49dd2e2a9b3d4e169d363acd59ed3e83e3ba83c50c2f7da802ab0476d52"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_source_cache.gd",
+                      "size_bytes":  13492,
+                      "sha256":  "13be57e05a8ba5ef6fd8cfb5b8b7a3776cdf59ad22950b5baeeac5ce696a3227"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_step_controls.gd",
+                      "size_bytes":  6566,
+                      "sha256":  "b1710ce73d7a834bb7c4405360b0d392f47732da01e1601c55f0fd0bbaccc842"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_synthesis.gd",
+                      "size_bytes":  28625,
+                      "sha256":  "e9589c58aa0290f62914c02c78940fc73976585a6d5492e9a06f1f4310b6a4a8"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_templates.gd",
+                      "size_bytes":  4350,
+                      "sha256":  "6d76752b0b3c4847e74564f0c65e3893b8ff30f9eeef262b9ea00dbd79ac3b28"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_tempo_map.gd",
+                      "size_bytes":  11617,
+                      "sha256":  "ec25e892a6f1e6870d101cf893bd4cc8344928f45507f43b8fcbb8b3d9afa45b"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_timeline_canvas.gd",
+                      "size_bytes":  24308,
+                      "sha256":  "24b2dc63ac9bd3fb67bcf143fce32081952703e4b6c0630bd3e6f702a93df4b2"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_waveform_canvas.gd",
+                      "size_bytes":  5838,
+                      "sha256":  "9afe2b58948f17ffb63ee27762ee6e4c22cca93b05478d80b8a2c98c204a35d1"
+                  },
+                  {
+                      "path":  "Workspaces/AudioWorkspace/audio_workspace.gd",
+                      "size_bytes":  189741,
+                      "sha256":  "8a3460a540374162be3ef8febd0eb85c72b1336791e1b5ba04873ac4d3c3459e"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_animation.gd",
+                      "size_bytes":  3976,
+                      "sha256":  "230be8adea83ecaa9b72a8ff49157227b2864550ca6f9107e94dd48690302e33"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_animation_track.gd",
+                      "size_bytes":  2942,
+                      "sha256":  "6fba4af79f1516aa8885bdcecf06d6a485514885b51b23622369fa29734ecdbe"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_audio.gd",
+                      "size_bytes":  20285,
+                      "sha256":  "f662ae1c5ee9358ec6cff79d6dcce5792c4120f6312afce2ecba8abfce3cc249"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_audio_recorder.gd",
+                      "size_bytes":  9394,
+                      "sha256":  "bc74709880e14b521e2d9205c46fd0533b5068a6117fa16aef600ef8c10effa2"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_audio_system.gd",
+                      "size_bytes":  6807,
+                      "sha256":  "3ab86204357d7e48f227c3d3e0616ec5d0bc7a2e52f16f1972496f31804d699e"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_catalog.gd",
+                      "size_bytes":  506,
+                      "sha256":  "5bab9de6aeb4c391a48b774ba1b6d3d2fb8b930940311ab9aaae08af98310d0b"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_clip.gd",
+                      "size_bytes":  847,
+                      "sha256":  "dba367eda75df9e6178ab72577738f4e572c3f71a9d2eb09d48a223cf0969707"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_data.gd",
+                      "size_bytes":  2483,
+                      "sha256":  "741585078f9229059d658cd0fcbd77a60fb9952cda4ca718ec09c1e63d77a2f6"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_definition.gd",
+                      "size_bytes":  2188,
+                      "sha256":  "f9317458c362bd7aa8369f63c9ccefd804c2fb71412f265663bcc9516aacdb69"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_dimension_dialog.gd",
+                      "size_bytes":  1816,
+                      "sha256":  "e4ed657acb21fbd303447fa3e6e5f75e87afea2209644c04a8acc184f573e3c7"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_file_import.gd",
+                      "size_bytes":  5005,
+                      "sha256":  "daaa2dc5a954fd7b3739c7884c92fb95b6096b2210f9affbfe04817f7cf6a360"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_font_picker.gd",
+                      "size_bytes":  4246,
+                      "sha256":  "ddcc56cd7efb1fb0350ec7c721405eabe40970d746466ed5b637101fe7591d50"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_image_generator.gd",
+                      "size_bytes":  4020,
+                      "sha256":  "ccf95e1741c8d7b45e32af6656020e6dec367a2e61163f3d4b0257ebb7939e59"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_inspector_state.gd",
+                      "size_bytes":  1843,
+                      "sha256":  "448205fcaf995ab9a3437cde865f98cd394a612a9b97c812919a67eefe1f8a98"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_keyframe.gd",
+                      "size_bytes":  950,
+                      "sha256":  "322d04d3cc310941b59c64ba8884f65b1d0285dfef6cd3c3aef2c840cb63789e"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_media_export.gd",
+                      "size_bytes":  5875,
+                      "sha256":  "727e014bc3d6938cfbad410e0a434cdcf56d6788d7f9ab45130534fe9c11b86b"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_media_preview.gd",
+                      "size_bytes":  2729,
+                      "sha256":  "5bb83ab4d7e4d4d9cc63a081083fd1f787bce4028258ee1dbb70f4f170277894"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_object_data.gd",
+                      "size_bytes":  749,
+                      "sha256":  "eebd38ab1c5f9dcea836254689ef6bb5b8b28200849966ad477a92e986792bab"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_object_definition.gd",
+                      "size_bytes":  1526,
+                      "sha256":  "3e03f8275f48eb4f7abb54cc5ea1d503c2ed79ab3f9ba5e5bd2ea14890526bb1"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_object_reference.gd",
+                      "size_bytes":  1799,
+                      "sha256":  "3916fc31bcac494536cd64176ab1f6cc140ed498c4340efa8b5a3157f2883022"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_project_file_picker.gd",
+                      "size_bytes":  20532,
+                      "sha256":  "5429ae9b84053f753164ac74378370ca9870083170b0c22234bec3bf27ed4571"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_project_resource_save_dialog.gd",
+                      "size_bytes":  15033,
+                      "sha256":  "e98d6f6e8357252c3f6580f95eff4ecbb105a869489e80fb9f15809a7126d672"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_property.gd",
+                      "size_bytes":  3495,
+                      "sha256":  "c5f798d381a3b7f4227058eea14492abbc24822d2f7c76a4a6beab965d742208"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_property_batch.gd",
+                      "size_bytes":  4134,
+                      "sha256":  "52a07f7a8ff3271cfab5fed684b31f8d288ed873e543a8dbff0d38fcab7db60d"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_registry.gd",
+                      "size_bytes":  2145,
+                      "sha256":  "58ac0f6a4df6d4972d4a0583479936e1a5e07866d6f4352bb7274a60e1b410d0"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_resource_slot.gd",
+                      "size_bytes":  1618,
+                      "sha256":  "b89b9f6cc35e8f630aca4c5d40cc87430edafe717315956c5a53b027a6df60d3"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_runtime.gd",
+                      "size_bytes":  2301,
+                      "sha256":  "5a96b863c12910208aab53034bd70575f652ac39a6fdd11dff53be6199f81a53"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_scene_data.gd",
+                      "size_bytes":  1309,
+                      "sha256":  "a35e3e4d03e8a0f47563aeffeb871163949266e06e139dbf72cc4b41e1c1ad10"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_scene_exporter.gd",
+                      "size_bytes":  11803,
+                      "sha256":  "3f653cece353f7f9d02edf5aae18e44ce17748eacb53151f19f2a852972c93e3"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_screen_recorder.gd",
+                      "size_bytes":  7633,
+                      "sha256":  "325397d283b3829a438db37a6008110d989bf53982a809f4fdabb2cf4a9f1ec9"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_section.gd",
+                      "size_bytes":  207,
+                      "sha256":  "92cf014cc0c670b40fa4889655a997f63015c905a37da433d9f3ef0aac942381"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_shader_time.gd",
+                      "size_bytes":  2340,
+                      "sha256":  "c7a98022f1baeae49271e0f08c7683841ea01834f2b3f81e03c5b40575a5fb53"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_text_settings.gd",
+                      "size_bytes":  2108,
+                      "sha256":  "f4bb5c1e49a2fb0a21863bd372c511c50078abd652ab8e9f72bb5a61a74350de"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_timeline.gd",
+                      "size_bytes":  81454,
+                      "sha256":  "a13e4252c2e3f0ca58d9140af46dab67f3061eef851d1c3d3cf55095c528d486"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_ui_gizmo.gd",
+                      "size_bytes":  14715,
+                      "sha256":  "4a3a7aaf789fa207e9518b8890e349f6d04bdaa2f81e056ec6b7d369a6b80453"
+                  },
+                  {
+                      "path":  "scripts/actors/core/actor_video.gd",
+                      "size_bytes":  5791,
+                      "sha256":  "24d3300e5293352d26314a3000e4e8072e531ad4da26c5b69b60b8cedcd83f33"
+                  },
+                  {
+                      "path":  "scripts/actors/core/audio_encoder_process.gd",
+                      "size_bytes":  6940,
+                      "sha256":  "2e04e687021e70f5a86acbf93d299ee36cdbe35bcdd9263b1d2c9ef3760ca971"
+                  },
+                  {
+                      "path":  "scripts/actors/core/editor_audio_settings.gd",
+                      "size_bytes":  801,
+                      "sha256":  "05543b68c7a090809d74262c96743920cd15b0e0c7f94ea2f45095831a90f4a9"
+                  },
+                  {
+                      "path":  "scripts/actors/core/windows_system_audio.gd",
+                      "size_bytes":  3133,
+                      "sha256":  "d1762626d6b66a52d1462a9ecbdc102533172728f2aadd889ad742ac1eb52442"
+                  }
+              ]
+}

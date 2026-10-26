@@ -1,0 +1,20 @@
+{
+    "batch":  "Kiwi/09_dry_overdub",
+    "archive_sha256":  "2e59c909aa76d804ffbe3f96aa663c6f2a8b07577ea8b9172d17e3d6841be400",
+    "patch_sha256":  "f2db7588e84bd361f8399d3cc262b9f465e96e2386c6d458ce52885297db7458",
+    "precondition_count":  76,
+    "postcondition_count":  76,
+    "backup":  "C:\\Users\\User1\\Documents\\GodotProjects\\kiwi-studios-2\\tools\\delivery_correctness_20261015\\backups\\batch09_dry_overdub_20261015_7c31e4d7e1e347469ecf13e44cc86664",
+    "targets":  [
+                    {
+                        "path":  "Workspaces/AudioWorkspace/audio_workspace.gd",
+                        "pre_sha256":  "a423439ad768080cc95b75e932b828119f52f53886ac0dbe6ad0becc6d46d8bd",
+                        "post_sha256":  "31a4da464aa801f5b4e7e4051a79286fa5916accb8ccc175e63d5b267a3dd8f7"
+                    },
+                    {
+                        "path":  "scripts/actors/core/actor_audio_recorder.gd",
+                        "pre_sha256":  "bc74709880e14b521e2d9205c46fd0533b5068a6117fa16aef600ef8c10effa2",
+                        "post_sha256":  "f7b17cfccb6a32da7cbe4aefb013b4d01d561f84a1bd7668b3402d92c654bcee"
+                    }
+                ]
+}
