@@ -11,6 +11,8 @@ var duration_input: SpinBox
 var duration_reset: Button
 var resolution_input: OptionButton
 var fps_input: OptionButton
+var motion_input: OptionButton
+var aa_input: OptionButton
 var destination_label: Label
 var status_label: Label
 var export_button: Button
@@ -121,6 +123,12 @@ func _open() -> void:
 	for fps in [24, 30, 60]: fps_input.add_item("%d fps" % fps, fps)
 	fps_input.select(1)
 	_field(column, "Frame rate", fps_input)
+	motion_input=OptionButton.new(); motion_input.tooltip_text="Average deterministic subframes for motion blur, including deforming growth. Higher settings take longer."
+	for row in [["Motion blur off",1],["Temporal blur · 2 samples",2],["Temporal blur · 4 samples",4],["Temporal blur · 8 samples",8]]: motion_input.add_item(row[0],row[1])
+	_field(column,"Motion blur",motion_input)
+	aa_input=OptionButton.new()
+	for label in ["Use viewport setting","2× MSAA","4× MSAA","8× MSAA"]: aa_input.add_item(label)
+	_field(column,"Edge smoothing",aa_input)
 	var path_header := Label.new()
 	path_header.text = "SAVE VIDEO TO"
 	path_header.add_theme_color_override("font_color", Color("8da9ba"))
@@ -257,8 +265,10 @@ func _render_to_destination() -> void:
 	export_button.disabled = true
 	var dimensions := [Vector2i(1280, 720), Vector2i(1920, 1080), Vector2i(3840, 2160)]
 	var size: Vector2i = dimensions[resolution_input.selected]
+	var options:={"motion_samples":motion_input.get_selected_id(),"shutter":.5}
+	if aa_input.selected>0: options.msaa=aa_input.selected
 	var error: String = await SceneExporter.render(timeline, destination, size.x, size.y,
-		fps_input.get_selected_id(), _progress)
+		fps_input.get_selected_id(), _progress,options)
 	busy = false
 	export_button.disabled = false
 	if error.is_empty():

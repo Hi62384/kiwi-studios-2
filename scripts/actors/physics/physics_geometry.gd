@@ -17,6 +17,7 @@ static func primitive(runtime: ActorRuntime, values: Dictionary) -> PrimitiveMes
 static func meshes(runtime: Node, physics_ids: Dictionary) -> Array[MeshInstance3D]:
 	var result: Array[MeshInstance3D] = []
 	for child in runtime.get_children():
+		if child.has_meta("kiwi_physics_excluded") and bool(child.get_meta("kiwi_physics_excluded")): continue
 		if child is ActorRuntime and physics_ids.has(child.actor.id): continue
 		if child is MeshInstance3D and child.mesh != null and (child.layers & 1) != 0: result.append(child)
 		result.append_array(meshes(child, physics_ids))
@@ -43,11 +44,55 @@ static func capture(runtime: ActorRuntime, physics_ids: Dictionary) -> Dictionar
 			for vertex: Vector3 in data[Mesh.ARRAY_VERTEX]: points.append(local * vertex)
 		items.append({"node": node, "original": original, "skin": node.skin, "local": local, "surfaces": arrays, "materials": materials, "visible": node.visible,"primitive":is_primitive,
 			"actor_id":owner.actor.id if owner is ActorRuntime else runtime.actor.id,"owner_local":owner.remote_transform().affine_inverse()*node.global_transform if owner is ActorRuntime else local})
+		if mesh.has_meta("kiwi_collision_faces"): items[-1].collision_faces=mesh.get_meta("kiwi_collision_faces")
+		if mesh.has_meta("kiwi_compound_points"): items[-1].compound_points=mesh.get_meta("kiwi_compound_points")
+		if mesh.has_meta("kiwi_editable_topology"): items[-1].polygon=mesh.get_meta("kiwi_editable_topology")
 	if first: bounds = AABB(Vector3(-.5,-.5,-.5),Vector3.ONE)
-	return {"meshes": items, "points": points, "bounds": bounds}
+	var geometry:={"meshes": items, "points": points, "bounds": bounds}
+	return prepare_collision(geometry)
+static func prepare_collision(geometry: Dictionary) -> Dictionary:
+	var items: Array=geometry.get("meshes",[])
+	var has_proxy:=false
+	for item: Dictionary in items: has_proxy=has_proxy or item.has("collision_faces")
+	if has_proxy:
+		var collision_points:=PackedVector3Array(); var collision_bounds:=AABB(); var initial:=true
+		for item: Dictionary in items:
+			var vertices:=PackedVector3Array()
+			if item.has("collision_faces"): vertices=item.collision_faces
+			else:
+				for surface: Array in item.surfaces: vertices.append_array(surface[Mesh.ARRAY_VERTEX])
+			for vertex in vertices:
+				var point: Vector3=item.local*vertex; collision_points.append(point); collision_bounds=AABB(point,Vector3.ZERO) if initial else collision_bounds.expand(point); initial=false
+		if not initial: geometry.collision_points=collision_points; geometry.collision_bounds=collision_bounds
+	var compound:=false
+	for item: Dictionary in items: compound=compound or item.has("compound_points")
+	if compound:
+		var pieces: Array=[]
+		for item: Dictionary in items:
+			var parts: Array=item.get("compound_points",[])
+			if not item.has("compound_points"):
+				var points:=PackedVector3Array()
+				if item.has("collision_faces"): points=item.collision_faces
+				else:
+					for surface: Array in item.surfaces: points.append_array(surface[Mesh.ARRAY_VERTEX])
+				parts=[points]
+			for points: PackedVector3Array in parts:
+				if points.size()<4: continue
+				var local:=PackedVector3Array()
+				for point in points: local.append(item.local*point)
+				pieces.append(local)
+		geometry.compound_points=pieces
+	return geometry
 static func collider(geometry: Dictionary, settings: Dictionary) -> Dictionary:
-	var bounds: AABB = geometry.bounds; var size := bounds.size.max(Vector3.ONE * .005)
+	var bounds: AABB = geometry.get("collision_bounds",geometry.bounds); var size := bounds.size.max(Vector3.ONE * .005)
 	var choice := int(settings.shape); var shape: Shape3D; var offset := Transform3D(Basis.IDENTITY, bounds.get_center())
+	if geometry.has("compound_points") and (choice==0 or (choice==6 and int(settings.body_mode)!=1)):
+		var parts: Array=geometry.compound_points
+		if parts.size()<=512:
+			var shapes: Array=[]
+			for points: PackedVector3Array in parts:
+				var hull:=ConvexPolygonShape3D.new(); hull.points=points; shapes.append({"shape":hull,"offset":Transform3D.IDENTITY})
+			if not shapes.is_empty(): return {"shape":shapes[0].shape,"offset":Transform3D.IDENTITY,"compound":shapes}
 	match choice:
 		2:
 			var sphere := SphereShape3D.new(); sphere.radius = maxf(size.x,maxf(size.y,size.z))*.5; shape = sphere
@@ -56,12 +101,16 @@ static func collider(geometry: Dictionary, settings: Dictionary) -> Dictionary:
 		4:
 			var cylinder := CylinderShape3D.new(); cylinder.radius = maxf(size.x,size.z)*.5; cylinder.height = size.y; shape = cylinder
 		5:
-			if geometry.points.size() >= 4:
-				var hull := ConvexPolygonShape3D.new(); hull.points = geometry.points; shape = hull; offset = Transform3D.IDENTITY
+			var points: PackedVector3Array=geometry.get("collision_points",geometry.points)
+			if points.size() >= 4:
+				var hull := ConvexPolygonShape3D.new(); hull.points = points; shape = hull; offset = Transform3D.IDENTITY
 		6:
 			if int(settings.body_mode) == 1:
 				var faces := PackedVector3Array()
 				for item: Dictionary in geometry.meshes:
+					if item.has("collision_faces"):
+						for vertex: Vector3 in item.collision_faces: faces.append(item.local*vertex)
+						continue
 					for arrays: Array in item.surfaces:
 						var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
 						var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
@@ -70,7 +119,7 @@ static func collider(geometry: Dictionary, settings: Dictionary) -> Dictionary:
 					var concave := ConcavePolygonShape3D.new(); concave.set_faces(faces); concave.backface_collision = true; shape = concave; offset = Transform3D.IDENTITY
 	if shape == null:
 		var box := BoxShape3D.new(); box.size = size; shape = box
-	return {"shape": shape, "offset": offset}
+	return {"shape": shape, "offset": offset,"error":"Compound collision exceeds 512 pieces. Use static mesh collision or instantiate the model as separate actors." if geometry.get("compound_points",[]).size()>512 and (choice==0 or (choice==6 and int(settings.body_mode)!=1)) else ""}
 static func particles(geometry: Dictionary, count: int, pose: Transform3D) -> Dictionary:
 	if geometry.points.size() > MAX_RENDER_VERTICES: return {"error": "Deformation supports up to 30,000 render vertices per actor. Use a lower-resolution simulation model."}
 	var unique := {}; var source: PackedVector3Array = geometry.points

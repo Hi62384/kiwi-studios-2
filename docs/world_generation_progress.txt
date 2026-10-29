@@ -1,0 +1,503 @@
+World generation checkpoint — 2026-10-28
+
+VISUAL UPDATE / WORLD-RELATIVE OCCUPANCY CHECKPOINT (newest):
+- Material, render-distance and live-update-toggle changes use a separate source
+  geometry signature and installed-source snapshot. No road graph or building
+  generation job runs for these edits. Road surface/detail/bridge/portal material
+  roles update independently; component material overrides remain intact. Native
+  mesh objects and actual scatter placements are reused. Local building source
+  edits and individual layer distance/detail overrides survive visual edits.
+- World-relative generated pose baselines distinguish actual movement from
+  reparenting that preserves global pose. Ancestor-driven moves now reserve the
+  correct actual footprint; whole-world moves do not create false reservations.
+  Baselines survive regenerated/cached output, copying, save and history, and are
+  removed when a controlled component becomes independent. Expected parent
+  baselines remain stable through visual/development reuse.
+- World layout reseeding updates linked default settlement, vegetation, prop,
+  district and region seeds while preserving explicit local seed overrides and
+  authored settlement positions. It does not silently change the terrain seed.
+- world_visual_complete_native: all eight native cases pass: 11 visual update/
+  occupancy checks, four reseeding checks, six parent-preservation checks, eight
+  identity/copy checks, four actual props UI checks, six preset workspace checks,
+  eight regional instance-streaming checks and seven actual Scene/physics checks.
+  Logs contain only the pre-existing certificate-store message. Previous reports
+  with inferred-local parse errors or a freed-menu assertion are superseded.
+- Fresh application launch being collected in world_features_normal_launch.log.
+- Current next work: on-demand building detail beyond the 128 detailed-building
+  limit. No lazy building implementation exists yet; do not claim it finished.
+- Weather spec 47e43db3-8b2f-4358-abb0-d61cca057f1b was read in full during the
+  regression wait. It remains after World completion, before unified-environment,
+  VFX, footage and compositing work. Coraline remains canceled. No app export.
+
+PRESETS / INSTANCE STREAMING / CONTEXTUAL PROPS CHECKPOINT (newest):
+- Seven reusable source recipes configure actual terrain profiles, mountain or
+  island clearings, ocean water, settlement layout, district rules, architectural
+  styles, road surfaces and vegetation. Modern/suburban recipes include native
+  benches and lamp fixtures; other recipes include rock clusters. Seeded source
+  identities and countryside geography are reproducible.
+- Presets are offered for empty worlds with owned terrain; existing authored
+  worlds, external terrain and locked components are preserved. Private terrain
+  generation runs before terrain-aware settlement search and world generation.
+  Terrain plus completed native world output commit as one action. Cancel and
+  stale-source checks discard partial worker output. Saving waits for the complete
+  recipe; undo/redo restores terrain as well as source hierarchy. Workspace exit
+  cancels and collects its worker. A save-wait success accumulator found by the
+  first test was corrected before the passing native rerun.
+- world_recipes_native: all four native scripts pass (six real preset workspace
+  checks, seven preset source checks, six rendering checks and portability).
+  Later contextual props exposed legitimate placement-limit messages being
+  categorized as renderer errors; these now use a separate warning field,
+  surfaced in the selected scatter layer inspector. Corrected native recipe and
+  runtime checks pass in world_context_verified; its props UI check needed a
+  freed-menu assertion fix and is being rerun.
+- Native vegetation/prop instance buffers stream by spatial region around the
+  current camera. Complete authored poses and packet data stay cached on CPU;
+  returning to a region restores identical transforms. Camera changes refresh
+  immediately; hysteresis avoids boundary thrash, and hidden environments release
+  buffers. Full aggregate collision remains present and discoverable by offline
+  physics. Generic scatter streaming is opt-in; world forests/props enable it.
+- world_streaming_native: all four native cases pass (eight streaming checks,
+  six rendering checks, actual forest workspace and preset workspace). This is
+  instance-buffer streaming, not on-demand CPU building generation or unlimited
+  regional detailed-world scale. Complex world meshes also use native index LOD.
+- Eight built-in editable native multi-part prop models: park bench, street lamp,
+  bollard, direction sign, wood fence, stone boundary, crates and rock cluster.
+  Lamp lenses emit material light; these are fixtures, not spawned Light3D nodes.
+  Contextual roadside rules can target actual sidewalks or filter road types.
+  Pavement masks exclude the carriageway while permitting sidewalk placement;
+  anchor elevations retain actual curb height. Terrain/offset/authored anchor
+  height modes are native saved scatter properties.
+- world_prop_library_test: ten checks now cover real models, materials, pavement
+  geometry/elevation, filtering, partial-placement warnings, native save/reopen
+  and undo/redo. Nine checks passed before the warning check was added; corrected
+  native rerun is in progress. World props, generic scatter and recipes source
+  regressions also pass.
+- world_acceptance_cpu: all eleven integration cases pass: identity, manual
+  parenting, incremental development reuse, occupancy, real crossings, water
+  routing, live dependencies/history, Scene integration, clipboard resources,
+  architecture destruction and architecture portability. Logs contain only the
+  pre-existing certificate-store message.
+- Current work: a visual-only world update path that reuses existing geometry
+  and placement sources for material, distance and live-update toggle changes.
+  Its tests are being collected; do not mark it verified yet.
+- Still unfinished: building/road regional CPU generation and detailed-geometry
+  streaming, merged distant building representations, district-specific palettes
+  and brush masks, richer environmental transitions, automatic tunnels, complete
+  scale/physics/clipboard acceptance and all later queued specifications. No app
+  export. Fresh normal launch required after these additions.
+
+DISTRICTS / RENDER DETAIL CHECKPOINT (newest):
+- Ten authored district presets use editable simple polygon boundaries and real
+  architectural templates. Density, lot size, setback, seed, height range and
+  architectural style affect native output. District coverage classifies whole
+  road blocks; later overlapping districts take priority. Per-block assignment
+  overrides boundaries and open-block overrides omit buildings. Parks reserve
+  land; automatic park landscaping and district prop palettes are still pending.
+- A Districts and blocks page creates/removes/edits districts and block overrides.
+  Viewport points support drag, edge insertion, right-click deletion and drag
+  cancellation. Self-crossing, degenerate, nonfinite and over-budget polygons,
+  invalid height ranges and dangling district references are rejected.
+- Districts remain inside settlement source dictionaries, so native copy/save,
+  world signatures, region locks and history follow the existing source system.
+  world_districts_cpu: all three scripts pass (nine district checks, blocks and
+  connections). district_handles_verified: six real workspace checks pass.
+  District save/reopen and boundary undo/redo pass. The first native handle test
+  inspected a freed button after regeneration; its lifetime assertion was fixed.
+- World meshes now use the existing native index-LOD generator for sufficiently
+  complex asset meshes, retaining source geometry and full collision triangles.
+  World render distance reaches actual native geometry fade controls.
+- World forest and prop scatter uses 32-meter spatial batches, native mesh LOD
+  and layer-appropriate fading distances. Generic scatter retains its legacy
+  single-batch default. Cluster size, distance, LOD toggle and detail bias are
+  editable. Render settings have a separate signature: changing them reinstalls
+  render batches without regenerating or repositioning native scatter placements.
+- world_rendering_regions: six native rendering checks pass, including exact
+  instance transforms, preserved collision, render-only updates and save/reopen.
+  Actual forced-coarse rendering submitted 24 versus 16,128 full primitives.
+  This is a real LOD check, not a 60-fps guarantee or proof of massive-world scale.
+- Existing native environment runtime (nine checks), terrain LOD, district
+  workspace, forests (ten checks) and props regressions pass. Earlier rendering
+  reports contain a test parser failure and an anchor fixture outside its default
+  region; world_rendering_regions is the corrected rendering report.
+- Still pending: regional generation/geometry streaming and cached regional
+  outputs; these distance/cluster/LOD changes do not implement full streaming.
+  Recipe creation, richer region transitions, full acceptance and all later
+  weather/environment/VFX/footage/compositing specs remain unfinished.
+
+ROAD-BLOCK / PARENT PRESERVATION CHECKPOINT (newest):
+- Ground-road graphs now produce actual bounded blocks by directed half-edge
+  traversal. Dead-end branches are pruned from face discovery, collinear points
+  are simplified and source-family lineage keeps block identity through road
+  splitting. Road-network settlements create inset, clipped frontage parcels;
+  fitted building rectangles stay inside concave parcels and face actual roads.
+  Separate inset pieces receive distinct parcel IDs. Generation remains bounded
+  to 128 detailed plots; this is not regional streaming or full district editing.
+- The settlement inspector switches between generated grids and drawn roads,
+  exposes frontage lot size, and hides the irrelevant blocks-per-side control
+  for drawn-road layouts. Native buildings, roads and source settings save/reopen
+  and layout changes undo/redo through the existing world action.
+- Customized or rigged/groomed generated buildings cannot silently disappear
+  when their plot is removed; generation reports the conflict and requires the
+  existing Keep independent action before that layout change.
+- World updates track expected parent identities. Manually reparented generated
+  parts retain their parent and local pose. Ownership, rather than ancestry,
+  determines replacement, preventing duplicates when a part was moved outside
+  its world and avoiding removal of another nested world's owned components.
+  Parent baselines remap on native copies, detach on standalone copies, and an
+  invalid/missing/cyclic resulting hierarchy is rejected before committing.
+- world_parent_cpu: all three CPU scripts pass (six parent preservation checks,
+  eight block checks and four mesh-override checks).
+- world_blocks_native: all four Forward+ scripts pass: six actual block workspace
+  checks including save/reopen and undo/redo, parent preservation, hierarchy/rig
+  and environment portability. Workspace capture was inspected. Log audit found
+  only the pre-existing Windows certificate-store message.
+- world_site_cleanup: four native scripts pass, including corrected site-job
+  exit cleanup, water routing, hierarchy/rig and environment portability. The
+  earlier missing get_meta cleanup error is absent in these rerun logs.
+- Fresh normal Forward+ application launch completed with exit 0 and only the
+  pre-existing certificate-store message; world_blocks_normal_launch.log.
+  No application export.
+
+ROADS / GEOGRAPHY / LIVE DEPENDENCIES CHECKPOINT (newest):
+- Ten editable road cross-section profiles generate actual solid surfaces,
+  shoulders, curbs, sidewalks, matching junction corners and optional phased lane
+  markings. Highway, rural and unpaved sections differ from residential streets.
+  Surface/paint/gravel/concrete material references and lane/speed/direction data
+  remain native editable source settings. Grading, scatter exclusions and roadside
+  placement use the full cross-section width. Bridges omit exterior pavements.
+- Road inspector supports reverse, split, join, extend, control-point deletion,
+  cross-section editing and terrain following. Point Delete is consumed by the
+  road tool. Collinear extensions reuse explicit endpoints. Coincident graph nodes
+  canonicalize deterministically; smooth region continuations share cross-section
+  tangents rather than creating fake intersections and cut-back gaps.
+- Settlement connections use terrain-cost routing and a deterministic spanning
+  network. Ground routes respect water and protected polygon edges, including
+  barriers narrower than a grid cell. Bridge-enabled routes create actual decks,
+  graded approaches, continuous rails and terrain-matched piers. Source roads can
+  be promoted into ordinary editable roads without automatic duplicates. A
+  dedicated Connections inspector controls bridge permission and connection type.
+- World masks capture independent native buildings and generic asset footprints
+  in world-local space. Building descendants do not each create duplicate masks.
+  Manually moved generated buildings reserve their actual position without
+  excluding/deleting their own plot. Changed masks inside locked regions stop
+  regeneration with an explicit message.
+- Live terrain/object dependency refresh is enabled by default and can be toggled.
+  It uses the existing cancellable world jobs, honors source gestures and locks,
+  and merges derived changes into the causing history action. Sparse sculpt undo
+  callbacks retain their behavior. Explicit undo/redo/cancel suspends reapplication
+  until a new user edit, so undo cannot immediately regenerate what was undone.
+- New manual roads can follow the actual height field; fixed elevation disables
+  following. Source control-point heights update along with generated geometry.
+- Terrain snapshots retain native-resolution private packed height buffers and
+  water fields, avoiding coarse riverbed/sculpt sampling. Packed buffers must be
+  explicitly duplicated: the first native-buffer test caught shared edits mutating
+  a worker snapshot. Corrected and verified. Live terrain identity is weak, so the
+  bounded eight-entry field cache does not retain whole retired terrain resources.
+  The 129-square grid remains a coarse cache/diagnostic, not the sampling limit.
+- World mesh baselines now include UVs/material slots with legacy migration;
+  manual native mesh overrides survive regeneration. Rebind checks compare actual
+  vertex/topology geometry rather than rejecting UV-only differences.
+- Automatic settlement-site search is implemented on a cancellable worker. It
+  checks dry land, slope/height spread, protected/locked areas, native object and
+  settlement footprint clearance, and nearby infrastructure/water. Existing sites
+  can be moved with the same finder; automatic creation begins with a compact
+  editable settlement. Native site-workspace tests are being collected below.
+
+Verification for this checkpoint:
+- road_editor_verified: four CPU cases pass (17 cross-section checks, nine source
+  editing checks, terrain-aware town and forest regression).
+- road_occupancy_native: four native cases pass (nine actual road-inspector actions,
+  progressive road uploads, nine occupancy checks and 13 city checks). An earlier
+  native test assumed four frames were enough for uploads; it now waits for the
+  actual upload queue. A later hidden-dropdown test selection was corrected to
+  target the visible road category control rather than the Connections control.
+- world_continuous_bridges: four CPU cases pass (eight connection/water/undo
+  checks, 17 cross-section checks, crossings and graph). The river test found the
+  region-boundary-as-junction bridge gap; smooth continuation handling fixes it.
+- world_live_native: all three native scripts pass: 11 live dependency/history
+  checks, nine actual road-editor actions and eight river connection checks.
+- world_water_rules_verified: four CPU cases pass: eight water/routing/snapshot
+  checks, connections, forest and existing scatter. Shoreline placement uses the
+  existing native water query instead of nearest-pixel water depth.
+- world_private_height_snapshots: three CPU scripts pass after private-buffer fix
+  (seven immutable field checks, eight water/routing checks and incremental reuse).
+- world_sites_native: four native scripts pass (five site-analysis checks, four
+  actual automatic-placement UI checks, 11 live-history checks and four connection
+  workspace checks). Log review found an exit cleanup get_meta error despite exit
+  0; guarded the missing metadata lookup and a clean rerun is still required.
+- Native connection workspace capture was inspected: two actual settlements,
+  native water, connecting bridge and contextual controls. Save/reopen and source
+  promotion pass. Fresh application launch still required after these changes.
+
+Remaining World work includes arbitrary polygon block/district editing, broader
+settlement/world recipes and environment-region transitions, regional streaming,
+architectural/clustered foliage distant LOD, richer contextual props, automatic
+tunnel selection, and the full large-world performance/clipboard/physics audit.
+The later weather, unified-environment, VFX and footage specifications remain in
+the recorded queue. Do not claim the complete specification queue is finished.
+
+POPULATION / GRADING CHECKPOINT (newest; supersedes older remaining lists):
+- Eight forest profiles now generate canopy, subcanopy, understory and ground
+  layers through the existing natural generator and environment MultiMesh system.
+  Native model palettes can be embedded as portable resources. Smooth seeded
+  density fields create clearings; layers retain the existing biome, climate,
+  slope, elevation, shore and painted-mask filters. The World inspector opens
+  each layer's existing scatter controls for filters, palettes and instance edits.
+- Terrain-local polygon masks exclude generated road corridors, settlement plots,
+  authored exclusion polygons and disabled regions. Spatial mask bins avoid
+  checking every road segment for every candidate. Layer-specific clearance
+  keeps large trees farther from development than ground vegetation. Manual
+  erase/paint masks, instance deletions and edited rules survive regeneration.
+  Existing independent/moved external buildings still need automatic footprint
+  capture; do not claim all arbitrary scene geometry participates in exclusions.
+- Reusable models can populate roadsides, regions, clusters or regular grids.
+  Roadside anchors maintain arc-length spacing across regional road splits and
+  face inward; both/left/right sides and setback are editable. Stable IDs preserve
+  instance edits. Native anchor arrays are also supported by the shared scatter
+  resource. The World Objects menu chooses a project model, then exposes the
+  contextual placement controls. Every source-model child is instanced using its
+  original hierarchy transform. These are instanced models, not placeholder boxes.
+- Forest/prop-only changes reuse an immutable development snapshot instead of
+  rebuilding streets and architecture. Unrelated locally edited building sources
+  remain intact. Real city/road changes retain the existing explicit conflict
+  checks. Terrain dependency signatures now survive save/reopen; cache lookup
+  separately includes resource identity so a reopened document cannot reuse a
+  snapshot owned by another live resource.
+- Each rendered scatter environment has an independent shader-time/material scope.
+  Linked authored parameters still propagate after asset-cache eviction. Embedded
+  palette models save/reopen and promote to ordinary editable components with undo.
+- Grading now includes derived city streets. Surface targets subtract frozen sculpt
+  data before the current sculpt is added, preventing doubled offsets. Frozen edits
+  resample when terrain resolution changes, and removing grading restores the
+  original sculpt. Tiny vertical graph segments at averaged junctions are removed.
+- Road drawing and point dragging show the live road-width strip, with cancellation
+  before committing geometry. Ground heights are resampled after horizontal snap.
+
+Recent verification:
+- world_ground_city_native: 4/4 native cases pass, including actual starter-ground
+  adoption, terrain-aware cities and scene use.
+- world_city_grading_fixed: 4/4 CPU cases pass (town, graph, grading and foundation).
+- inline_scatter_native: 3/3 native cases pass; embedded palettes/material clocks,
+  existing scatter and model-source shader time.
+- world_forest_native: 4/4 native cases pass; actual forest workspace (5 checks),
+  forest generation/undo/save (10), embedded scatter (7) and natural wind.
+- forest_incremental_cpu: 4/4 CPU cases pass (forest, identity, town and ownership).
+- world_stable_dependency: 2/2 CPU cases pass, including save/reopen incremental
+  development reuse and immutable terrain snapshots. The preceding incremental
+  report exposed the resource-identity key bug; corrected in this report.
+- world_forest_ui_verified: 4/4 native cases pass (forest UI, road UI, incremental
+  development and crossings). World forest screenshot inspected after upload.
+- world_props_cpu: 3/3 CPU cases pass (11 placement checks, 10 forest checks and
+  existing scatter).
+- world_population_native: 5/5 native cases pass, totaling 32 checks across the
+  props workspace, placement logic, forest workspace, live road preview and
+  incremental city reuse. Inspected world_props_workspace.png and the forest
+  workspace capture after native upload. world_population_validation also passes
+  all 13 native placement checks, including null model/palette rejection.
+- Normal application launch completed with exit 0; only the pre-existing Windows
+  certificate-store message appears. Log: world_population_normal_launch.log.
+  No application export performed.
+
+Explicit remaining World work includes arbitrary polygon block/district editing,
+automatic settlement layout/connections, richer road lanes/curbs/types, water-aware
+automatic crossings, terrain propagation, ecological region transitions, streaming,
+architectural distant LOD and full performance/clipboard/physics acceptance. Layer
+budget is at most 20,000 instances, not a claim of million-object rendering. Forest
+LOD uses existing native geometry/foliage behavior; clustered foliage LOD remains
+unfinished. Queued weather/environment/VFX specifications below are not complete.
+
+After the VFX rendering task, the user queued Advanced Video Motion Tracking:
+C:/Users/User1/.codex/attachments/a0ddd8f4-e13c-4c6a-b511-0d69dbd18b2b/Pasted text.txt
+Only its opening has been read. Read the full specification before implementing
+2D, planar, camera, object and actor tracking. This does not replace World work.
+After video motion tracking, the user queued Advanced Real-World Scene Reconstruction:
+C:/Users/User1/.codex/attachments/97fcdf7d-8e05-4b2d-8cc5-bdc7e3ff0313/Pasted text.txt
+Only the opening has been read; read the complete specification before implementation.
+After scene reconstruction, the user queued Advanced CGI Integration into Real Footage:
+C:/Users/User1/.codex/attachments/ab051ba4-d97e-46de-972f-a471b0ef80d3/Pasted text.txt
+Only the opening has been read; read the complete specification before implementation.
+After CGI integration, the user queued Advanced Footage Manipulation:
+C:/Users/User1/.codex/attachments/c24db196-3a63-49d4-a8d5-1eb09a3074f4/Pasted text.txt
+Only the opening has been read; read the complete specification before implementation.
+After footage manipulation, the user queued Advanced Non-Destructive Compositing:
+C:/Users/User1/.codex/attachments/cb4905bc-b921-490c-aed2-2bc8724efec0/Pasted text.txt
+Only the opening has been read; read the complete specification before implementation.
+This is an addition to the ordered queue, not a replacement for unfinished World,
+weather, environment, VFX, tracking, reconstruction or CGI integration work.
+
+LATEST IMPLEMENTATION CHECKPOINT (supersedes older remaining lists below):
+World now includes Town, Village and City settlement sources. Streets generate
+before blocks/frontage plots; plots are filtered against roads, each other and
+protected masks. Cities have residential, downtown and industrial differences;
+villages use irregular five-spoke lanes and roadside clusters. Buildings reuse
+the actual architecture generator, materials, real door/window holes, separate
+native components, roofs and multi-floor stairs/shafts. Explicit detail budget:
+128 generated buildings, at most eight settlement sources (not a streaming claim).
+
+World inspector is contextual: World / Roads / Settlements / Regions, with only
+one manual road's controls shown at a time. Section, road, settlement and region
+indices survive normal save/reopen and tab snapshots. A framing-only world bounds
+proxy is stored on the group; Environment runtime does not render the proxy.
+Region bounds can be overlaid. Region visibility and locks affect generated road
+and plot content. Manual transforms/materials, rigs/grooms on unchanged surfaces
+and component IDs are retained. Conflicting local building-source edits stop
+regeneration explicitly. Keep Building Independent reserves its plot so later
+regeneration cannot create a duplicate; reservations survive older input snapshots.
+
+The World toolbar creates owned ground when none exists. A pristine default
+starter terrain can be adopted/resized in the same undoable action. Authored or
+external terrain is reused without claiming ownership. Owned terrain and road /
+tunnel data delete and undo together; copied worlds remap their own terrain IDs.
+Starter adoption and the latest actual-toolbar UI path still need fresh reruns.
+
+Terrain adaptation now uses an immutable, cached (eight entries) 129x129 maximum
+CPU height snapshot, independent of a live SceneTree. Root/terrain transforms,
+sculpt and water dependencies invalidate it. Snapshot data is not serialized;
+editable sources and dependency keys are. Generated settlement roads follow the
+field, reject out-of-terrain / over-grade streets, and buildings sample footprint
+heights/slopes with appropriate foundation depth. Entrance steps connect road
+elevation to the actual floor. Unsuitable plots produce localized warnings.
+Manual roads now pick the referenced terrain while drawing/dragging Ground mode;
+Bridge/Tunnel control points preserve their authored height. Ctrl inverts snap.
+
+Recent verified reports (read logs, not only exit code):
+- world_city_complete_preview: native 3/3 (workspace eight checks, city thirteen,
+  road workspace seven). The image capture explicitly waited for every native
+  building mesh after reopen; inspected world_city_workspace.png. Initial earlier
+  capture was incomplete because progressive uploads were still pending.
+- world_city_ui_verified: native two scripts passed before bounds/field/owned
+  ground changes. Initial observed native city generation was 1,491.928ms;
+  full multi-regeneration/save round trip 5,339.842ms for that case. These are
+  observed wall times, not fixed performance guarantees. Later complete-preview
+  case measured 1,219.518ms initial generation and 4,098.357ms full round trip.
+- world_settlement_terrain_cpu: four scripts pass (terrain-adapted settlement,
+  procedural city, crossings and identity). world_access_verified: four CPU
+  scripts pass (six terrain/entry checks, owned terrain, seven field checks and
+  crossings). Earlier world_access_cpu failed on a newly added inferred-bool
+  variable; fixed with explicit bool and rerun under the verified report.
+- world_owned_terrain_verified: all three CPU scripts pass, including the
+  no-generator deletion path; a typed-empty-array bug in foundation cleanup was
+  found by the first ownership suite and corrected.
+- world_portals_native: all five native scripts pass (scene collision/rewind,
+  crossings, road workspace, standalone components and trim). Portal placement
+  now follows actual hillside crossings with the excavated circular clearance,
+  not road ends; inspected inside/outside images. World scene test verifies real
+  road floor, open passage and underground ceiling through existing physics.
+- Test runner now stops its own process tree promptly on GDScript parse/compile
+  errors instead of waiting for a test that can never reach quit(). Python syntax
+  check and subsequent native/CPU runs passed. Old failed reports are retained.
+
+Next required work: fresh native owned-terrain + field/adapted-city UI acceptance
+and a normal app launch; automatic grading/dependency propagation; manual/spline
+road editing completeness, shoulder/curb/lane geometry; water-aware bridge choice
+and terrain-matched piers; richer district/block/plot editing; settlement links;
+forests/ecology and object exclusion; regional caches/streaming/building LOD and
+the remaining world acceptance cases. Current basic layout is not an arbitrary
+polygon block solver or an unrestricted metropolis generator. Manual road grading
+and whole-world tunnel refresh are still explicit. No application export.
+
+This records active implementation, not completion of the full queued world,
+weather, reusable-environment or Particle/VFX specifications.
+
+The complete 2,740-line world specification has been read. Native Environment
+components now store an editable World resource with stable IDs, seeds, meter
+coordinates, region bounds, terrain reference, protected masks, road nodes and
+road controls. Region-boundary nodes split deterministic ownership without
+duplicating logical connections. Region enable/disable affects owned road parts.
+
+Road geometry uses continuous shared-vertex curved strips and explicit graph
+intersections. Road ends are cut back to junction boundaries, whose vertices
+match incident road elevations. A spatial candidate grid bounds intersection
+search, with 65,536 sampled-point and 500,000 candidate budgets. Dense unsupported
+inputs fail explicitly rather than freezing without a bound. CPU work runs in
+session-owned cancelable jobs; save flushes pending world work. Normal undo/redo
+and stale document guards are reused. Unchanged meshes and local poses survive
+unrelated source edits.
+
+Environment toolbar World creates a source group. Context controls expose world
+dimensions, regions, road drawing, point handles and width. Viewport tools support
+two-click drawing, point dragging, Shift-click insertion and Escape cancellation.
+Terrain fitting samples the full curve. A weighted grid A* routes around hills
+and avoids protected areas. Roadbed grading uses the existing removable terrain
+modifier pipeline, preserving sculpt arrays and normal environment history.
+Terrain sampling respects translated/scaled upright world and ground transforms;
+unsupported tilted fitting reports an error. Grading is currently explicit and
+must be reapplied after road edits; automatic downstream grading is still pending.
+
+Verified initial reports:
+- world_roads_routing: 11 CPU checks pass.
+- world_road_workspace: native World Workspace 7, roads 11, architectural
+  components 38 and existing Environment Workspace 13 checks pass. One expanded
+  architecture destruction test had a test-side bool inference parse error;
+  corrected; native rerun still required. Existing fracture suite passed earlier.
+- world_terrain_cpu: terrain suite 10 checks and roads 11 pass, covering actual
+  cut/fill, removal, history, off-road terrain, region borders and transforms.
+
+Current changes after those reports (spatial road broad phase, source/owner remap,
+native hierarchy copy and region visibility) require a fresh regression pass.
+
+Still required: complete road types and contextual controls, lane/shoulder/curb
+geometry, automatic grade propagation and water-aware crossings, bridges/tunnels
+with real terrain excavation, richer routing validation, settlement placement,
+districts/blocks/plots, integrated real buildings and ecology, protected placement
+rules, regional generation caches/streaming and architectural distant LOD,
+comprehensive clipboard/scene/physics/visual/performance acceptance. Source graph
+storage is not a claim that these generation systems already exist.
+
+Subsequent tasks remain ordered:
+1. Advanced environmental systems / weather:
+   C:/Users/User1/.codex/attachments/47e43db3-8b2f-4358-abb0-d61cca057f1b/Pasted text.txt
+2. Editable reusable environments / unified workflows:
+   C:/Users/User1/.codex/attachments/a7f2051b-6a55-4042-9c60-89fb787fa4ad/Pasted text.txt
+3. Universal Particle/VFX Actor and customizable emitters:
+   C:/Users/User1/.codex/attachments/cf6decec-a48a-4dc3-93bc-4da185022807/Pasted text.txt
+Read each complete specification before implementing it. Do not export the app.
+
+4. Advanced Particle Physics, Forces, Turbulence, Collisions, Trails and
+   Cross-System Interaction (user queued after universal Particle/VFX actor):
+   C:/Users/User1/.codex/attachments/0188a29d-9d10-410a-a8dd-f06104734449/Pasted text.txt
+   Only the opening has been read; read the full spec before implementation.
+
+5. CANCELED: the user explicitly said the Coraline prompt was posted here by
+   accident and must be ignored. Do not inspect or change that project.
+
+6. Advanced Procedural VFX Generation — Fire, Smoke and related effects:
+   C:/Users/User1/.codex/attachments/49e2ccc5-5b95-4c7b-966d-e38c54b5d4f9/Pasted text.txt
+   This follows Advanced Particle Physics; the accidental Coraline request was
+   canceled by the user. Only the opening has been read; read the full
+   specification before implementation.
+
+7. Advanced Node-Based VFX Graph for Combining Effects:
+   C:/Users/User1/.codex/attachments/fc5770de-8094-41cf-b05c-dc09d346fffb/Pasted text.txt
+   User queued this after procedural VFX generation. Only the opening has been
+   read; read the full specification before implementation.
+
+8. Advanced Realistic, Stylized and 2D VFX Rendering:
+   C:/Users/User1/.codex/attachments/a14e70d5-d980-4f1e-bae4-542be51cae2c/Pasted text.txt
+   User queued this after the VFX graph. Only the opening has been read; read the
+   complete specification before implementation. Coraline remains canceled.
+
+Later verification / crossing checkpoint:
+- world_road_terrain_native: all six native scripts pass (workspace, road graph,
+  terrain grading/region continuity, architecture destruction with doorway
+  preservation, model hierarchy/rig and environment portability).
+- world_identity_verified: eight CPU checks pass for material identity, world and
+  terrain duplication, stable component IDs, detached standalone road copies,
+  reusable selected worlds with terrain dependencies, locked regions and pending
+  job cancellation. world_crossings_cpu: all three scripts pass, including ten
+  bridge/tunnel checks. Bridge decks are actual closed solids with railing/pier
+  meshes; tunnels use the existing terrain volume-generation worker, actual voids
+  and open portals. Terrain/road changes commit atomically with one undo/redo,
+  including restoration when switching Tunnel back to Ground. Buried entrances
+  are rejected. Latest cave-owner remap and refresh-controls changes need rerun.
+- Normal application launch completed with exit 0 and only the pre-existing
+  Windows certificate-store message; world_normal_app_launch.log. A later launch
+  is still required after the crossing changes. No application export performed.
+
+Limitations remain explicit: crossings are user-directed, automatic bridge/water
+  selection and terrain-matched pier bottoms are not yet complete. After moving
+  a whole world/terrain, tunnel refresh is explicit; automatic propagation and
+  grade refresh remain pending. Cities/ecology/streaming are not yet implemented.
+
+## 2026-10-28 continuation update
+The previous on-demand building streaming, massing, editable expansion and camera-aware render wait now pass their current targeted regressions (288-building large fixture; streaming, building edit, scene integration, parent preservation, visual edit, spatial index and scene data). The corresponding JSON report is `.godot/verification/world_all_targeted.json`. See the Environment climate and weather progress appended to `docs/environment_creator_progress.txt` for the climate/weather slice started after world generation.

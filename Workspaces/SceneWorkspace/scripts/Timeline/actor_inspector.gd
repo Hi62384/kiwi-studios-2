@@ -30,6 +30,7 @@ var _main_buttons: Dictionary = {}
 var _main_tab := "Properties"
 var _section := ""
 var _navigation_revision := 0
+var _resource_depth:=0
 var _empty_section: Label
 
 # Preserve the inspector's existing scrolling interface for scene integrations.
@@ -263,6 +264,7 @@ func inspect_file_resource(path: String) -> void:
 	var object := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as ActorObjectData
 	if object == null:
 		return
+	if object.type_id in [&"powder_material",&"destruction_material",&"destruction_region",&"debris_vfx"]: object=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_REPLACE) as ActorObjectData
 	var definition := registry.get_object_definition(object.type_id)
 	if definition == null:
 		return
@@ -291,6 +293,7 @@ func inspect_file_resource(path: String) -> void:
 	var group: VBoxContainer
 	var resource_state_id := "FileResource:" + path
 	for property in definition.properties:
+		if not _property_is_visible(property,object): continue
 		var property_group := str(property.options.get("group", "Properties"))
 		if property_group != current_group:
 			current_group = property_group
@@ -301,6 +304,9 @@ func inspect_file_resource(path: String) -> void:
 
 func _add_file_object_value(object: ActorObjectData, definition: ActorObjectDefinition,
 		property: ActorProperty, parent: VBoxContainer, save_owner: ActorObjectData = null) -> void:
+	if not property.object_type.is_empty():
+		if _resource_depth>=6: _add_label(parent,"Reference depth limit — open the linked resource directly."); return
+		_resource_depth+=1; _add_file_object_reference(object,property,parent,save_owner if save_owner!=null else object); _resource_depth-=1; return
 	if property.options.get("natural_material", false):
 		_add_natural_material_editor(null, object, definition, property, parent, save_owner)
 		return
@@ -323,6 +329,7 @@ func _add_file_object_value(object: ActorObjectData, definition: ActorObjectDefi
 	var label := Label.new()
 	label.text = property.label
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS; label.tooltip_text=property.label
 	heading.add_child(label)
 	var reset := Button.new()
 	reset.name = str(property.id) + "_reset"
@@ -336,7 +343,7 @@ func _add_file_object_value(object: ActorObjectData, definition: ActorObjectDefi
 			var previous: Variant = ActorData.copy_value(object.get_value(property.id))
 			if _same_value(previous, value):
 				return
-			var target := object if not object.resource_path.is_empty() else save_owner
+			var target := object if not object.resource_path.is_empty() and not object.resource_path.contains("::") else save_owner
 			model.history.create_action("Change " + property.label)
 			model.history.add_do_method(func():
 				object.set_value(property.id, ActorData.copy_value(value))
@@ -348,8 +355,11 @@ func _add_file_object_value(object: ActorObjectData, definition: ActorObjectDefi
 				model.changed.emit())
 			model.history.commit_action()
 		else:
-			object.set_value(property.id, value)
-			ResourceSaver.save(object, object.resource_path)
+			var before: Variant=ActorData.copy_value(object.get_value(property.id))
+			if not _same_value(before,value):
+				model.history.create_action("Change "+property.label)
+				model.history.add_do_method(_assign_file_object_value.bind(object,property.id,ActorData.copy_value(value),object))
+				model.history.add_undo_method(_assign_file_object_value.bind(object,property.id,before,object)); model.history.commit_action()
 		reset.visible = not _same_value(definition.value_for(object, property), property.create_default())
 		for update in _updaters:
 			update.call()
@@ -363,7 +373,13 @@ func _add_file_object_value(object: ActorObjectData, definition: ActorObjectDefi
 			var input := _number_editor(parent, float(current_value), property)
 			var normalize := func(value: float) -> Variant: return int(value) if property.value_type == TYPE_INT else value
 			input.value_changed.connect(func(value: float): set_value.call(normalize.call(value)))
-			input.preview_changed.connect(func(value: float): set_value.call(normalize.call(value)))
+			var gesture:={"origin":current_value}
+			input.interaction_started.connect(func(): gesture.origin=ActorData.copy_value(definition.value_for(object,property)))
+			input.preview_changed.connect(func(value: float): object.set_value(property.id,normalize.call(value)); model.changed.emit())
+			input.drag_committed.connect(func(value: float): object.set_value(property.id,gesture.origin); set_value.call(normalize.call(value)))
+			input.drag_cancelled.connect(func(): object.set_value(property.id,gesture.origin); model.changed.emit())
+			_updaters.append(func():
+				if not input.dragging: _set_number_silent(input,float(definition.value_for(object,property))))
 		TYPE_VECTOR2, TYPE_VECTOR3:
 			var component_count := 2 if property.value_type == TYPE_VECTOR2 else 3
 			for axis in component_count:
@@ -380,6 +396,13 @@ func _add_file_object_value(object: ActorObjectData, definition: ActorObjectDefi
 					var updated: Variant = definition.value_for(object, property)
 					updated[axis] = value
 					set_value.call(updated))
+				var gesture:={"origin":current_value}
+				input.interaction_started.connect(func(): gesture.origin=ActorData.copy_value(definition.value_for(object,property)))
+				input.preview_changed.connect(func(value: float): var updated: Variant=definition.value_for(object,property); updated[axis]=value; object.set_value(property.id,updated); model.changed.emit())
+				input.drag_committed.connect(func(value: float): var updated: Variant=definition.value_for(object,property); updated[axis]=value; object.set_value(property.id,gesture.origin); set_value.call(updated))
+				input.drag_cancelled.connect(func(): object.set_value(property.id,gesture.origin); model.changed.emit())
+				_updaters.append(func():
+					if not input.dragging: input.set_value_no_signal(definition.value_for(object,property)[axis]))
 		TYPE_STRING, TYPE_STRING_NAME:
 			if property.options.get("file_picker", false):
 				var row := HBoxContainer.new()
@@ -399,19 +422,68 @@ func _add_file_object_value(object: ActorObjectData, definition: ActorObjectDefi
 				_add_file_resource_slot(row, property,
 					func() -> Variant: return object.get_value(property.id), set_value,
 					Callable(), workspace_parameters)
+			else:
+				var input:=LineEdit.new(); input.name=str(property.id)+"_text"; input.text=str(current_value); input.size_flags_horizontal=Control.SIZE_EXPAND_FILL; input.editable=not property.options.get("read_only",false); parent.add_child(input)
+				input.text_submitted.connect(func(_value: String): set_value.call(StringName(input.text) if property.value_type==TYPE_STRING_NAME else input.text)); input.focus_exited.connect(func(): set_value.call(StringName(input.text) if property.value_type==TYPE_STRING_NAME else input.text))
+				_updaters.append(func():
+					if not input.has_focus(): input.text=str(definition.value_for(object,property)))
 		TYPE_BOOL:
 			var input := CheckButton.new()
 			input.name = str(property.id)
 			input.button_pressed = current_value
 			parent.add_child(input)
 			input.toggled.connect(func(value: bool): set_value.call(value))
+			_updaters.append(func(): input.set_pressed_no_signal(bool(definition.value_for(object,property))))
 		TYPE_COLOR:
 			var input := LiveColorPickerButton.new()
 			input.name = str(property.id)
 			input.color = current_value
 			parent.add_child(input)
-			input.color_changed.connect(func(value: Color): set_value.call(value))
+			input.preview_changed.connect(func(value: Color): object.set_value(property.id,value); model.changed.emit())
+			input.drag_committed.connect(func(original: Color,value: Color): object.set_value(property.id,original); set_value.call(value))
+			input.drag_cancelled.connect(func(original: Color): object.set_value(property.id,original); model.changed.emit())
+			_updaters.append(func(): input.set_color_silent(definition.value_for(object,property)))
 
+
+func _assign_file_object_value(object: ActorObjectData,key: StringName,value: Variant,root: ActorObjectData) -> void:
+	object.set_value(key,ActorData.copy_value(value)); root.emit_changed()
+	var target:=object if not object.resource_path.is_empty() and not object.resource_path.contains("::") else root
+	if not target.resource_path.is_empty(): ResourceSaver.save(target,target.resource_path)
+	model.changed.emit()
+
+func _add_file_object_reference(object: ActorObjectData,property: ActorProperty,parent: VBoxContainer,root: ActorObjectData) -> void:
+	_add_label(parent,property.label)
+	var reference:=object.get_value(property.id) as ActorObjectReference; var resolved:=_resolve_object(reference)
+	var row:=HBoxContainer.new(); parent.add_child(row)
+	var slot:=ActorResourceSlot.new(); slot.text=("▸  "+str(resolved.type_id).capitalize()) if resolved!=null else "<empty>"; slot.size_flags_horizontal=Control.SIZE_EXPAND_FILL; slot.clip_text=true; slot.toggle_mode=true; row.add_child(slot)
+	var menu:=MenuButton.new(); menu.text="⋯"; row.add_child(menu)
+	var definitions:=registry.object_definitions_for(property.object_type)
+	for i in definitions.size(): menu.get_popup().add_item("New "+definitions[i].display_name,100+i)
+	for entry in [[1,"Load from project…"],[2,"Load from Super Clipboard…"],[3,"Make Unique"],[4,"Copy to Super Clipboard"],[5,"Clear"]]: menu.get_popup().add_item(entry[1],entry[0])
+	var assign:=func(value: Variant):
+		var previous: Variant=ActorData.copy_value(object.get_value(property.id))
+		model.history.create_action("Change "+property.label); model.history.add_do_method(_assign_file_object_value.bind(object,property.id,value,root)); model.history.add_undo_method(_assign_file_object_value.bind(object,property.id,previous,root)); model.history.commit_action(); inspect_file_resource(root.resource_path)
+	var load_path:=func(path: String):
+		if path==ActorProjectFilePicker.EMPTY_RESOURCE: assign.call(null); return
+		if path.is_empty(): return
+		var value: Variant=ResourceLoader.load(path) if path.get_extension().to_lower() in ["tres","res"] else null
+		if value is ActorObjectData and registry.object_type_matches(value.type_id,property.object_type): assign.call(ActorObjectReference.from_asset(path,value.type_id))
+		elif property.object_type==&"image":
+			var image:=registry.get_object_definition(&"image").create_object(); image.values[&"source"]=path; assign.call(ActorObjectReference.from_object(image))
+	slot.accepts_file=_object_resource_path_allowed.bind(property); slot.file_dropped.connect(load_path)
+	menu.get_popup().id_pressed.connect(func(id: int):
+		if id>=100: assign.call(ActorObjectReference.from_object(definitions[id-100].create_object()))
+		elif id in [1,2]: load_path.call(await ActorProjectFilePicker.pick(self,_object_picker_property(property),"Choose "+property.label,id==2))
+		elif id==3 and resolved!=null: assign.call(ActorObjectReference.from_object(resolved.copy_object()))
+		elif id==4 and resolved!=null and KiwiSuperClipboardService.instance!=null: KiwiSuperClipboardService.instance.quick_save(resolved,property.label)
+		elif id==5: assign.call(null))
+	if resolved==null: return
+	var children:=VBoxContainer.new(); children.hide(); parent.add_child(children); slot.toggled.connect(children.set_visible)
+	if registry.object_type_matches(resolved.type_id,&"image"): _add_image_object_preview(resolved,children)
+	var definition:=registry.get_object_definition(resolved.type_id)
+	if definition==null: return
+	for child in definition.properties:
+		if _property_is_visible(child,resolved): _add_file_object_value(resolved,definition,child,children,root)
 
 func _add_file_shader_uniforms(object: ActorObjectData, parent: VBoxContainer) -> void:
 	var shader_source: Variant = object.get_value(&"shader_path", "")
@@ -599,11 +671,18 @@ func refresh() -> void:
 	if KiwiPhysicsSettings.compatible(actor):
 		KiwiPhysicsInspector.build(self,actor,_category("Physics",actor,"Actor"))
 	if actor.type_id==&"skeleton_rig": _add_skeleton_editor(actor)
+	var advanced_groups:={}
 	for property in definition.properties:
 		if not _property_is_visible(property, actor):
 			continue
 		var property_group := str(property.options.get("group", "Properties"))
 		var group_container := _category(property_group, actor, _property_main_tab(property))
+		if property.options.get("advanced",false):
+			if not advanced_groups.has(property_group):
+				var categories: Dictionary=ui_state._actor_state(actor.id).get("categories",{})
+				if not categories.has("PowderMaterial:Advanced"): ui_state.set_category_expanded(actor.id,"PowderMaterial:Advanced",false)
+				advanced_groups[property_group]=_stateful_category("Advanced",actor.id,group_container,"PowderMaterial")
+			group_container=advanced_groups[property_group]
 		_add_property(property, definition, group_container)
 	_prepare_buttons()
 	_main_tab = ui_state.main_tab_for(actor.id)
@@ -923,6 +1002,51 @@ func _choice_editor(parent: Control, property: ActorProperty, selected: int) -> 
 
 
 func _add_property(property: ActorProperty, definition: ActorDefinition, parent: VBoxContainer) -> void:
+	if property.options.get("environment_open",false):
+		var button:=Button.new(); button.text="Open Environment Creator ↗"; button.disabled=str(_actor.values.get(&"environment_path","")).is_empty(); parent.add_child(button); var actor:=_actor
+		button.pressed.connect(func():
+			var tabs:=get_tree().get_first_node_in_group("actor_scene_tabs")
+			if tabs!=null: tabs.open_environment(str(actor.values.get(&"environment_path",""))))
+		return
+	if property.options.get("fog_motion_status",false):
+		var actor:=_actor; var label:=Label.new(); label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; label.add_theme_font_size_override("font_size",12); parent.add_child(label)
+		var refresh:=func():
+			label.text="CPU reference transport · use a local domain for physical motion."
+			for editor in get_tree().get_nodes_in_group("actor_timeline_editors"):
+				if editor.model!=model: continue
+				var runtime: Node=editor.physics._runtime(actor.id)
+				if runtime==null: continue
+				var stats: Dictionary=runtime.get_meta("fog_motion_stats",{})
+				if not stats.is_empty(): label.text="%d cells · step %.2f ms · upload %.2f ms\nConcentration volume %.3f · outflow / decay %.3f\n%s"%[stats.cells,stats.cpu_ms,stats.upload_ms,stats.mass,stats.lost,stats.error]
+		refresh.call(); _updaters.append(refresh); return
+	if property.options.get("fog_presets",false):
+		var control:=preload("res://scripts/actors/fog/fog_control.gd").new(); parent.add_child(control); control.setup(self,_actor); return
+	if property.options.get("fragment_director",false) or property.options.get("destruction_workflow",false):
+		var control:=preload("res://scripts/actors/physics/destruction/destruction_workflow_control.gd").new(); parent.add_child(control); control.setup(self,_actor,property.options.get("destruction_workflow",false)); return
+	if property.options.get("damage_presets",false):
+		var control:=preload("res://scripts/actors/physics/destruction/destruction_material_control.gd").new(); parent.add_child(control); control.setup(self,_actor); return
+	if property.options.get("destruction_editor",false):
+		var editor:=preload("res://scripts/actors/physics/destruction/destruction_control.gd").new(); parent.add_child(editor); editor.setup(self,_actor); return
+	if property.options.get("structure_editor",false):
+		var editor:=preload("res://scripts/actors/physics/structure/structure_control.gd").new(); parent.add_child(editor); editor.setup(self,_actor); return
+	if property.options.get("debris_copy",false):
+		var button:=Button.new(); button.text="Copy debris to editable actors"; button.tooltip_text="Copy current fragments as ordinary mesh actors in one undo action. Originals remain intact; copied actors start with physics disabled to avoid double simulation."; parent.add_child(button)
+		button.pressed.connect(func():
+			for editor in get_tree().get_nodes_in_group("actor_timeline_editors"):
+				if editor.model==model: KiwiDebris.copy_fragments(editor,_actor))
+		return
+	if property.options.get("powder_presets",false):
+		var browser:=preload("res://scripts/actors/physics/powder/powder_material_control.gd").new(); parent.add_child(browser); browser.setup(model,_actor,_queue_rebuild_selected); return
+	if _actor.type_id==&"powder" and property.id==&"powder_enabled":
+		var actor:=_actor; var status:=Label.new(); status.name="PowderStatus"; status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; status.add_theme_font_size_override("font_size",12); parent.add_child(status)
+		var refresh:=func():
+			for editor in get_tree().get_nodes_in_group("actor_timeline_editors"):
+				if editor.model!=model: continue
+				var state: Dictionary=editor.physics.display_states.get(actor.id,{})
+				status.text=str(state.get("powder_error",""))
+				if status.text.is_empty(): status.text=str(state.get("powder_warning",""))
+				if status.text.is_empty(): status.text="%d grains · %s"%[(state.get("points",PackedVector3Array()) as PackedVector3Array).size(),"Granular simulation" if actor.get_value(&"powder_simulate",true) else "Source preview only"]
+		_updaters.append(refresh); refresh.call()
 	if _actor.type_id==&"fluid" and property.id==&"fluid_preset":
 		var actor:=_actor
 		_add_label(parent,"Liquid preset")
@@ -949,7 +1073,7 @@ func _add_property(property: ActorProperty, definition: ActorDefinition, parent:
 	label.text = property.label
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	label.tooltip_text = property.label
+	label.tooltip_text = str(property.options.get("tooltip",property.label))
 	heading.add_child(label)
 	var reset := Button.new()
 	reset.name = str(key) + "_reset"
@@ -1034,6 +1158,7 @@ func _add_property(property: ActorProperty, definition: ActorDefinition, parent:
 			_updaters.append(func(): _set_number_silent(input, actor.get_value(key)))
 		TYPE_BOOL:
 			var input := CheckButton.new()
+			input.name = str(key)
 			input.button_pressed = value
 			parent.add_child(input)
 			input.toggled.connect(commit)
@@ -1102,6 +1227,8 @@ func _add_object_reference(property: ActorProperty, actor_definition: ActorDefin
 		object_definition = base_definition
 	var creatable_definitions := registry.object_definitions_for(property.object_type)
 	var state_key := "Resource:" + str(property.id)
+	if property.object_type in [&"powder_material",&"destruction_material",&"destruction_region",&"debris_vfx"] and not (ui_state._actor_state(actor.id).get("categories",{}) as Dictionary).has(state_key):
+		ui_state.set_category_expanded(actor.id,state_key,false)
 	_add_label(parent, property.label)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -1908,6 +2035,7 @@ func _create_project_file(property: ActorProperty, title: String) -> String:
 func _resolve_object(reference: ActorObjectReference) -> ActorObjectData:
 	if reference == null:
 		return null
+	if reference.object_type in [&"powder_material",&"destruction_material",&"destruction_region",&"debris_vfx"]: return ActorAnimation.resolve_reference(reference)
 	return reference.resolve(func(path: String):
 		return ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as ActorObjectData)
 
@@ -1950,6 +2078,8 @@ func _resource_box() -> StyleBoxFlat:
 
 func _property_is_visible(property: ActorProperty, owner: Object) -> bool:
 	if property.options.get("inspector_hidden", false): return false
+	for condition: Dictionary in property.options.get("visible_when_all",[]):
+		if not (condition.get("values",[]) as Array).has(owner.get_value(StringName(condition.get("property","")))): return false
 	var visible_when: Dictionary = property.options.get("visible_when", {})
 	if not visible_when.is_empty():
 		var dependency := StringName(visible_when.get("property", ""))
@@ -2305,6 +2435,36 @@ func _add_natural_material_editor(actor: ActorData, object: ActorObjectData,
 
 func _add_object_value(actor: ActorData, object: ActorObjectData,
 		definition: ActorObjectDefinition, property: ActorProperty, parent: VBoxContainer) -> void:
+	if property.options.get("fog_actor_link",false):
+		_add_label(parent,property.label)
+		var choose:=OptionButton.new(); choose.fit_to_longest_item=false; choose.size_flags_horizontal=Control.SIZE_EXPAND_FILL; parent.add_child(choose); choose.add_item("Fog actor / local source"); choose.set_item_metadata(0,"")
+		for candidate: ActorData in model.actors:
+			if candidate==actor or not candidate.values.get(&"position") is Vector3: continue
+			choose.add_item(candidate.display_name); choose.set_item_metadata(choose.item_count-1,candidate.id)
+		for index in choose.item_count:
+			var current:=str(object.get_value(property.id,"")); current=str(actor.values.get(&"fog_motion_links",{}).get(current,current)) if actor!=null else current
+			if str(choose.get_item_metadata(index))==current: choose.select(index)
+		choose.item_selected.connect(func(index: int):
+			var original:=str(object.get_value(property.id,"")); var links: Dictionary=actor.values.get(&"fog_motion_links",{}).duplicate() if actor!=null else {}
+			if links.has(original):
+				links[original]=str(choose.get_item_metadata(index)); model.edit_property(actor,registry.get_definition(actor.type_id),&"fog_motion_links",links)
+			else: model.edit_object_property(actor,object,definition,property.id,str(choose.get_item_metadata(index))))
+		return
+	if property.options.get("fog_paint",false):
+		var viewport_button:=Button.new(); viewport_button.text="Paint in scene viewport"; viewport_button.toggle_mode=true; viewport_button.button_pressed=actor.get_meta("editor_fog_field",null)==object if actor.has_meta("editor_fog_field") else false; parent.add_child(viewport_button)
+		viewport_button.toggled.connect(func(enabled: bool):
+			if enabled:
+				if int(object.get_value(&"mode",0))!=5: model.edit_object_property(actor,object,definition,&"mode",5)
+				actor.set_meta("editor_fog_field",object)
+			else: actor.remove_meta("editor_fog_field"))
+		_updaters.append(func(): viewport_button.set_pressed_no_signal(actor.has_meta("editor_fog_field") and actor.get_meta("editor_fog_field")==object))
+		var button:=Button.new(); button.text="Paint density slices…"; parent.add_child(button)
+		button.pressed.connect(func():
+			if int(object.get_value(&"mode",0))!=5: model.edit_object_property(actor,object,definition,&"mode",5)
+			var editor:=preload("res://scripts/actors/fog/fog_painter.gd").new(); add_child(editor); editor.setup(self,actor,object,definition); editor.popup_centered(Vector2i(620,620)))
+		return
+	if definition.type_id==&"fog_appearance" and str(property.id).begins_with("layer_"):
+		preload("res://scripts/actors/fog/fog_control.gd").layer_actions(self,actor,object,property,parent)
 	if property.options.get("natural_material", false):
 		_add_natural_material_editor(actor, object, definition, property, parent)
 		return
@@ -2317,7 +2477,8 @@ func _add_object_value(actor: ActorData, object: ActorObjectData,
 		_add_shader_uniforms(actor, object, definition, parent)
 		return
 	if not property.object_type.is_empty():
-		_add_nested_object_reference(actor, object, definition, property, parent)
+		if _resource_depth>=6: _add_label(parent,"Reference depth limit — open the linked resource directly."); return
+		_resource_depth+=1; _add_nested_object_reference(actor, object, definition, property, parent); _resource_depth-=1
 		return
 	var current_value: Variant = _animated_object_value(actor, object, definition, property)
 	var heading := HBoxContainer.new()
@@ -2325,6 +2486,8 @@ func _add_object_value(actor: ActorData, object: ActorObjectData,
 	var label := Label.new()
 	label.text = property.label
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+	label.tooltip_text=str(property.options.get("tooltip",property.label))
 	heading.add_child(label)
 	var animation_path := ActorAnimation.path_to_object(actor, object)
 	if not animation_path.is_empty():
@@ -2410,12 +2573,20 @@ func _add_object_value(actor: ActorData, object: ActorObjectData,
 				_add_file_resource_slot(row, property,
 					func() -> Variant: return _animated_object_value(actor, object, definition, property), set_path,
 					Callable(), workspace_parameters)
+			else:
+				var input:=LineEdit.new(); input.name=str(property.id)+"_text"; input.text=str(current_value); input.size_flags_horizontal=Control.SIZE_EXPAND_FILL; input.editable=not property.options.get("read_only",false); parent.add_child(input)
+				var commit:=func(): model.edit_object_property(actor,object,definition,property.id,StringName(input.text) if property.value_type==TYPE_STRING_NAME else input.text)
+				input.text_submitted.connect(func(_text: String): commit.call()); input.focus_exited.connect(commit)
+				_updaters.append(func():
+					if not input.has_focus(): input.text=str(_animated_object_value(actor,object,definition,property)))
 		TYPE_BOOL:
 			var input := CheckButton.new()
 			input.name = str(property.id)
 			input.button_pressed = current_value
 			parent.add_child(input)
-			input.toggled.connect(func(value: bool): model.edit_object_property(actor, object, definition, property.id, value))
+			input.toggled.connect(func(value: bool):
+				model.edit_object_property(actor, object, definition, property.id, value)
+				if property.options.get("refresh_inspector",false): _queue_rebuild_selected())
 			_updaters.append(func(): input.set_pressed_no_signal(_animated_object_value(actor, object, definition, property)))
 		TYPE_COLOR:
 			var input := LiveColorPickerButton.new()

@@ -1,0 +1,212 @@
+Environment Creator — active implementation, 2026-10-28
+
+CURRENT CHECKPOINT (supersedes historical remaining-work lists below): terrain,
+vegetation/natural objects and architecture now have substantial implementations
+and native regression evidence. Read advanced_terrain_progress.txt,
+natural_generation_progress.txt and architecture_progress.txt for accurate current
+features, limits and tests. None of the full queued specifications is claimed
+complete merely because its foundational implementation passes tests.
+Architecture is the active task. After it: large-scale world generation
+(67ee3382 attachment), then advanced environmental/weather systems (47e43db3).
+Both queued files are in C:/Users/User1/.codex/attachments/; exact paths are saved
+in architecture_progress.txt. The user prohibits exporting the application.
+
+HISTORICAL CHECKPOINTS:
+
+LATEST TERRAIN: real hydrology/water rendering/cave-opening depth, shared climate
+and normalized biome rules, biome landform geometry and continuous native PBR
+two-material paint now implemented and tested. See advanced_terrain_progress.txt
+for reports and limitations. Enclosed cave water, full biome material layers and
+large-world work remain. Queue afterward: vegetation/natural objects, then the
+new structures/architecture specification (341fe14d attachment), read in full.
+Neither queued specification is implemented or claimed complete.
+
+LATEST: The initial environment workflow and integrations pass the 16-script
+environment_final_checks native Forward+ suite. Subsequent reset/picker fixes
+have targeted passing reports. Actual application launch completed with exit 0;
+no application export. Advanced terrain is now the active next phase; see
+docs/advanced_terrain_progress.txt for code, measurements, queue and outstanding
+caves/LOD/hydrology/biomes/material requirements. Vegetation remains queued after
+terrain, not implemented or claimed complete.
+
+The earlier outstanding renderer/scatter scheduling and selected reusable
+components have since been implemented: preview chunk budget, background scatter
+with cancel/stale guards, selected component save/import/clipboard, dependency
+remapping. Clipboard portability tested after removing original model/image files.
+Latest categorical material paint remains a limitation, not smooth shader blending.
+
+CURRENT UPDATE (supersedes the older foundation-only checklist below)
+- Environment Creator is registered in New Tab. Separate sessions, cameras,
+  selection, tools, panels, hierarchy expansion and inspector scroll state are
+  captured per tab. Saved files reopen/deduplicate through the project filesystem.
+- Linked Environment Asset actors render the authored components in Scene.
+  Save refreshes linked instances and invalidates existing offline physics caches.
+- Derived Model viewport reuses navigation, transforms, snapping and parenting.
+  Terrain picking and brush gestures operate on actual native chunk meshes.
+  Drop preview follows the terrain and cancels off the viewport.
+- Terrain generation at 129+ samples uses worker-owned CPU resources. Cancel,
+  switch, intervening edits and stale results are guarded. Main-thread chunk
+  uploads and scatter generation are still synchronous: budgeted scheduling is
+  outstanding, not claimed implemented.
+- Scatter painting/erasing uses one sparse transaction per stroke. UI exposes
+  weights, spacing, seed, scale/yaw/elevation/slope ranges and bounded counts.
+  Native MultiMesh rendering is shared with Scene. Optional collisions aggregate
+  real source triangles into one body, capped at 600,000 triangle vertices with
+  an explicit warning. Decorative scatter is excluded from offline capture.
+- Base and painted terrain materials use existing native/Kiwi adapters. A sparse
+  authored mask switches native terrain cells between two material surfaces.
+  This is categorical painting, NOT smooth blending of arbitrary shader graphs.
+  Raw image ground materials use triplanar textures. Mask/materials save/reopen.
+- Searchable project library uses original file paths, thumbnail preview, drag
+  placement and source opening. Categories use names/folders as hints; no new
+  duplicate asset database. Binary resources are validated on use.
+- Authored sunlight and opt-in scene world environment are separate from editor
+  preview lighting. Manual shader TIME wrapper is used for native source shaders.
+- Recent fixes include no default sun from an invalid environment source, image
+  refresh group compatibility, preserving children when locked parents cannot be
+  deleted, and rejecting empty source meshes.
+
+Verified reports in .godot/verification (actual renderer, not application exports):
+- environment_async_verified: generation 12 checks + workspace 7 checks passed;
+  scene run exposed a parse error in new refresh code, subsequently fixed.
+- environment_paint_verified: scatter 12, scene integration 8, runtime 6 passed.
+- environment_collision_fixed: runtime 9 and scene integration 8 passed.
+  The earlier collision fixture used an unsupported primitive name and an empty
+  mesh. It was corrected to a real Box and empty assets are now rejected.
+- environment_collision_verified: shared timeline physics retained 41 checks;
+  its earlier collision failure is superseded by environment_collision_fixed.
+- environment_library_fixed: terrain material 8, workspace 7, scene integration
+  8 passed. Later material-cache/world-ownership changes need a new regression run.
+
+Remaining before declaring Environment Creator complete:
+- Budgeted renderer/scatter scheduling; actual large-environment measurements.
+- Broader material/image dependency invalidation and linked source checks.
+- World ownership tests with fog, camera/render integration and source changes.
+- Reusable selected components/clipboard dependency tests and refinement of
+  structure/library actions. Scatter MultiMesh picking/manual overrides pending.
+- Native input/drop/cancel/tab-state regression, latest full app launch, final
+  source checks. Never claim every A–X acceptance item passed from backend tests.
+
+USER QUEUE, in order:
+1. Finish Environment Creator spec e248c7b1-65c5-49e8-ae30-0da550edecf9.
+2. Advanced Terrain spec 12534cae-3b3e-4c71-a7e7-4d53f03f686a.
+3. NEW: Procedural Vegetation, Natural Object Generation, Scattering &
+   Environmental Variation, fully read including the middle material/environment/
+   manual override sections:
+   C:/Users/User1/.codex/attachments/8d0f837c-cd46-4bae-b1bd-cf12467d7feb/Pasted text.txt
+   Requires real connected tree/leaf structure and distinct families, plants,
+   geological rocks, cave attachments, environmental/biome rules, stable instance
+   overrides, seasonal variation, bounded variants/LOD, Model conversion,
+   existing Scene/physics/material/clipboard integration and A–AI tests.
+   Not implemented yet. Do not substitute current generic model scatter for it.
+
+No application export. No ZIP, commit, push or destructive checkout cleanup.
+
+OLDER FOUNDATION NOTES (retain for implementation context)
+
+Current authorized specification (fully read):
+C:/Users/User1/.codex/attachments/e248c7b1-65c5-49e8-ae30-0da550edecf9/Pasted text.txt
+NEXT, after finishing Environment Creator, the user queued (fully read, including
+middle river/biome/texturing/dependency sections):
+C:/Users/User1/.codex/attachments/12534cae-3b3e-4c71-a7e7-4d53f03f686a/Pasted text.txt
+Advanced Terrain Creation, Procedural Generation, Sculpting, Erosion, Caves,
+Mountains, Rivers, Oceans, Biomes & Texturing. Not implemented yet. Preserve this
+queue; do not substitute the small current heightfield for the complete next spec.
+
+Implemented foundation, not a completed user-facing workspace
+- KiwiEnvironmentDocument extends KiwiModelDocument. Reuses existing model
+  components, hierarchy, material references, thumbnail and editor-state storage.
+  Own stable environment identity/name, component generator metadata, sun and
+  environment reference. Schema validation; snapshots isolate owned terrain and
+  scatter data and copy embedded atmosphere references.
+- KiwiEnvironmentSession extends existing KiwiModelSession for transforms, parenting
+  and bounded history. Sparse multi-dab terrain strokes, cancel, undo and redo.
+- KiwiEnvironmentTerrain separates deterministic noise base and packed authored
+  edits. Flat/noise generation, raise/lower/smooth/flatten operations, resampling
+  edits on resolution changes. Initial range 3–257 samples, 32-cell chunks.
+  Chunk meshes share edge positions/normals and cache by per-chunk edit revision.
+- KiwiEnvironmentScatter stores weighted asset paths and rules, height/slope/normal
+  constraints, deterministic rotation/scale, hashed spacing rejection, painted and
+  erased regions, real instance/attempt budgets. No separate scene actor per tree.
+- KiwiEnvironmentAssets reuses KiwiModelImport/Modifiers and the shared native/
+  Kiwi material adapters. Cached model parts retain source paths; explicit source
+  invalidation and file signatures. It does not edit source resources.
+- KiwiEnvironmentRuntime builds native terrain chunks and collision triangles,
+  shared chunk mesh/collision resources, placed model parts and native MultiMesh
+  batches. Updates only touched terrain chunks; several instances share meshes.
+
+Tests/evidence actually obtained
+- environment_core_verified: 14 document/terrain checks pass (real geometry,
+  deterministic seeds, sparse sculpt undo/redo/cancel, seam coordinates, localized
+  dirty chunks, preserving edits under regeneration, parenting, save/reopen,
+  snapshot array independence).
+- environment_scatter_verified: 7 checks pass; 64 fixtures generated in 1.916 ms
+  with 108 attempts, correct anchoring/normals, spacing, seeds, paint/erase masks,
+  instance limit and changed elevation after sculpting.
+- environment_runtime_core: six functional assertions passed; 1,000 repeated
+  models use one MultiMesh and two authored components. First runtime build
+  97.735 ms, reported native node count 15. The run logged get_meta errors for
+  absent collision metadata; the production call now uses has_meta first.
+  RERUN this test to verify clean logs before citing it as fully passed.
+- environment_core: Model geometry regression passed and timeline physics retained
+  all 41 checks after initial collider placement/ground-height integration changes.
+- Native source editor/import checks for new classes completed; see verification
+  logs. Still run current targeted and integration tests after further edits.
+
+Required next work (do not claim the task is finished)
+1. Complete Environment viewport and UI, normal New Tab registration, per-tab state,
+   save/load/dirty-close handling, project filesystem open/thumbnail integration.
+2. Reuse KiwiModelViewport camera and transform handles. A derived viewport should
+   render via KiwiEnvironmentRuntime, pick actual terrain chunks/model meshes,
+   suppress geometry-edit modes, provide terrain/scatter brushes with one action
+   per stroke, and preserve large viewport/resizable hierarchy/properties panels.
+   Existing model_hierarchy.gd already provides drag-parent behavior.
+3. Asset placement/drop preview, terrain/surface snapping, library filtered over
+   project filesystem, selecting sources and editing them in Model Workspace.
+4. Scatter UI, painting/erasing/regeneration, dependency refresh, efficient native
+   batch updates; add actual optional collision support (the current data flag is
+   NOT acted on yet). Do not expose it as working until implemented/tested.
+5. Materials (standard/Kiwi/shader/image) and basic terrain material painting,
+   lighting/environment preview, grouping/structure assembly, source updates.
+6. Environment Asset actor, linked scene integration, correct existing offline
+   physics collider registration, source edits invalidate physics signatures.
+   Do not create thousands of authored actors or a separate simulation world.
+7. Save/clipboard dependent resources and reusable components, async/cancel/stale
+   generation safeguards, meaningful A–X UI/native regression/performance tests.
+
+Important integration details already inspected
+- scene_tabs.gd maintains one workspace UI per type and captures independent
+  sessions/state into document dictionaries. Follow model branch patterns for open,
+  save, switch, capture, unsaved close and To Scene. Filesystem must recognize
+  KiwiEnvironmentDocument BEFORE generic KiwiModelDocument (it is a subclass).
+- KiwiModelViewport has camera/nav, object transforms, snapping, selection and
+  overlay code. Extract its handles/navigation overlay into a reusable method if
+  needed instead of drawing all terrain mesh edges every frame. Derived input
+  must block Tab / 1–4 geometry modes and inappropriate model-edit commands.
+- Model hierarchy widget accepts KiwiModelSession, so the environment subclass
+  is compatible. Override duplication to clone/remap environment metadata and
+  scatter terrain dependencies; inherited duplication currently only clones model
+  components. Inherited grouping produces groups without explicit metadata, so
+  normalize those to kind=group in the environment session/UI.
+- Existing CanvasActorTimeline.dropped_paths is static and accepts ordinary file
+  drag dictionaries; reuse its drag interpretation.
+- Runtime terrain renderer currently has no asynchronous job layer or LOD. Editing
+  proxy meshes are full meshes while actual rendering uses chunks. Do not advertise
+  full large-world editing/streaming or advanced terrain/caves/erosion as implemented.
+
+No application export, ZIP, branch, commit or push. Temporary scene-video tests
+were authorized and removed; application export remains prohibited.
+
+## Climate and weather progress (2026-10-28)
+
+Implemented in the current continuation:
+- A resource-backed shared climate evaluates timeline time/day phase, season, sun direction/energy, humidity, temperature lapse, visibility, cloud coverage, global weather, local weather regions, deterministic weather schedules, and animated Scene-level overrides.
+- Procedural sun/sky/ambient/fog updates apply to the active scene environment without mutating the reusable environment source. The Environment workspace preview also uses the same climate evaluator.
+- Scene weather now emits camera-following GPU rain and snow. Intensity controls emission; snow and rain are separate emitters and stop when their climate is inactive.
+- Timeline physics samples the active environment at each simulated actor position. Wind applies bounded aerodynamic response to rigid/soft bodies and the authored wind velocity to powder transport; scenes without an environment retain their original physics behavior.
+- Climate resource edits use the environment session undo/redo path and climate data participates in the document signature and scene save/load.
+
+Latest targeted verification: environment climate (including rain/snow emitters), Environment workspace, Environment scene integration, Scene data, timeline physics, actor picker, and the three on-demand building streaming/editing tests pass. Report files are under `.godot/verification/` with prefixes `weather_wind_climate_`, `climate_weather_recheck_`, `actor_picker_reload_`, and `weather_particles_current_` (the earlier weather-particle run predates a property-name fix; use the later passing reports).
+
+Not complete: persistent/paintable snow and wetness maps, puddle accumulation and runoff, ground/material response, seasonal vegetation and snow cover, cloud shadows, lightning, regional wind physics fields, weather audio, timeline baking/caching and their full performance/acceptance matrices. Do not mark the environmental systems specification complete until these are implemented and tested.
+Latest focused passing climate report: `.godot/verification/climate_particle_behavior_fixed.json`. The earlier `weather_particles_current.json` was captured before the ParticleProcessMaterial property fix and is obsolete.

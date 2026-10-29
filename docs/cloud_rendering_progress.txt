@@ -1,0 +1,79 @@
+Cloud / atmosphere rendering — active implementation, 2026-10-27
+
+Authorized specification:
+C:/Users/User1/.codex/attachments/dc9d7805-0436-49bb-98f1-445c367a8137/Pasted text.txt
+After this specification, implement Environment Creator:
+C:/Users/User1/.codex/attachments/e248c7b1-65c5-49e8-ae30-0da550edecf9/Pasted text.txt
+
+Implemented so far
+- Cloud / atmospheric structure is mode 8 of the shared fog_field resource. All
+  mappings, masks, saved object paths, animation, native volume rendering and motion
+  source initialization reuse the established fog infrastructure.
+- Six distinct density distributions: seeded billowing cumulus lobes and a broad
+  base, layered stratus, stretched wispy formations, storm noise, ground mist and
+  height-dependent haze. Editable coverage/macro size/shape/detail/erosion/base/
+  thickness/profile/softness/seed/streak scale. Ground/haze use world elevation.
+- Twenty editable cloud/mist/haze presets in the fog inspector. Existing painted
+  fields remain in an editable mask; subsequent presets replace the generator,
+  avoiding repeated cloud-generator nesting. One undo action restores all changes.
+- Shared Realistic/Cartoon/Anime/Painterly/Fantasy appearance controls. Style changes
+  preserve the source texture and physical grid. Native illumination remains active.
+- Optional six-sample internal shadow and backlit silver-lining approximation,
+  driven by the actual strongest visible directional light and current camera.
+  This is not full multiple scattering or a second lighting engine.
+- Optional projected ground shadows integrate actual source/simulated concentration
+  toward the sun into a 16^2/32^2 local decal. Configurable receiver elevation,
+  receiver depth/layers, strength and distance fade. Static results cache; interactive
+  motion updates at 8 Hz, exact scene captures use their sampled density/time.
+  Texture allocation is reused. Disabling/changing the material hides the projection.
+  Procedural translation/rotation are sampled; projected turbulent detail is still
+  approximate. This is not an unlimited native volumetric surface-shadow solution.
+
+Verified
+- fog_cloud_quality.json: both scripts pass. Fifteen cloud-data checks cover unique
+  populated fields, seed determinism, height attenuation, all twenty presets,
+  painted-source preservation, one-action undo and dependency save/reopen.
+- Five native cloud pixel checks: style modifies pixels without rebuilding density,
+  camera parallax, inside-volume view, actual directional-light color, stratus shape.
+- cloud_cumulus.png, cloud_cartoon.png, cloud_stratus.png are actual Forward+ frames.
+  Visual review led to seeded lobe shaping and stronger cartoon bands; these are
+  practical native froxel clouds, not a claim of film-quality ray marching.
+- Six 16^3 fields initially generated and inspected in 145.08 ms total, before the
+  later lobe refinement. Do not use that earlier value as the refined generator's
+  final performance result; latest log contains current measurements.
+- fog_cloud_shadow_verified: all five native checks pass. Actual floor pixel changed
+  from white to .7098 gray under the integrated shadow; generation 26.856 ms in that
+  16^2 primitive-field fixture. Changing sun direction moves the reused projection.
+- Existing fog_render_test retains all 23 checks after the shader additions.
+
+Further implemented and verified
+- fog_ground_follow / fog_cloud_backlight: five terrain-following checks pass.
+  Cached 16² heights come from the existing offline collision world, including
+  raised terrain and invalidation when a collider moves. Sample generation took
+  2.924 ms for the fixture; upright domains and configured colliders are required.
+- Optional cloud source LOD blends to a cached 16³ field over a distance band.
+  It does not resize physical concentration grids. Native binding check passes.
+- Seven native cloud rendering checks now include LOD and backlit silver lining:
+  image difference 1937.44 when backlit, exactly zero from that control front-lit.
+- fog_motion_video_warm.json: all three native scene-video scripts pass: transported
+  fog (6), lighting (4), hair export (10). Fog density hashes and captured pixels
+  match at shared times across 24/30/60 fps in this fixture. Initial black capture
+  was fixed by warming six render passes at the same first sampled time; later
+  frames still use two. Temporary MP4 files are deleted. No application export.
+
+Remaining broader acceptance / limitations
+- Broader terrain/deck and distance-transition visual acceptance, beyond current
+  primitive collider and native LOD resource checks.
+- Dedicated backlighting/silver-lining, M2DO-character, dense/inside/depth temporal
+  stability, cloud projected-shadow simulation and production-cost fixtures.
+- Native scene-video tests of transported/baked cloud density at differing output
+  frame rates, appearance-only changes over a bake, and broader saved workspace UI.
+- Refine and profile exact-frame projected shadows, low-sun behavior, custom mesh
+  boundary/source mask support and nested masks. Optional projection is a local
+  receiver approximation; it must stay labeled and avoid claiming full terrain
+  shadow coverage.
+
+Environment Creator foundation is now being implemented; see
+environment_creator_progress.txt. It is not yet exposed as a complete workspace.
+
+No application export, ProjectBridge ZIP or Git publication was made.

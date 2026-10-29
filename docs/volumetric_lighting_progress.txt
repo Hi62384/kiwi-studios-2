@@ -1,0 +1,100 @@
+Volumetric lighting implementation / evidence — 2026-10-27
+
+Native integration
+- Existing Directional, Omni and Spot actors light native FogVolume data. General
+  Light now exposes volumetric energy, source size, distance/cone attenuation and
+  native shadow bias, normal bias, opacity and softness. Dedicated Directional
+  controls retain their previous properties. Zero volumetric energy leaves ordinary
+  surface Energy unchanged; there are no duplicate fog-only light actors/passes.
+- Basic Mesh/Shape, Text 3D and Image 3D actors expose shadow casting: Keep original,
+  Off, On, Double-sided, Shadows only. Child actors retain their own settings.
+  Render-only shadow controls do not invalidate physics signatures or portable bakes.
+- World Environment exposes temporal reprojection, history strength and ambient
+  injection alongside its existing anisotropy, GI, sky, distance and detail settings.
+  Native Environment setters do not always emit changed, so the temporary fog
+  environment detects actual property changes using a cached property layout.
+- Editor opens project-wide volumetric sampling: Fast 64/32, Balanced 128/64,
+  Detailed 192/96, Final 256/128, custom bounded dimensions, filtering and scene
+  positional shadow atlas 1024/2048/4096/8192. Sampling is renderer-wide; shadow
+  atlas is the scene viewport's and is copied to camera previews. Settings persist
+  in Project.fog_rendering and are undoable through the scene model history.
+
+Shadows and shafts
+- Real shadow maps and opaque scene depth determine shadowed fog and light shafts.
+  Window openings, moving walls and colored overlapping lights are native geometry /
+  light interactions, not transparent cone or dark overlay geometry.
+- Reproduced stale shadow-atlas binding when shadows become enabled after fog data
+  exists. On a changed shadow-light topology / atlas configuration, the coordinator
+  changes internal render scale for one frame to recreate native buffers and restores
+  the exact authored scale. It does not do this for moving light/caster transforms.
+  Confirmed by native pixel tests: behind-wall intensity 0.28009 -> 0.20232 with
+  shadows enabled; moving the caster restores light. Upstream context:
+  https://github.com/godotengine/godot/issues/83685
+- Godot also has an inherent spot volumetric-shadow fade limitation at distance.
+  The integration does not claim to remove the engine's hardcoded fade or provide
+  independent per-volume light linking / anisotropy. Upstream discussion:
+  https://github.com/godotengine/godot/issues/80039
+- Exclusion is explicitly authored with primitive, painted or closed-mesh fields.
+  It changes allowed density, rather than pretending a solid wall automatically
+  causes airtight flow. Mesh occupancy is cached, rigid and bounded at 32³. Full
+  deforming-mesh SDFs and automatically actor-following exclusion links are not
+  implemented. Source meshes remain intact.
+
+Timeline / scene video
+- Light transforms/colors/energy/volumetric energy/angle and caster transforms use
+  normal actor tracks, property gestures, undo and scene serialization.
+- Scene-frame capture marks its viewport, explicitly synchronizes fog ownership
+  after actor/camera evaluation, disables fog temporal history in temporary world /
+  camera overrides and waits two render completions before reading each exact time.
+  Particle/physics time stays fixed during warm-up. Original history settings and
+  capture flags are restored; source Environment resources are never rewritten.
+- fog_export_test captures actual red / purple / blue fog on all three intended
+  frames. Previously frame zero was gray and later colors were history-blended;
+  that failure was fixed, not hidden by changing the color assertions.
+- fog_lighting_export_test encodes actual animated light / moving-caster scenes at
+  24 and 48 fps. Six matching center-pixel samples were identical in the measured
+  fixture. This is not a claim of universal bit-identical rendering. Temporary
+  MP4s are removed; no application export was performed.
+
+Verified native Forward+ reports
+- fog_lighting_regressions: all 11 broader actor/scene/shader/growth/bake/clipboard
+  scripts pass after the lighting and export changes.
+- lighting_quality_final: four scripts pass (settings, spotlight/wall shadow,
+  window shafts and fog scene video). Later fog_multi_light_depth expands lighting
+  rendering to 11 assertions, all passing.
+- fog_light_video_retry: animated lighting/caster MP4 tests, 4 assertions passing.
+- fog_exclusion_pixels: primitive, closed-mesh and painted-mask pixels, 3 passing.
+- fog_environment_live: live anisotropy/window shafts and appearance rendering pass;
+  its settings fixture initially placed the environment clip at 5s while testing
+  0.5s. The fixture now uses an explicit free layer/start and all 8 controls/save/
+  undo/keyframe assertions pass in fog_light_controls_final / lighting_quality_final.
+- fog_native_shadow_fix: real shadow/moving caster test and fog video pass.
+- Failed intermediate reports are retained, not counted as successful final checks.
+
+Performance actually obtained (simple 512x384 native RTX 3060 Laptop fixture)
+- One volumetric light, no shadows, one volume, 64/32 froxels: viewport render CPU
+  0.151–0.217 ms, GPU 0.216–0.311 ms.
+- Four lights, no shadows, one volume, 64/32: CPU 0.154–0.300 ms, GPU 0.335–0.348 ms.
+- Four shadow lights, one volume, 64/32: CPU 0.175–0.343 ms, GPU 0.622–0.678 ms.
+- Four shadow lights, three volumes, 64/32: CPU 0.176–0.307 ms, GPU 0.668–0.698 ms.
+- Four shadow lights, three volumes, 192/96: CPU 0.135–0.266 ms; GPU steady
+  1.922–1.931 ms, with initial transition samples 7.638–11.466 ms.
+- Later process-frame intervals mostly 16.1–17.1 ms under vsync. First partial-frame
+  intervals are not full frame measurements. Viewport renderer timings exclude
+  the complete editor, script simulation and production-scene costs. These fixtures
+  use native simple fog materials, not a worst-case five-influence appearance stack.
+
+Limits
+- Native single scattering, not multiple scattering/path tracing. Fog emission
+  does not illuminate scene meshes; use an actual light for that.
+- Alpha/transparency/custom-shader shadow/depth behavior follows Godot. No claimed
+  physically correct colored transparent shadows or custom transparency solution.
+- Resolution and distance affect thin shafts, banding and cost. High temporal
+  history can trail in interactive playback; it is editable and disabled for exact
+  frame capture. Full skinned-character shadow and large production-asset visual
+  coverage remains broader than the current primitive/proxy acceptance fixtures.
+
+Next authorized queued specification, fully read:
+C:/Users/User1/.codex/attachments/7bdc8488-9a05-4118-bc0f-af4808d37c88/Pasted text.txt
+Animated & Simulated Volumetric Fog Movement. Not yet implemented by the lighting
+work above: it requires genuine density/velocity transport, not scrolling noise.

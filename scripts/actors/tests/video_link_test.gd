@@ -1,4 +1,7 @@
 extends SceneTree
+const CompositingDocument=preload("res://Workspaces/CompositingWorkspace/compositing_document.gd")
+const CompositingLayer=preload("res://Workspaces/CompositingWorkspace/composite_layer.gd")
+const CompositingEvaluator=preload("res://Workspaces/CompositingWorkspace/compositing_evaluator.gd")
 var failures := 0
 func check(condition: bool, message: String) -> void:
 	if not condition:
@@ -72,6 +75,11 @@ func run() -> void:
 		await process_frame
 		frame = ActorVideo.frame(path, 1.0, true)
 	check(frame != null, "FFmpeg produces seekable video preview frames")
+	var composition=CompositingDocument.new(); composition.canvas_size=Vector2i(720,404); composition.duration=3.; composition.layers.clear(); var footage=composition.add_layer(CompositingLayer.Kind.VIDEO,"Footage"); footage.source_path=path; footage.end_time=3.
+	var comp_evaluator=CompositingEvaluator.new(); var composite=comp_evaluator.evaluate(composition,1.0)
+	check(composite!=null and composite.image.get_size()==composition.canvas_size and composite.image.get_pixel(360,202).a>0.,"Compositor decodes and composites an FFmpeg-backed video frame at timeline time")
+	footage.start_time=1.; footage.source_time_offset=.5; footage.playback_speed=1.5
+	check(is_equal_approx(CompositingEvaluator.source_time_for_layer(footage,3.),3.5),"Video footage maps composition time through source offset and playback speed")
 	var preview: Texture2D = await FileOperations.get_file_thumbnail(path)
 	check(preview != null and preview.get_width() == 720, "File manager uses a video frame thumbnail")
 	var inspector := ActorInspector.new()

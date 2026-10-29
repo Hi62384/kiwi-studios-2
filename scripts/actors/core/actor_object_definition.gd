@@ -33,6 +33,7 @@ func create_object() -> ActorObjectData:
 	object.schema_version = schema_version
 	for property in properties:
 		object.values[property.id] = property.create_default()
+	if object.values.has(&"material_id") and str(object.values[&"material_id"]).is_empty(): object.values[&"material_id"]=ActorData.new_id()
 	return object
 
 

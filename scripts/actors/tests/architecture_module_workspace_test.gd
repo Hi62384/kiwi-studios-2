@@ -1,0 +1,16 @@
+extends "res://scripts/actors/tests/model_scene_integration_test.gd"
+const Modules=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_modules.gd")
+func run() -> void:
+	root.size=Vector2i(1440,950); root.gui_embed_subwindows=true; var folder:=ProjectSettings.globalize_path("user://linked_workspace_"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.new("Linked workspace"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.loaded_project=project
+	var main: Node=load("res://scenes/Main.tscn").instantiate(); root.add_child(main); await settle(); await settle(); var tabs:=get_first_node_in_group("actor_scene_tabs") as ActorSceneTabs; tabs.new_model(); await settle(); var library_index:=tabs._active_index; var library_session:=tabs.model_workspace.session; var original:=library_session.add("Box"); var source:=folder.path_join("Shared Window.res"); await tabs.model_workspace.save_to(source)
+	tabs.new_environment(); await settle(); var environment_index:=tabs._active_index; var workspace:=tabs.environment_workspace; var environment:=workspace.session; var room:=environment.add_group("Room"); var placed:=Modules.insert(environment,room.id,source); var part_id:=""; var before:=PackedVector3Array()
+	for item in environment.document.components:
+		if item.parameters.get("_module_bindings",{}).has(placed.id): part_id=item.id; before=item.mesh.vertices.duplicate()
+	environment.selected=[placed.id]; environment.changed.emit(); await settle()
+	check(button(workspace,"Open source ↗")!=null and button(workspace,"Refresh from source")!=null and button(workspace,"Make unique")!=null,"Linked source controls are reachable in the actual component inspector")
+	await workspace.save_to(folder.path_join("Room.res")); tabs._capture_current(); tabs._open_index(library_index); await settle(); library_session.action("Edit library geometry",func(): library_session.document.component(original.id).mesh.vertices[0].x-=.4); await tabs.model_workspace.save_to(source); await settle()
+	check(environment.document.component(part_id).mesh.vertices!=before and environment.dirty,"Saving a library model updates an inactive open Environment document through the native tabs system")
+	environment.undo(); check(environment.document.component(part_id).mesh.vertices==before,"Automatic linked-source refresh is one undoable authoring change"); environment.redo()
+	tabs._capture_current(); tabs._open_index(environment_index); await settle(); check(workspace.session==environment and workspace.session.document.component(part_id)!=null,"Returning to the Environment tab preserves updated source identities and its history")
+	var unique:=button(workspace,"Make unique"); unique.pressed.emit(); await settle(); check(not environment.document.component(placed.id).parameters.has("architecture_module_source"),"Native Make unique control detaches the source without removing instance geometry")
+	main.queue_free(); await process_frame; await process_frame; StaticData.loaded_project=null; print("ARCHITECTURE MODULE WORKSPACE: %d checks, %d failures"%[checks,failures]); quit(failures)

@@ -383,9 +383,15 @@ static func get_file_thumbnail(file: String) -> Texture2D:
 	
 	if file.get_extension().to_lower() in ["tres", "res"]:
 		var resource := ResourceLoader.load(file, "", ResourceLoader.CACHE_MODE_IGNORE)
+		if resource is KiwiGrowthStyle: return resource.thumbnail()
+		if resource is KiwiGrowthMaterial: return resource.thumbnail()
 		if resource is KiwiTransformationImage2D:
 			var preview: Texture2D=resource.thumbnail()
 			return preview if preview!=null else load("res://resources/Images/ActorIcons/Transformation2D.svg") as Texture2D
+		if resource is KiwiEnvironmentDocument:
+			var picture: Texture2D=resource.thumbnail()
+			if picture==null: return load("res://resources/Images/ActorIcons/WorldEnvironment.svg") as Texture2D
+			var thumbnail:=Image.create(192,144,false,Image.FORMAT_RGBA8); thumbnail.fill(Color("23594b")); var image:=picture.get_image(); image.convert(Image.FORMAT_RGBA8); image.resize(180,116,Image.INTERPOLATE_LANCZOS); thumbnail.blend_rect(image,Rect2i(Vector2i.ZERO,image.get_size()),Vector2i(6,6)); thumbnail.fill_rect(Rect2i(6,128,54,4),Color("7fe4c3")); thumbnail.fill_rect(Rect2i(66,128,24,4),Color("a8d5e5")); return ImageTexture.create_from_image(thumbnail)
 		if resource is KiwiModelDocument:
 			var preview: Texture2D = resource.thumbnail()
 			return preview if preview!=null else load("res://resources/Images/ActorIcons/BasicMesh.svg") as Texture2D

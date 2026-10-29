@@ -504,6 +504,15 @@ func run() -> void:
 		"Selecting a camera shows its render-only view in the viewport overlay")
 	check(editor.viewport_gizmo.camera_preview.find_world_3d() == viewport.find_world_3d(),
 		"Camera preview uses the scene viewport's actual 3D world")
+	var original_projection:=actor_camera.projection; var original_attributes:=actor_camera.attributes; var original_environment:=actor_camera.environment; var original_view_size:=viewport.size
+	actor_camera.projection=Camera3D.PROJECTION_ORTHOGONAL; actor_camera.size=7.5; actor_camera.h_offset=.2; actor_camera.v_offset=-.1; actor_camera.keep_aspect=Camera3D.KEEP_WIDTH
+	actor_camera.attributes=CameraAttributesPractical.new(); actor_camera.attributes.exposure_multiplier=1.4; actor_camera.environment=Environment.new(); viewport.size=Vector2i(500,700)
+	editor.viewport_gizmo._process(0.)
+	var copied_camera:=editor.viewport_gizmo.preview_lens
+	check(copied_camera.projection==actor_camera.projection and is_equal_approx(copied_camera.size,7.5) and copied_camera.keep_aspect==actor_camera.keep_aspect and is_equal_approx(copied_camera.h_offset,.2),"Selected-camera preview copies projection, orthographic size, aspect policy and offsets")
+	check(copied_camera.attributes==actor_camera.attributes and copied_camera.environment==actor_camera.environment,"Selected-camera preview preserves camera exposure and environment override")
+	check(editor.viewport_gizmo.camera_preview.size==Vector2i(640,896),"Camera preview preserves a portrait scene aspect ratio")
+	actor_camera.projection=original_projection; actor_camera.attributes=original_attributes; actor_camera.environment=original_environment; actor_camera.h_offset=0.; actor_camera.v_offset=0.; actor_camera.keep_aspect=Camera3D.KEEP_HEIGHT; viewport.size=original_view_size; editor.viewport_gizmo._process(0.)
 	check(editor.viewport_gizmo.preview_shader_overlay.visible
 		and editor.viewport_gizmo.preview_shader_overlay.material == camera_runtime.camera_shader_material
 		and camera_runtime.camera_overlay.size.is_equal_approx(Vector2(viewport.size)),
@@ -563,6 +572,10 @@ func run() -> void:
 		check(center_pixel.r > 0.7 and center_pixel.g < 0.3,
 			"Camera preview actually renders a 2D actor, rather than an empty gray viewport")
 		shape_clip.start_time = 100.0
+		# Test the camera's 3D output independently of the white particle overlays
+		# already checked above; otherwise emitter coverage changes the pixel color.
+		particles_2d_clip.start_time=100.0
+		particles_clip.start_time=100.0
 		var marker := MeshInstance3D.new()
 		marker.mesh = BoxMesh.new()
 		var marker_material := StandardMaterial3D.new()
@@ -715,7 +728,7 @@ func run() -> void:
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(source_path))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(image_path))
 	DirAccess.remove_absolute(path)
-	outer.free()
-	await process_frame
+	outer.queue_free()
+	for frame in 4: await process_frame
 	print("Scene data checks: %d failures" % failures)
 	quit(failures)

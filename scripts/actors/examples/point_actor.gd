@@ -9,6 +9,9 @@ func _ready() -> void:
 	parenting_anchor = Node3D.new()
 	parenting_anchor.name = "ParentingAnchor"
 	add_child(parenting_anchor)
+	if preload("res://Workspaces/ModelWorkspace/model_source_link.gd").register_actor(actor,self): add_to_group("model_instance_runtimes"); refresh_model_binding.call_deferred(str(actor.values.get(&"model_component_source","")))
+func refresh_model_binding(path: String) -> void:
+	if preload("res://Workspaces/ModelWorkspace/model_source_link.gd").refresh(actor,path): evaluate_transform(ActorAnimation.sampled_values(actor,actor.animation_time))
 
 
 func set_active(value: bool) -> void:

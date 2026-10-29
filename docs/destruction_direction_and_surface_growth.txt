@@ -1,0 +1,226 @@
+Editable destruction, surface growth and grooming
+=================================================
+Godot 4.6.1; writable-checkout implementation. No second physics clock, modeling
+workspace, application export or patch ZIP is introduced. The repeated physical
+debris specification was identical to the already implemented debris/VFX task.
+
+DIRECTABLE DESTRUCTION
+----------------------
+Use a Basic Shape / Basic Mesh > Properties > Destruction.
+- Operations keep the original source resource. Add, disable, duplicate, reset,
+  reorder and remove operations through the existing stack. Reset also removes
+  that operation's animation keys, with undo restoring them. Explicit depends_on
+  references refuse unsafe order/timing rather than silently retargeting geometry.
+- Preview cuts shows real prepared cap boundaries as a viewport-only overlay,
+  without advancing a future fracture. Operation activation still uses source time.
+- Position in viewport moves impact/plane/region centers. Draw fracture path
+  places points on the actual mesh; consecutive segments become real cutting
+  planes extruded along the view direction. Right-click ends placement. Each point
+  is an undoable authored action; paths are limited to 32 segments.
+- Weakness regions reduce local physical impact resistance. Protected regions
+  reject local automatic impact damage; fracture planes intersecting a protected
+  sphere are conservatively skipped. This is deliberately conservative: a plane
+  may be refused entirely, not bent around the protected sphere. It is not a
+  vertex-painted resistance texture or a guarantee against every manual carve.
+- Impact impulse operations apply a timed real impulse/energy event. Fracture
+  direction bias mixes authored direction with the normal separation impulse.
+  Numeric/vector controls use existing property tracks and curves; topology is
+  discrete, never interpolated as mismatched vertex arrays.
+- Direct fragments opens a compact editor for individual/multi-selected pieces.
+  Pick in the viewport, Shift-click for groups. Drag a gold target to author force
+  guidance in one undo action. Root source IDs + prepared geometry identity keep
+  selection stable when only timing/impulses/guidance change.
+- Fragment controls include initial linear/angular velocity, mass multiplier,
+  timed impulse, pin/release time, world target, interval, stiffness and damping.
+  Physical, force-guided (contact solved) and explicitly animated-target modes are
+  separate. Leaving animated mode carries its last target velocity into physics.
+  Targets have standard diamond keyframes; group property edits are atomic.
+- Animation-only corrections provide keyed position/rotation offsets, baked
+  time offset/rate and freeze-at-scene-time. They do NOT recalculate collisions.
+  VFX timing offset is separate. Recalculate with guidance for physical changes.
+  Corrections can sample only fragment identities that exist in the sampled bake;
+  they do not invent earlier fragments or retime all topology/contacts implicitly.
+- Preview, reset/disable stack, recalculate, freeze, bake group and clear-bake
+  controls reuse the existing Scene timeline. Late motion edits keep the bounded
+  prepared fracture cache; geometry changes produce a new dependent geometry key.
+- Capture setup produces a regular Destruction Setup object. Expand Reusable setup
+  for normal project Save / Load / Clipboard controls. Apply validates canonical
+  source topology/size and copies independent authored settings. It does not blindly
+  transfer indexed geometry to a different mesh. Capture baked assembly additionally
+  stores a validated complete rigid/destruction group as a reusable scene. Instancing
+  remaps identities, transforms and time. Other solvers are explicitly rejected by
+  portable-assembly capture rather than claiming unsupported replay.
+
+GROUP BAKES
+------------
+Bake group records every configured physics actor together, avoiding half-baked
+interacting assemblies. Start/end and sampling rate (1-240) are configurable. The
+physics fixed-step rate remains independent of output sampling rate. Progress is
+shown, cancellation keeps the previous valid bake, and completion is one atomic
+undoable action. Closing/changing the scene cancels safely. Existing per-actor
+legacy bakes remain readable and their old API remains available.
+
+KiwiPhysicsBakeCache is an ordinary persistent Resource. It interns mesh/material
+resources and prepared geometry records once, compresses blocks of 32 samples,
+and keeps at most two decoded blocks resident. Snapshots contain rigid fragment
+IDs/transforms/velocities, deformable state, topology, structural damage and VFX
+event seeds. It does not duplicate a complete rigid mesh at every sample.
+The group shares the same immutable cache resource; ordinary actor copies/history
+do not clone the whole cache. Copying/moving a world-space assembly invalidates its
+old bake as before. Bakes survive scene save/load. Correction layers remain separate.
+
+Limits now include optional external compressed 32-frame chunks, an atomic manifest,
+SHA-256 validation, two decoded chunks, 262,144 samples and 4 GiB streamed data.
+Embedded expanded data remains bounded at 256 MiB. Prefix reuse validates authored
+inputs and resumes on the fixed-step grid; cancellation preserves the prior bake.
+Portable rigid/destruction assemblies support timeline retiming. These features do
+not imply arbitrary topology editing or new collision solving during baked replay.
+Existing contact and convex-source limitations still apply.
+
+SURFACE GROWTH
+---------------
+In the 3D Model Workspace select a mesh, optionally select faces, then choose
+Surface growth... > Hair / Fur / Feathers. The new independent child component
+references its source's stable ID. Multiple systems can share one surface.
+
+Actual triangles are sampled proportionally to area using seeded barycentric
+coordinates. Roots save IDs, triangle indices, face IDs, barycentric attachment,
+orientation and stable variation. Open surfaces are supported. Selected polygon
+faces on a native bound mesh are mapped to corresponding weighted triangles.
+Density reserves candidate roots (normally 2x visible density) for local density
+painting. Minimum spacing uses a spatial grid. Ordered rows project a lattice onto
+the actual surface; this is useful for locally planar wings, not a general curved
+UV row-unwrapping system. Appearance/length edits do not reshuffle roots.
+
+Hair/fur use batched tapered ribbons with straight/curved/wavy/coiled shapes,
+length/thickness/direction variation, bending and optional fur guard strands.
+Feathers add distinct vanes and raised central shafts, with down/contour/flight
+profiles, width and overlap controls. They are real geometry, not a fur texture.
+Fine barb geometry and specialized anisotropic hair shading are not supplied.
+
+Components have source, density, length, thickness, seed, quality, shape, taper,
+variation, minimum spacing, direction (normal/world/local/tangent), color and
+feather-specific settings. Regenerate and convert-to-editable-mesh are supported.
+Rename, hide, duplicate, parent hierarchy and native model save/load use existing
+component systems. Source deletion is refused while dependent growth remains.
+Source topology changes invalidate/hide old attachments and request explicit
+regeneration; they never silently reuse unrelated triangle indices. Compatible
+vertex deformations retain barycentric roots. GPU shader displacement and arbitrary
+runtime blend-shape evaluation are not sampled by the attachment adapter.
+
+Skin attachment evaluates the actual weighted source vertices, then barycentrically
+evaluates each root and its deformed frame. This avoids treating a blended triangle
+as one rigid bone. Rigid bone attachments are handled separately. Cached styles
+are deformed at pose time; root distribution is not regenerated for bone motion.
+Scene instantiation retains procedural component data and resolves the instance's
+own skeleton. Repeated paused poses reuse geometry. Native model resources and
+the existing model Super Clipboard save retain dependencies; a standalone growth
+component without its source is not a self-contained asset.
+
+GROOMING
+----------
+Select a growth component and enable Groom in viewport. The contextual inspector
+offers Brush, Comb, Cut, Grow, Curl, Clump, Density, Length, Smooth, Relax, Part,
+Feather width, Spread, Protect, Reset region and Guide, each with a distinct icon.
+Shift-wheel changes world brush radius. Ctrl inverts applicable tools. Smooth
+falloff, spacing, target-versus-add modes, local-axis symmetry and through-surface
+editing are supported. Posed surface hits are mapped back into rest coordinates.
+Default face/normal filtering avoids the opposite facing side; this is not an
+exact geodesic brush or a separate occlusion ray for every neighboring strand.
+
+Tools change actual curves/lengths/density/feather geometry. Roots are fixed.
+Density reveals/suppresses stable reserved candidates; it cannot exceed the reserved
+root pool without increasing the base density/regenerating. Curl preserves sampled
+arc length approximately. Feathers bend rather than receiving automatic spiral
+curls. Clumps retain root-specific attachments and saved cell/target relationships.
+Smooth averages local direction/offset/length/density; Relax reduces deviations.
+
+One mouse stroke becomes one sparse ordered grooming layer and one undo action.
+Escape cancels. Enable/disable, reorder/remove, reset and apply layers are available.
+Layer changes store per-root field targets; ordering is deterministic last-writer
+composition, not an arbitrary replayable boolean geometry stack. The source mesh
+is unchanged. Applying layers consolidates targets into the base style; undo restores
+the layers. Limits: 128 layers / 65,536 sparse edit entries before consolidation.
+
+Guide mode: click a root to create a major guide affecting nearby roots. Gold
+control points can be dragged in 3D; the root cannot move. The inspector switches
+guides, changes influence, adds/removes tip points, smooths and duplicates/removes
+guides. Point drags use nearest-handle selection and one undo entry. Guides express
+root-relative style; this is not a full multi-guide interpolation/lock constraint
+solver. Independent per-strand numeric selection, arbitrary cutting planes, brush
+presets, continuous guide rotation gizmos and advanced clump scheduling remain
+limited. No strand physics or separate grooming workspace is added.
+
+PERFORMANCE AND QUALITY
+-----------------------
+20,000 candidate roots per component; one million generated vertices; 100,000
+source vertices/faces. Ordered rows have a two-million triangle-query ceiling.
+Fast/Balanced/Detailed use 3/6/10 curve segments. Limits reject excessive requests
+with visible feedback rather than allocating unbounded strand nodes.
+
+One MeshInstance per growth component, not one per strand. Spatially ordered chunks
+of 128 roots cache unchanged geometry. Brush queries use a root spatial grid.
+Local edits replace only affected ArrayMesh surfaces. Dense built-in materials now
+deform strands on the GPU using source attachment and weighted guide-pose textures.
+Source skinning uploads source vertices; each instance owns its pose tables. Small
+grooms and arbitrary custom shaders retain CPU deformation. Distance LOD compacts
+geometry and final-quality scene-video capture restores full coverage. See
+growth_rendering_progress.txt for current measurements and limits.
+
+Measured on this machine: 8,000 reserved roots, radius .15, four local comb stamps
+affected 115-140 roots and rebuilt 6 of 63 chunks. Full brush + geometry update was
+about 32-44 ms per stamp in the final measured run. This is not a 60 FPS guarantee.
+Initial 8,640-root generation/rendering was hundreds of milliseconds depending on
+load; changing a small region avoids repeating that entire initial generation.
+The 31-sample two-actor destruction fixture used about 1.2 KiB compressed state
+plus three interned resources / one prepared geometry record (simple fixture only).
+
+VERIFICATION
+-------------
+Reports/screenshots/logs are in .godot/verification. Focused new tests include:
+- destruction_authoring_test: operation enable/source preservation, physical regions,
+  cache reuse/stable IDs, guidance/pins, reusable setup, chunked group bake,
+  cancellation, save/reopen, post-bake offsets/freeze, keys and dependencies.
+- destruction_authoring_workspace_test: real inspector clicks/numeric gesture/undo,
+  native group bake and actual 12/24-fps scene-video rendering. Matching timestamps
+  compare topology, corrected fragment transforms, events and VFX buffer hashes.
+  Temporary validation videos are deleted; no application was exported.
+- surface_growth_test: face masks, area weighting, deterministic seeds, density,
+  feather geometry/rows, resource persistence, hierarchy, budget rejection and
+  exact barycentric multi-bone roots.
+- groom_tools_test: real sparse curve edits for all principal tools, root/locality
+  preservation, layer disabling, density pool behavior and save/reopen.
+- growth_workspace_test: real native viewport stroke and guide-handle drag, cancel,
+  atomic undo/redo, source preservation and a native screenshot.
+- surface_growth_scene_test: actual scene rig keyframes, rendered attached roots,
+  correct rig-space transform, pause caching and scene serialization.
+- growth_performance_test: measured full brush/render cost and assertions that local
+  edits do not rebuild every chunk.
+
+Broader model/hierarchy/rig, destruction/structure/debris, rigid/timeline, fluids,
+powder, clipboard and serialization regressions are rerun as relevant. Diagnostics
+are reported honestly: Windows certificate-store and some resource/RID shutdown
+warnings remain. The camera preview now copies projection, aspect, environment,
+exposure and viewport quality. Its color fixture isolates unrelated particles;
+the unchanged color assertion passes on Forward+ and OpenGL. Intermediate failed
+logs are retained and are not counted as passing final results.
+
+Delivery verification, 2026-10-27:
+- release_regressions.json: 20/20 relevant scripts pass on native Forward+.
+- last_feature_checks.json: 4/4 focused follow-ups pass, including 24 surface-growth
+  checks (bound face masks + real Super Clipboard snapshot) and 22 destruction-
+  authoring checks. Guide UI includes real nearest-handle mouse dragging.
+- delivery_final_followup.json: focused native rerun after setup-track and bake
+  safety fixes: 4/4 pass.
+- final_integration_checks.json: the growth scene and scene_data tests pass on
+  OpenGL; its earlier Guide handle failure was fixed and rerun successfully on
+  Forward+ (nearest handle is selected, not the first nearby control point).
+- delivery_source_final.log: headless editor source import/check is clean apart
+  from the Windows certificate-store diagnostic. git diff --check is clean.
+- delivery_visual.json: the compact guide UI passes on OpenGL. The final broader
+  scene_data retry reported zero assertion failures but timed out during renderer
+  shutdown at 100 seconds; the runner correctly marks that retry failed. Earlier
+  final_integration_checks.json completed the same OpenGL scene_data test normally.
+  Later camera_and_growth_lod, growth_gl_validation and fog_delivery runs completed
+  scene_data successfully. The historical shutdown timeout is retained in its old
+  report, not presented as a passing run.

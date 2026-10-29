@@ -1014,16 +1014,22 @@ func instantiate_scene(scene: ActorSceneData, point_definition: ActorDefinition,
 		actor.section_id = selected_section_id
 		actor.parent_id = str(id_map.get(source_actor.parent_id,
 			section_parents.get(source_actor.section_id, root.id)))
-		for key in [&"linked_audio_actor", &"remote_actor", &"model_skeleton_actor"]:
+		for key in [&"linked_audio_actor", &"remote_actor", &"model_skeleton_actor", &"model_component_instance_id"]:
 			if actor.values.has(key):
 				actor.values[key] = str(id_map.get(str(actor.values[key]), ""))
+		if actor.values.has(&"model_component_bind_transform") and str(actor.values.get(&"model_component_instance_id","")).is_empty(): actor.values[&"model_component_instance_id"]=root.id
 		if actor.values.get(&"physics") is Dictionary: actor.values[&"physics"] = KiwiPhysicsSettings.remap(actor.values[&"physics"],id_map)
+		if actor.values.has(&"structure_connections"): KiwiStructure.remap_actor(actor,id_map)
+		preload("res://scripts/actors/fog/fog_motion_definition.gd").remap_actor(actor,id_map,true)
 		if actor.values.has(&"fluid_mesh_actor"): actor.values[&"fluid_mesh_actor"]=id_map.get(str(actor.values[&"fluid_mesh_actor"]),actor.values[&"fluid_mesh_actor"])
+		if actor.values.has(&"powder_mesh_actor"): actor.values[&"powder_mesh_actor"]=id_map.get(str(actor.values[&"powder_mesh_actor"]),actor.values[&"powder_mesh_actor"])
 		var clip := source_clip.duplicate(true) as ActorClip
 		clip.id = ActorData.new_id()
 		clip.actor_id = actor.id
 		clip.start_time = root_clip.start_time + source_clip.start_time - first
 		clip.layer = root_clip.layer + scene.sections.size() + 1 + source_clip.layer - lowest_layer
+		if actor.values.get(&"physics",{}).get("bake",{}).get("portable",false):
+			actor.values.physics.bake.portable_root=root.id; actor.values.physics.bake.owner=actor.id; actor.values.physics.bake.portable_authored=KiwiBakeEditing.portable_signature(actor)
 		entries.append({"actor": actor, "clip": clip})
 	var ids: Array[String] = []
 	for entry in entries:
@@ -1293,11 +1299,19 @@ func paste_snapshots(snapshots: Array[Dictionary], time: float, preferred_layer:
 		for entry in group:
 			var actor: ActorData = entry.actor
 			var snapshot: Dictionary = entry.snapshot
+			var fog_ids:={}
+			for source_id in actor_map: fog_ids[source_id]=(actor_map[source_id] as ActorData).id
+			preload("res://scripts/actors/fog/fog_motion_definition.gd").remap_actor(actor,fog_ids)
+			if actor.values.has(&"structure_connections"):
+				var structure_ids:={}
+				for source_id in actor_map: structure_ids[source_id]=(actor_map[source_id] as ActorData).id
+				KiwiStructure.remap_actor(actor,structure_ids)
 			if actor.values.get(&"physics") is Dictionary:
 				var physics_ids:={}
 				for source_id in actor_map: physics_ids[source_id]=(actor_map[source_id] as ActorData).id
 				actor.values[&"physics"]=KiwiPhysicsSettings.remap(actor.values[&"physics"],physics_ids)
 				if actor.values.has(&"fluid_mesh_actor"): actor.values[&"fluid_mesh_actor"]=physics_ids.get(str(actor.values[&"fluid_mesh_actor"]),actor.values[&"fluid_mesh_actor"])
+				if actor.values.has(&"powder_mesh_actor"): actor.values[&"powder_mesh_actor"]=physics_ids.get(str(actor.values[&"powder_mesh_actor"]),actor.values[&"powder_mesh_actor"])
 			if actor.type_id in [&"video", &"video_2d"]:
 				var source_audio := str(actor.values.get(&"linked_audio_actor", ""))
 				# A copy must never own the original video's audio child.
@@ -1972,7 +1986,9 @@ func commit_object_property_preview(actor: ActorData, object: ActorObjectData,
 func _set_object_property(object: ActorObjectData, key: StringName, value: Variant) -> void:
 	object.set_value(key, ActorData.copy_value(value))
 	if not object.resource_path.is_empty():
-		ResourceSaver.save(object, object.resource_path)
+		var path:=object.resource_path.get_slice("::",0)
+		var root:=ResourceLoader.load(path) as ActorObjectData if object.resource_path.contains("::") else object
+		if root!=null: root.emit_changed(); ResourceSaver.save(root,path)
 	changed.emit()
 
 

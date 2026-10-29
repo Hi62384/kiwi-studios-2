@@ -6,7 +6,9 @@ const ShaderWorkspaceScript = preload("res://Workspaces/ShaderWorkspace/shader_w
 const AudioWorkspaceScript = preload("res://Workspaces/AudioWorkspace/audio_workspace.gd")
 const ImageWorkspaceScript = preload("res://Workspaces/ImageWorkspace/image_workspace.gd")
 const ModelWorkspaceScript = preload("res://Workspaces/ModelWorkspace/model_workspace.gd")
+const EnvironmentWorkspaceScript=preload("res://Workspaces/EnvironmentWorkspace/environment_workspace.gd")
 const TransformationWorkspaceScript = preload("res://Workspaces/TransformationWorkspace/transformation_workspace.gd")
+const CompositingWorkspaceScript = preload("res://Workspaces/CompositingWorkspace/compositing_workspace.gd")
 
 var timeline: ActorTimelineEditor
 var scene_workspace: Control
@@ -16,7 +18,9 @@ var _audio_scene_id := ""
 const AUDIO_SCENE_UID_META := &"kiwi_audio_scene_uid"
 var image_workspace: Control
 var model_workspace: KiwiModelWorkspace
+var environment_workspace: KiwiEnvironmentWorkspace
 var transformation_workspace: KiwiTransformationWorkspace
+var compositing_workspace: Control
 var documents: Array[Dictionary] = []
 var _switching := false
 var _untitled_counter := 1
@@ -24,6 +28,7 @@ var _active_index := -1
 
 
 func _ready() -> void:
+	preload("res://scripts/actors/fog/fog_render_settings.gd").attach(self)
 	add_to_group("actor_scene_tabs")
 	tab_close_display_policy = TabBar.CLOSE_BUTTON_SHOW_ACTIVE_ONLY
 	clip_tabs = true
@@ -42,6 +47,7 @@ func _initialize_tabs() -> void:
 		timeline = get_tree().get_first_node_in_group("actor_timeline_editors") as ActorTimelineEditor
 	if timeline == null:
 		return
+	preload("res://scripts/actors/fog/fog_render_settings.gd").apply_scene_shadow(self)
 	scene_workspace = get_node_or_null("../WorkspaceContainer/SceneWorkspace") as Control
 	if scene_workspace != null:
 		shader_workspace = ShaderWorkspaceScript.new()
@@ -70,9 +76,11 @@ func _initialize_tabs() -> void:
 		model_workspace.document_changed.connect(_active_model_changed)
 		model_workspace.model_saved.connect(_model_saved)
 		model_workspace.use_in_scene.connect(_model_to_scene)
+		environment_workspace=EnvironmentWorkspaceScript.new(); environment_workspace.name="EnvironmentWorkspace"; environment_workspace.visible=false; scene_workspace.get_parent().add_child(environment_workspace); environment_workspace.document_changed.connect(_active_environment_changed); environment_workspace.environment_saved.connect(_environment_saved); environment_workspace.use_in_scene.connect(_environment_to_scene)
 		transformation_workspace=TransformationWorkspaceScript.new(); transformation_workspace.name="TransformationWorkspace"; transformation_workspace.visible=false
 		scene_workspace.get_parent().add_child(transformation_workspace)
 		transformation_workspace.document_changed.connect(_active_transformation_changed); transformation_workspace.asset_saved.connect(_transformation_saved)
+		compositing_workspace=CompositingWorkspaceScript.new(); compositing_workspace.name="CompositingWorkspace"; compositing_workspace.visible=false; scene_workspace.get_parent().add_child(compositing_workspace); compositing_workspace.document_changed.connect(_active_compositing_changed); compositing_workspace.composition_saved.connect(_compositing_saved)
 	var file_system := get_node_or_null("../WorkspaceContainer/SceneWorkspace/VBoxContainer/HSplitContainer/VSplitContainer/FileSystem")
 	if file_system != null and file_system.has_signal("file_resource_opened"):
 		file_system.connect("file_resource_opened", _filesystem_resource_opened)
@@ -117,6 +125,76 @@ func new_image() -> void:
 
 func new_model() -> void:
 	open_model(KiwiModelDocument.new())
+
+func new_environment() -> void:
+	var source:=KiwiEnvironmentDocument.new(); source.add_terrain(); open_environment(source)
+
+func new_composition() -> void: open_composition(KiwiCompositingDocument.new())
+
+func open_composition(value: Variant) -> bool:
+	if compositing_workspace==null: return false
+	var identity:=ProjectSettings.globalize_path(str(value)).replace("\\","/").simplify_path() if value is String else "embedded:"+str(value.get_instance_id())
+	for index in documents.size():
+		if documents[index].get("type","")=="compositing" and documents[index].get("identity","")==identity: _capture_current(); _open_index(index); return true
+	_capture_current(); var title: String=str(value).get_file() if value is String else (value.title if value is KiwiCompositingDocument else "Untitled Composition")
+	documents.append({"type":"compositing","source":value,"identity":identity,"path":value if value is String else "","name":title,"state":{},"dirty":false}); _switching=true; add_tab(title,preload("res://resources/Images/ActorIcons/WorldEnvironment.svg"))
+	if tab_count>documents.size(): move_tab(tab_count-1,documents.size()-1)
+	_ensure_new_tab(); _switching=false; _open_index(documents.size()-1); return true
+
+func _active_compositing_changed() -> void:
+	if _switching or _active_index<0 or _active_index>=documents.size() or documents[_active_index].get("type","")!="compositing": return
+	documents[_active_index].dirty=compositing_workspace.dirty; _refresh_titles()
+
+func _compositing_saved(saved_path: String,saved_document: KiwiCompositingDocument) -> void:
+	for index in documents.size():
+		if documents[index].get("type","")!="compositing": continue
+		if documents[index].get("state",{}).get("document")==saved_document or (index==_active_index and compositing_workspace.document==saved_document):
+			documents[index].source=saved_path; documents[index].path=saved_path; documents[index].identity=ProjectSettings.globalize_path(saved_path).replace("\\","/").simplify_path(); documents[index].name=saved_document.title; documents[index].dirty=false; break
+	_refresh_titles()
+
+func open_environment(value: Variant) -> bool:
+	if environment_workspace==null: return false
+	var identity:=ProjectSettings.globalize_path(str(value)).replace("\\","/").simplify_path() if value is String else "embedded:"+str(value.get_instance_id())
+	for index in documents.size():
+		if documents[index].get("type","")=="environment" and documents[index].get("identity","")==identity: _capture_current(); _open_index(index); return true
+	_capture_current(); var title:=str(value).get_file() if value is String else "Untitled Environment"
+	documents.append({"type":"environment","source":value,"identity":identity,"path":value if value is String else "","name":title,"state":{},"dirty":false}); _switching=true; add_tab(title,preload("res://resources/Images/ActorIcons/WorldEnvironment.svg"))
+	if tab_count>documents.size(): move_tab(tab_count-1,documents.size()-1)
+	_ensure_new_tab(); _switching=false; _open_index(documents.size()-1); return true
+
+func _active_environment_changed() -> void:
+	if _switching or _active_index<0 or _active_index>=documents.size() or documents[_active_index].get("type","")!="environment": return
+	documents[_active_index].dirty=environment_workspace.session.dirty; _refresh_titles()
+
+func _environment_saved(saved_path: String,saved_session: KiwiEnvironmentSession) -> void:
+	for index in documents.size():
+		if documents[index].get("type","")!="environment": continue
+		if documents[index].get("state",{}).get("session")!=saved_session and not (index==_active_index and environment_workspace.session==saved_session): continue
+		var document:=documents[index]; document.source=saved_path; document.path=saved_path; document.identity=ProjectSettings.globalize_path(saved_path).replace("\\","/").simplify_path(); document.name=saved_path.get_file(); document.dirty=saved_session.dirty; document.state.path=saved_path; documents[index]=document; break
+	KiwiEnvironmentAssets.invalidate(saved_path); _refresh_titles(); get_tree().call_group("environment_asset_actors","reload_environment",saved_path)
+	if timeline!=null: timeline.physics.invalidate_asset(saved_path); timeline._evaluate_runtimes()
+
+func _environment_to_scene(saved_path: String) -> void:
+	_capture_current(); var found:=-1
+	for index in range(documents.size()-1,-1,-1):
+		if documents[index].get("type","")=="scene": found=index; break
+	if found>=0: _open_index(found)
+	else: new_scene()
+	timeline.model.create_actor(timeline.registry.get_definition(&"environment_asset"),timeline.canvas.playhead,{&"environment_path":saved_path})
+
+func _confirm_environment_close(index: int) -> void:
+	var closing:=documents[index]; var dialog:=ConfirmationDialog.new(); dialog.title="Unsaved environment"; dialog.dialog_text="Save changes to "+str(closing.name)+"?"; dialog.ok_button_text="Save"; dialog.cancel_button_text="Keep editing"; add_child(dialog); var discard:=dialog.add_button("Discard",true,"discard")
+	discard.pressed.connect(func():
+		dialog.queue_free(); var current:=documents.find(closing)
+		if current>=0: close_scene(current,true)
+	)
+	dialog.confirmed.connect(func():
+		var current:=documents.find(closing)
+		if current<0: dialog.queue_free(); return
+		_capture_current(); _open_index(current); var session:=environment_workspace.session; await environment_workspace.save(); current=documents.find(closing)
+		if current>=0 and not session.dirty and not environment_workspace.path.is_empty(): close_scene(current,true)
+		dialog.queue_free())
+	dialog.canceled.connect(dialog.queue_free); dialog.popup_centered(Vector2i(360,150))
 
 func new_transformation() -> void: open_transformation(KiwiTransformationImage2D.blank())
 
@@ -184,6 +262,9 @@ func _active_model_changed() -> void:
 
 
 func _model_saved(saved_path: String, saved_session: KiwiModelSession) -> void:
+	KiwiEnvironmentAssets.invalidate(saved_path)
+	preload("res://Workspaces/ModelWorkspace/model_source_link.gd").invalidate(saved_path)
+	if environment_workspace!=null: environment_workspace.get("canvas").call("request_sync")
 	var index := -1
 	for i in documents.size():
 		if documents[i].get("type","")=="model" and (documents[i].get("state",{}).get("session")==saved_session or (i==_active_index and model_workspace.session==saved_session)): index=i; break
@@ -192,6 +273,8 @@ func _model_saved(saved_path: String, saved_session: KiwiModelSession) -> void:
 	document.source=saved_path; document.path=saved_path; document.identity=ProjectSettings.globalize_path(saved_path).replace("\\","/").simplify_path(); document.name=saved_path.get_file(); document.dirty=false
 	document.state.path=saved_path; document.dirty=saved_session.dirty
 	documents[index]=document; _refresh_titles()
+	preload("res://Workspaces/EnvironmentWorkspace/architecture/module_links_ui.gd").refresh_open(self,saved_path)
+	get_tree().call_group("model_instance_runtimes","refresh_model_binding",saved_path)
 	get_tree().call_group("actor_shader_runtimes","refresh_saved_model",saved_path)
 	if timeline!=null:
 		timeline.physics.invalidate_asset(saved_path)
@@ -392,6 +475,8 @@ func close_scene(index: int, discard_changes: bool = false) -> void:
 	if not discard_changes and str(documents[index].get("type", ""))=="model" and bool(documents[index].get("dirty",false)):
 		_confirm_model_close(index)
 		return
+	if not discard_changes and documents[index].get("type","")=="environment" and documents[index].dirty: _confirm_environment_close(index); return
+	if not discard_changes and documents[index].get("type","")=="compositing" and documents[index].dirty: _confirm_compositing_close(index); return
 	if not discard_changes and documents[index].get("type","")=="transformation" and documents[index].dirty: _confirm_transformation_close(index); return
 	var previous_active := _active_index
 	_switching = true
@@ -431,6 +516,18 @@ func _confirm_image_close(index: int) -> void:
 		if not image_workspace._dirty: close_scene(index,true))
 	popup.popup_hide.connect(popup.queue_free)
 	popup.popup_centered(Vector2i(390,132))
+
+func _confirm_compositing_close(index: int) -> void:
+	var closing: Dictionary=documents[index]; var popup:=ConfirmationDialog.new(); popup.title="Unsaved composition"; popup.dialog_text="Save changes to "+str(closing.name)+"?"; popup.ok_button_text="Save"; popup.cancel_button_text="Keep editing"; add_child(popup); var discard:=popup.add_button("Discard",true,"discard")
+	discard.pressed.connect(func(): popup.queue_free(); var at:=documents.find(closing); if at>=0: close_scene(at,true))
+	popup.confirmed.connect(func():
+		popup.queue_free(); _capture_current(); var at:=documents.find(closing)
+		if at<0: return
+		_open_index(at); compositing_workspace.composition_saved.connect(func(_saved_path: String,_saved_document: KiwiCompositingDocument):
+			var current:=documents.find(closing)
+			if current>=0 and not compositing_workspace.dirty: close_scene(current,true),CONNECT_ONE_SHOT)
+		compositing_workspace.save())
+	popup.canceled.connect(popup.queue_free); popup.popup_centered(Vector2i(390,150))
 
 
 func save_current(path: String = "") -> Error:
@@ -487,8 +584,20 @@ func _open_index(index: int) -> void:
 	var document := documents[index]
 	if audio_workspace != null: audio_workspace.visible = false
 	if model_workspace != null: model_workspace.visible=false
+	if environment_workspace!=null: environment_workspace.visible=false
 	if transformation_workspace!=null: transformation_workspace.visible=false
-	if document.get("type","")=="transformation":
+	if compositing_workspace!=null: compositing_workspace.visible=false
+	if document.get("type","")=="environment":
+		if scene_workspace!=null: scene_workspace.visible=false
+		if shader_workspace!=null: shader_workspace.visible=false
+		if image_workspace!=null: image_workspace.visible=false
+		environment_workspace.visible=true; environment_workspace.open_source(document.source,document.state)
+	elif document.get("type","")=="compositing":
+		if scene_workspace!=null: scene_workspace.visible=false
+		if shader_workspace!=null: shader_workspace.visible=false
+		if image_workspace!=null: image_workspace.visible=false
+		compositing_workspace.visible=true; compositing_workspace.open_source(document.source,document.state)
+	elif document.get("type","")=="transformation":
 		if scene_workspace!=null: scene_workspace.visible=false
 		if shader_workspace!=null: shader_workspace.visible=false
 		if image_workspace!=null: image_workspace.visible=false
@@ -542,6 +651,9 @@ func _open_index(index: int) -> void:
 	_refresh_titles()
 
 func _release_document_history(document:Dictionary)->void:
+	if document.get("type","")=="environment":
+		var session:=document.get("state",{}).get("session") as KiwiEnvironmentSession
+		if session!=null: session._undo.clear(); session._redo.clear()
 	var history:Variant=document.get("history")
 	if not is_instance_valid(history) or not history is UndoRedo:return
 	if is_instance_valid(timeline) and timeline.model.history==history:return
@@ -560,7 +672,11 @@ func _capture_current() -> void:
 	if _switching or timeline == null or _active_index < 0 or _active_index >= documents.size():
 		return
 	var document := documents[_active_index]
-	if document.get("type","")=="transformation":
+	if document.get("type","")=="environment":
+		document.state=environment_workspace.capture_state(); document.path=environment_workspace.path; document.dirty=environment_workspace.session.dirty
+	elif document.get("type","")=="compositing":
+		document.state=compositing_workspace.capture_state(); document.path=compositing_workspace.path; document.dirty=compositing_workspace.dirty; document.source=compositing_workspace.source; document.identity=_compositing_identity(document.source)
+	elif document.get("type","")=="transformation":
 		document.state=transformation_workspace.capture_state(); document.path=transformation_workspace.path; document.dirty=transformation_workspace.session.dirty
 	elif str(document.get("type", "scene"))=="model":
 		document.state=model_workspace.capture_state()
@@ -618,7 +734,7 @@ func _add_document(scene: ActorSceneData, path: String, title: String, history: 
 func _ensure_new_tab() -> void:
 	if tab_count == documents.size():
 		add_tab("", preload("res://resources/Images/BasicImages/Plus.png"))
-	set_tab_tooltip(documents.size(), "Create a scene, model, shader, image, transformation image, or audio tab")
+	set_tab_tooltip(documents.size(), "Create a scene, model, shader, image, audio, transformation, or composition tab")
 
 
 func _blank_scene() -> ActorSceneData:
@@ -660,10 +776,14 @@ func _filesystem_resource_opened(path: String) -> void:
 		open_audio(path)
 	elif resource is KiwiImageDocument:
 		open_image(path)
+	elif resource is KiwiEnvironmentDocument:
+		open_environment(path)
 	elif resource is KiwiModelDocument:
 		open_model(path)
 	elif resource is KiwiTransformationImage2D:
 		open_transformation(path)
+	elif resource is KiwiCompositingDocument:
+		open_composition(path)
 
 
 func _show_new_tab_menu() -> void:
@@ -696,9 +816,13 @@ func _show_new_tab_menu() -> void:
 	var model_button := _new_tab_choice("◇  3D Modeling", "Create and edit mesh geometry, components, and modifiers")
 	column.add_child(model_button)
 	model_button.pressed.connect(func(): popup.queue_free(); new_model())
+	var environment_button:=_new_tab_choice("△  Environment Creator","Create terrains, landscapes, structures, natural environments, and procedural worlds.")
+	column.add_child(environment_button); environment_button.pressed.connect(func(): popup.queue_free(); new_environment())
 	var transformation_button := _new_tab_choice("◈  Transformation Image 2D", "Draw independent states, morph, and animate components")
 	column.add_child(transformation_button); transformation_button.pressed.connect(func(): popup.queue_free(); new_transformation())
-	popup.popup_centered(Vector2i(380, 450))
+	var composition_button := _new_tab_choice("▧  Compositing", "Layer footage, images, and graphics with a shared image engine")
+	column.add_child(composition_button); composition_button.pressed.connect(func(): popup.queue_free(); new_composition())
+	popup.popup_centered(Vector2i(430, 600))
 
 
 func _new_tab_choice(label: String, description: String) -> Button:
@@ -725,6 +849,11 @@ func _image_identity(value: Variant) -> String:
 	if value is Object: return "embedded:" + str(value.get_instance_id())
 	return ""
 
+func _compositing_identity(value: Variant) -> String:
+	if value is String: return ProjectSettings.globalize_path(str(value)).replace("\\","/").simplify_path()
+	if value is KiwiCompositingDocument: return "embedded:"+str(value.get_instance_id())
+	return ""
+
 
 func _active_image_changed() -> void:
 	if _switching or _active_index < 0 or _active_index >= documents.size(): return
@@ -736,6 +865,10 @@ func _active_image_changed() -> void:
 
 
 func _image_saved(source: Variant) -> void:
+	KiwiGrowthMaterial.invalidate_source(source)
+	if source is String:
+		KiwiEnvironmentAssets.invalidate(source)
+		if environment_workspace!=null: environment_workspace.get("canvas").call("request_sync")
 	if _active_index < 0 or _active_index >= documents.size(): return
 	var document := documents[_active_index]
 	if str(document.get("type", "")) != "image": return
@@ -771,6 +904,12 @@ func _active_shader_changed() -> void:
 
 
 func _shader_saved(source: Variant) -> void:
+	KiwiGrowthMaterial.invalidate_source(source)
+	var environment_source: String=source if source is String else (source.resource_path if source is Resource else "")
+	if not environment_source.is_empty():
+		KiwiEnvironmentAssets.invalidate(environment_source)
+		get_tree().call_group("environment_asset_actors","refresh_saved_model",environment_source)
+		if environment_workspace!=null: environment_workspace.get("canvas").call("request_sync")
 	if _active_index < 0 or _active_index >= documents.size(): return
 	var document := documents[_active_index]
 	if str(document.get("type", "scene")) != "shader": return

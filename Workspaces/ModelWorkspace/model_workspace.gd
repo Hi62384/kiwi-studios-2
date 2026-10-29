@@ -179,6 +179,27 @@ func _refresh() -> void:
 		_button(properties,"Open / import…",open_dialog)
 		_syncing=false; return
 	_label(properties,item.title)
+	preload("res://Workspaces/EnvironmentWorkspace/architecture/building_ui.gd").properties(self,item,properties)
+	if item.growth!=null:
+		KiwiGrowthUI.build(self,item,properties); _syncing=false; return
+	if item.mesh!=null: _button(context,"Surface growth…",KiwiGrowthUI.add_menu.bind(self))
+	if item.mesh!=null:
+		var structural:=OptionButton.new(); structural.fit_to_longest_item=false; structural.tooltip_text="Structural role when this model is added to a scene. Scene Structure controls edit strength, pivots and timed failures. Parenting does not weld components."
+		for title in ["Structure: off"]+KiwiStructure.ROLES: structural.add_item(title)
+		structural.select(int(item.structural.get(&"structure_role",0))+1 if item.structural.get(&"structure_enabled",false) else 0); properties.add_child(structural)
+		structural.item_selected.connect(func(index: int): session.action("Structural support role",func(): item.structural[&"structure_enabled"]=index>0; item.structural[&"structure_role"]=maxi(0,index-1)))
+		_button(properties,"Connect selected components",func():
+			var ids:=session.selected.duplicate()
+			if ids.size()<2: return
+			session.action("Connect model structure",func():
+				var base:=session.document.component(ids[0])
+				for id in ids.slice(1):
+					var other:=session.document.component(id)
+					if base==null or other==null or base.mesh==null or other.mesh==null: continue
+					var a:=session.document.world_transform(base); var b:=session.document.world_transform(other); var point: Vector3=(a.origin+b.origin)*.5
+					base.structural[&"structure_enabled"]=true; other.structural[&"structure_enabled"]=true
+					if not base.structural.has(&"structure_connections"): base.structural[&"structure_connections"]={}
+					base.structural[&"structure_connections"][ActorData.new_id()]=KiwiStructure.connection(other.id,a.affine_inverse()*point,b.affine_inverse()*point)))
 	if item.locked: _label(properties,"Locked — unlock in Components")
 	var affine := KiwiModelDocument.transform_values(item.transform)
 	for data in [["Position",affine.position],["Rotation",affine.rotation],["Scale",affine.scale]]:
@@ -189,7 +210,11 @@ func _refresh() -> void:
 			var control := _number(row,["X","Y","Z"][axis],vector[axis],-10000,10000,.01,_transform_value.bind(name,axis))
 			control.custom_minimum_size.x=62; control.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 			_transform_fields[name+str(axis)]=control
-	if not item.generator.is_empty() and item.skin_mesh==null and item.binding==null:
+	if preload("res://Workspaces/ModelWorkspace/natural_cluster.gd").accepts(item):
+		preload("res://Workspaces/ModelWorkspace/natural_cluster.gd").properties(self,item,properties)
+	elif preload("res://Workspaces/ModelWorkspace/natural_generator.gd").accepts(item.generator):
+		preload("res://Workspaces/ModelWorkspace/natural_ui.gd").properties(self,item,properties)
+	elif not item.generator.is_empty() and item.skin_mesh==null and item.binding==null:
 		_label(properties,"PARAMETRIC · "+item.generator)
 		var fields := ["radius","height","segments"] if item.generator not in ["Box","Beam","Panel","Plane","Prism","Stairs"] else ["width","height","depth"]
 		if item.generator in ["Sphere","Torus"]: fields=["radius","segments"]
@@ -265,7 +290,7 @@ func _rebuild_tree() -> void:
 	hierarchy.clear(); var root := hierarchy.create_item(); var items := {}
 	for item in session.document.components:
 		var row := hierarchy.create_item(root); row.set_text(0,item.title); row.set_metadata(0,item.id); row.set_editable(0,true)
-		row.set_icon(0,preload("res://resources/Images/ActorIcons/SkeletonRig.svg") if item.is_skeleton else (preload("res://resources/Images/ActorIcons/BasicMesh.svg") if item.mesh!=null else preload("res://resources/Images/ActorIcons/Point3D.svg"))); row.set_icon_max_width(0,18)
+		row.set_icon(0,KiwiGrowthUI.icon(KiwiSurfaceGrowth.TYPES[int(item.growth.settings.get("type",0))]) if item.growth!=null else (preload("res://resources/Images/ActorIcons/SkeletonRig.svg") if item.is_skeleton else (preload("res://resources/Images/ActorIcons/BasicMesh.svg") if item.mesh!=null else preload("res://resources/Images/ActorIcons/Point3D.svg")))); row.set_icon_max_width(0,18)
 		row.set_text(1,"●" if item.visible else "○"); row.set_tooltip_text(1,"Hide / show component")
 		row.set_text(2,"L" if item.locked else "·"); row.set_selectable(1,false); row.set_selectable(2,false); items[item.id]=row
 		if not item.visible: row.set_custom_color(0,Color("667f90"))
@@ -356,7 +381,10 @@ func _load_material() -> void:
 	if material!=null: session.action("Load material",func(): session.primary().surface_materials.append(material))
 
 func create_menu() -> void:
-	var choices := KiwiModelPrimitives.SHAPES.duplicate(); choices.append_array(["Draw Box","Draw Cylinder"])
+	var choices := KiwiModelPrimitives.SHAPES.duplicate(); choices.append_array(["Draw Box","Draw Cylinder"]); choices.append_array(preload("res://Workspaces/ModelWorkspace/natural_generator.gd").kinds())
+	choices.append_array(preload("res://Workspaces/ModelWorkspace/natural_cluster.gd").kinds())
+	choices.append("Building")
+	choices.append_array(preload("res://Workspaces/EnvironmentWorkspace/architecture/architectural_component.gd").kinds())
 	_choice_menu("CREATE GEOMETRY",choices,func(kind:String):
 		if kind.begins_with("Draw "): canvas.start_creation(kind.trim_prefix("Draw "))
 		else: session.add(kind,{},canvas.target)
@@ -510,6 +538,7 @@ func _view_command(index: int) -> void:
 		_: canvas.set_view(["Front","Back","Left","Right","Top","Bottom"][index-3])
 	canvas.overlay.queue_redraw()
 func open_source(value: Variant, state: Dictionary={}) -> void:
+	preload("res://Workspaces/EnvironmentWorkspace/architecture/building_ui.gd").cancel(self)
 	if rig_ui!=null: rig_ui.cancel_job()
 	if session.changed.is_connected(_changed): session.changed.disconnect(_changed)
 	if session.changed.is_connected(canvas.request_sync): session.changed.disconnect(canvas.request_sync)
@@ -517,6 +546,9 @@ func open_source(value: Variant, state: Dictionary={}) -> void:
 		session=state.session
 	else:
 		session=KiwiModelSession.new(); session.document=KiwiModelImport.load_document(value); session.dirty=not value is String
+		var linked: Dictionary=preload("res://Workspaces/EnvironmentWorkspace/architecture/module_links.gd").resolve(session.document)
+		if linked.document!=null: session.document=linked.document
+		else: status.text=linked.error+" Saved instance geometry is retained."
 		session.selected.assign(session.document.workspace_state.get("selected",[]))
 		session.mode=str(session.document.workspace_state.get("mode","Object")); session.elements=session.document.workspace_state.get("elements",PackedInt32Array())
 		if session.selected.is_empty() and not session.document.components.is_empty(): session.selected.assign([session.document.components[0].id])
@@ -543,7 +575,9 @@ func open_source(value: Variant, state: Dictionary={}) -> void:
 	var panels: Dictionary=state.get("panels",session.document.workspace_state.get("panels",{}))
 	if _layout_ready: _restore_panels(panels)
 	else: _pending_panels=panels
+	preload("res://Workspaces/EnvironmentWorkspace/architecture/building_ui.gd").restore(self)
 func capture_state() -> Dictionary:
+	preload("res://Workspaces/EnvironmentWorkspace/architecture/building_ui.gd").cancel(self)
 	for number in find_children("*","SpinBox",true,false):
 		if number is DragNumber and number._pressed: number.cancel_drag()
 	canvas.cancel_all(); _property_gesture=false
@@ -568,9 +602,12 @@ func save_as() -> void:
 	var result := await ActorProjectResourceSaveDialog.pick(self,"Save editable 3D model",path.get_file().get_basename() if not path.is_empty() else "Model","tres",false,PackedStringArray(["tres","res"]),func(): return session.document.snapshot())
 	if not result.get("cancelled",true): await save_to(str(result.path))
 func save_to(destination: String) -> Error:
-	canvas.rig_tool.finish(); canvas.finish_transform(); canvas.finish_extrusion(); session.document.workspace_state={"view":canvas.capture_state(),"panels":_capture_panels(),"selected":session.selected.duplicate(),"mode":session.mode,"elements":session.elements.duplicate(),"rig":_rig_state()}
+	if not await preload("res://Workspaces/ModelWorkspace/natural_edit.gd").flush(self): return ERR_BUSY
+	canvas.rig_tool.finish(); canvas.finish_transform(); canvas.finish_extrusion(); session.document.workspace_state.merge({"view":canvas.capture_state(),"panels":_capture_panels(),"selected":session.selected.duplicate(),"mode":session.mode,"elements":session.elements.duplicate(),"rig":_rig_state()},true)
 	var errors := session.document.validate()
 	if not errors.is_empty(): status.text="Save cancelled: "+errors[0]; return ERR_INVALID_DATA
+	var preview_session:=session; canvas.request_sync(); await canvas.flush_preview()
+	if session!=preview_session: return ERR_BUSY
 	var saved_session := session; var saved_revision := session.revision; var saved := session.document.snapshot()
 	if DisplayServer.get_name()!="headless":
 		await RenderingServer.frame_post_draw

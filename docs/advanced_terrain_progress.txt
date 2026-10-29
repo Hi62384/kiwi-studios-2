@@ -1,0 +1,387 @@
+Advanced Terrain — active implementation, 2026-10-27
+
+LATEST VERIFIED CHECKPOINT (supersedes older remaining-work notes below):
+- Forward+ supports EIGHT biome PBR slots plus ground/paint (10 total), four
+  on fallback devices. Three RGBA surface maps and two 3D cave maps. Actual
+  floor/ceiling render colors tested at the same XZ, including high palette slots.
+- Cave biome volume rules include depth, submersion, geology and surface normal.
+  Dry/damp/flooded/cold/limestone/volcanic starters; saved semantic signatures.
+- Biome paint has private live heatmap preview, one undo action and exact cancel.
+- Geology influences actual crater/landform eligibility and erosion mobility.
+- True full-resolution editable Model bake freezes 2D/3D material weight textures;
+  cancellable native chunk iteration, no source changes, normal model import.
+- Large Scene sources prepare derived fields in owned worker jobs, then upload
+  native chunks progressively. Timeline physics waits for complete geometry.
+- Native 1025 generation 1524.899ms, chunk queue 25.828ms; native 513 Scene all256
+  chunks/colliders, 524288 real primitives vs36120 proxy primitives. Optimized
+  startup97.464ms, peak atomic upload pass56.092ms, tracked CPU delta199442469B.
+  These measurements are NOT a hard60fps guarantee or total GPU memory claim.
+- Combined acceptance checks terrain/caves/water/biomes/sculpt/paint, exact saved
+  source/editor/cache state, native chunks and24 exact tributary joins.
+- terrain_acceptance_native:4/4 PASS; terrain_palette_and_load:4/4 PASS;
+  terrain_geology_caves:3/3 PASS; terrain_load_optimized:4/4 PASS;
+  biome_masks_and_cache:4/4 PASS; terrain_cliff_pixels:2/2 PASS. Real cliff checker
+  horizontal25/vertical26 edge transitions demonstrate no axial stretching.
+- Cross-system native regression currently running as terrain_cross_regression.
+- Existing limitations: bounded material/voxel/geometry budgets; static reservoir
+  hydrostatics, AABB buoyancy approximation, no finite-volume drainage; no 3D
+  cave-biome mask-painting UI; source geometry keyed midclip remains general
+  existing physics limitation. Vegetation is now actively being implemented.
+
+
+ACTIVE CONTINUATION — user asked to finish everything; DO NOT stop at this stage:
+- Native biome surface blending is implemented in terrain_biome_render.gd.
+  Ground + manual paint + four native PBR biome surfaces; normalized climate
+  weights also drive scatter. Albedo/normal/roughness/metallic and source texture
+  channels/UVs preserved. Inspector surface picker per biome. Explicit warnings
+  for unsupported shader sources and palette overflow; no silent layer omission.
+  biome_surface_and_handles: biome material 5 + water handles 8 + biome workspace
+  7 checks pass natively. Older biome_material_integration contains a fixed parse
+  error and a timeout; it is not passing evidence.
+- environment_water_tool.gd: direct river handles with private preview, plane
+  dragging, snapping, nearest-segment Shift insertion, remove point, Escape/RMB/
+  undo cancellation, one completed worker/history action, per-tab selection.
+- terrain_cave_water.gd: bounded priority flood through 3D cave AIR, seeded by
+  real connected water. Sealed chambers stay dry; underwater air volumes and
+  actual free surfaces under intact roofs. Saved volume queries, budget failures
+  restore previous data, cancellation. terrain_water_visuals native cave flood
+  8 checks pass including actual blue-water pixels from an interior camera.
+  This is static reservoir hydrostatics, not finite-volume dynamic drainage.
+- EnvironmentDocument.water_at is shared by runtime and offline physics.
+  Existing KiwiFluidBridge now samples animated environment poses/clip timing,
+  provides implicit stable rigid-body buoyancy and flow drag; no second physics
+  engine. Density/drag and enable controls on water, per-actor water response,
+  buoyancy/drag in standard physics inspector, supported by existing animation/
+  history. Source saves invalidate cached replay. terrain_buoyancy 5 native
+  checks pass: mass-50 cube floats y=.049934, dense cube sinks y=-2.222913,
+  disabled cube rests y=-2.749178; flow moves the floater; exact rewind and
+  saved-source disabling tested. Existing timeline_physics_test also passes.
+- terrain_waterfall_render.gd + terrain_spray.gdshader: one bounded seeded
+  MultiMesh spray batch at real river drops; analytical liquid_time, foam
+  controls, size/lifetime/density/disable, culling bounds, excluded from physics.
+  terrain_water_visuals: waterfall 6, cave flood 8, water physics 5 native checks
+  all pass. Rendered waterfall byte buffers differ across times and match EXACTLY
+  after rewind. No native wall-clock particle simulation.
+- Large terrain now supports 513 and 1025 (MAX_RESOLUTION) and 4km extents.
+  Above 257, 129-square authoring proxy; native terrain still uses full source.
+  Worker precomputes exported chunk keys; sparse edits invalidate regional keys,
+  binary resources preserve them. Runtime validates semantic source stamp before
+  reuse; direct external array mutation must be followed by normal refresh.
+  Large proxy updates map source sample indices properly. Existing 3..257 proxy
+  behavior unchanged. large_terrain_core: 1025 source (1,050,625 samples) in
+  1577.331ms, proxy16,641 vertices, 1024 cached chunks, compressed save/reopen,
+  regional signatures, and proxy edits all pass (6 checks). Cave seams4 and
+  brushes41 also pass. Native large upload performance test is NEXT.
+- Regression runner Windows timeout cleanup no longer uses hanging taskkill/WMI:
+  Toolhelp snapshot identifies ONLY descendants of its owned test process and
+  terminates them through kernel handles. A real owned parent/child probe passes.
+  The first failed shader attempt hung under old taskkill; its verified owned
+  children were stopped. No user editor/application processes were touched.
+
+Remaining terrain work/audit: native large upload/performance and physics checks,
+terrain-to-Model bake/source pipeline controls and richer masks, cave biome fields,
+geology-aware starter distinctions, complete A-AI visual/integration acceptance.
+Biome material palette is explicitly limited to FOUR biome surfaces plus ground/
+paint per terrain. No claims of unlimited material layering. Large source load
+and full Scene collision are currently synchronous after cached source preparation;
+preview upload is progressive. Need measure realistic large Scene memory/timing.
+Vegetation and architecture still NOT started. Continue them once terrain
+acceptance is complete. Do not export the application. No delegation authorized.
+
+FINAL CHECKPOINT FOR THIS PASS:
+- terrain_water_final: water runtime 12 and fluid workspace checks pass natively
+  after the final slope-normal fix and scaled world-space depth assertion.
+- terrain_biome_masks: 27 CPU checks pass, including preservation of painted
+  biome masks when terrain resolution changes. Roughness uses spatial spacing;
+  biome cache FORMAT_VERSION=2 invalidates earlier derived data correctly.
+- terrain_app_launch.log: normal Forward+ application launch exits 0 after 40
+  frames. Only the pre-existing Windows certificate-store error is present.
+  No application export. git diff --check is clean.
+- Latest paint/water/biome reports contain no script or shader errors; the earlier
+  failed shader/test attempts are retained in older diagnostic reports honestly.
+- Terrain, vegetation and architecture specifications are NOT fully complete.
+
+CURRENT UPDATE (supersedes hydrology/biome-not-implemented notes below):
+- Cave-connected surface openings now sample the actual exposed cave floor for
+  drainage and depth, with bounded/cancelable vertical sampling. Cave edits
+  invalidate water; one resulting ground field drives native cave meshes and
+  collision. This handles open caves, NOT enclosed underground hydrostatic flow.
+  terrain_cave_water_verified: 7 native checks + water workspace passed.
+- Native PBR terrain paint is now continuous, in one mesh surface, with triplanar
+  albedo/normal/roughness/metallic maps, texture channels, color/strength/UV scale
+  and offsets taken from the existing material assets. Immutable authored assets;
+  texture mask updates reuse the same GPU texture/shader, exact mesh and collider.
+  Arbitrary user shaders keep their own shader and categorical material fallback.
+  This is still TWO paint layers, not full biome multi-material blending.
+  terrain_paint_cached: 5 native scripts passed: paint pixels, material, cave
+  runtime, seams, LOD. terrain_pbr_verified: final paint 5 checks and material 12
+  checks passed, including actual rendered gradient and native PBR map settings.
+- terrain_hydrology.gd provides deterministic priority-flood drainage, acyclic
+  catchment accumulation, automatic downhill rivers with widening, manually
+  authored paths, channel carving, basin lakes and boundary-connected oceans.
+  Actual clipped water meshes, flow/depth/shoreline/moisture and waterfall drop
+  metadata. Bounded meshes and cancellation. No second fluid simulation.
+- Terrain stores water_delta separately from procedural/sculpt heights. Worker
+  order base -> erosion -> water -> final climate -> cave geometry -> proxy.
+  Sculpt inverse subtracts the current channel delta; derived regeneration adds
+  no history entry. Save ensures all derived stages are valid before writing.
+- environment_water_render.gd installs collision-excluded water meshes using
+  the existing liquid appearance shader. Optional wave/depth/flow shader inputs
+  preserve old fluid defaults. Manual liquid_time supports exact timeline rewind.
+  Scene actors expose transformed water_at queries. Preview waves animate while
+  the workspace is visible. Material changes reuse water geometry.
+- Inspector water controls include toggles, rainfall, catchment, river width/depth,
+  lake depth, sea level, flow/waves/color/native material picker; manually add and
+  edit river point coordinates and lake center/level. Each source change is one
+  undoable worker commit; appearance changes avoid CPU regeneration entirely.
+- terrain_biomes.gd: normalized continuous suitability weights; climate temperature,
+  latitude/altitude lapse, humidity plus water moisture, slope, roughness and shore
+  distance. Stable editable IDs, 14 starter definitions, fallback, frequency,
+  region size, transition width and masks. Saved fields and bilinear biome_at.
+  Real scatter generation accepts allowed biome IDs with probability weighting.
+  Inspector provides climate/rule editors and scatter biome checkboxes.
+- Optional per-biome analytic landforms reuse the existing terrain generator.
+  A frozen preliminary field on macro heights drives these BEFORE erosion;
+  final climate consumes completed ground/water. No circular regeneration.
+  Exposed landform height/width/length/direction controls, add/remove and history.
+- Base cache accounts recursively for nested field arrays within its byte budget.
+
+New evidence:
+- terrain_water_native: 3 native scripts passed (water runtime, cave runtime,
+  generation worker). terrain_water_history: water workspace passed.
+- terrain_water_biome_native water runtime: 12 checks passed including real water
+  pixels, collision separation, source isolation, save/cache, transformed actor
+  queries and exact timeline/rewind time. Fluid workspace passed after shared
+  liquid shader changes. That report also contains an earlier test-script parse
+  failure; corrected biome workspace is in terrain_biome_editor_verified.
+- terrain_biome_editor_verified: 3 native scripts passed: biome workspace 7,
+  existing scatter 12, cave tools 13 checks. Source+fields undo/redo/save verified.
+- terrain_biomes_core: biome 24 and hydrology 9 CPU checks passed. Its earlier
+  scatter dependency parse failure was caused by a concurrent unfinished edit;
+  corrected scatter passes in terrain_biome_editor_verified.
+- terrain_biome_geometry: 3 CPU scripts passed: biomes 26, generation 33, erosion
+  12 checks. Biome geometry changes and restores the actual procedural base.
+- terrain_latest_native: 4 native scripts passed: biome workspace, water workspace,
+  water rendering, environment Scene integration. Scaled water depth/bottom was
+  subsequently verified by terrain_water_final.
+
+Outstanding terrain acceptance (NOT complete): enclosed cave water routing
+and hydrostatic flooding, path viewport handles, waterfall VFX/volumes and
+water physics integration beyond surface query, more masks/bakes/source controls,
+large-world resolution/streaming (still 257 sample cap), cave biome fields and
+smooth biome multi-material blending. Native TWO-material painting is now smooth;
+biome rules store associated material paths but do not yet render biome materials.
+Some starter types depend on later geology rules for full semantic distinction
+(e.g. volcanic is not a real geology classification yet). Full A–AI acceptance
+and performance/stress testing remain. Do not declare the terrain spec complete.
+
+Queue: finish terrain -> vegetation/natural objects (8d0f837c attachment) ->
+advanced procedural structures/architecture (341fe14d attachment). Both specs
+were read in full. Structures implementation has not started: real floorplans,
+openings, doors/windows/stairs/roofs/modular anchors/foundations/editable metadata
+and existing destruction integration are required, not decorative box facades.
+User explicitly prohibits application export; test native launches only.
+
+LATEST FOLLOW-UP:
+- terrain_cave_tools: 13 native checks pass for actual viewport dig/fill strokes,
+  exactly one action per stroke, restoring solids with Fill, Escape cancel, local
+  smoothing, independent strength/radius, failed-budget non-retry, canceled jobs,
+  and an actual density-slice image generated by a cancelable worker.
+- terrain_slice_view.gd provides the bounded 96x96 worker diagnostic popup.
+- terrain_lod.gd uses Godot ImporterMesh native LOD generation. Border locking was
+  experimentally checked through the installed Godot API, then tested in the
+  production path. Chunk LOD, detail bias, render distance/fade margin and nearest-
+  camera upload priority are implemented. Full collision remains independent.
+- terrain_lod_native_fixed: 6 native checks passed. 128 shared border vertices
+  retained at every detail level. 6,144 base indices -> 402 coarsest indices.
+  Actual renderer primitives 8,192 -> 534; native optimization fixture 3.253 ms.
+- Volume cache format key includes VOLUME_FORMAT_VERSION. Increment this if a
+  future mesher change makes stored arrays incompatible. Cave titles participate
+  in authored history signatures but not geometry keys; renaming remains undoable.
+- New native source LOD defaults change chunk generation; rerun relevant cave,
+  physics and environment tests as final terrain changes accumulate.
+
+NEXT ACTIVE implementation step: hydrology/drainage, river carving and actual
+water surfaces. Not yet implemented. Need a separate saved derived delta/fields
+stage over generated+eroded+sculpted heights, preserve sculpt inverse offsets,
+and one action per brush. Automatic derived regeneration should commit derived
+data without adding an extra undo action. Water depth/flow/shoreline metadata
+must be shared with biomes/vegetation; no blue decorative lines as rivers.
+
+Pipeline preparation now added: _regenerate_terrain has derived_only for automatic
+cave-data regeneration and save preparation. Such results replace derived terrain/
+mesh data, mark dirty/revision and emit changed WITHOUT adding a history entry.
+Normal authored source edits still use one session.action on completed job.
+Run affected tests after this small change.
+
+Hydrology design considered next (NOT implemented):
+- KiwiTerrainHydrology source resource with automatic drainage/rivers, manual paths,
+  ocean/sea level and lakes. Priority-flood from boundary outlets with visited
+  parent graph; filled heads need no epsilon because parents are visited first.
+  Reverse visitation order accumulates physical catchment area. Basin fill gives
+  actual lake levels; terrain-sensitive downhill paths, channel carving and water
+  meshes use the same data.
+- Terrain source height before water = _base + authored edits. A separate exported
+  water_delta and water_data cache apply river carving after sculpt, before caves.
+  Source key includes generation/erosion plus edits and hydrology settings. height
+  adds current water_delta; sculpt inverse must subtract existing water_delta when
+  storing edits, preventing double carving. Worker order: base/erosion -> hydrology
+  -> cave volumes -> editable proxy. Save validates both derived stages.
+- Derived fields: water level/depth, flow, moisture, shoreline distance, river paths,
+  lake/ocean regions. Needed by biomes and NEXT vegetation task. Use finite dry
+  sentinel, normalized continuous data, not arbitrary biome IDs.
+- Native water shader/material should reuse compatible existing liquid appearance
+  properties, allow existing material assignment, use manual timeline time, actual
+  mesh shore clipping/flow UVs. Visual water is not a second fluid solver.
+- Preserve actor transforms, caching, bounded worker jobs, cancel and stale guards.
+
+LATEST CAVE UPDATE (supersedes the earlier cave-not-implemented notes below):
+- terrain_cave.gd is a true editable 3D capsule/chamber void field, connected seeded
+  networks, variable radii, roughness, smooth junctions, spherical dig/fill and a
+  local smoothing field (smoothing is a final six-sample convolution over the
+  authored dig/fill field). Dig/fill strength blends signed distances; radius is
+  the actual displayed brush radius. Cave smoothing and strength edits are NEW
+  and still need their targeted tests.
+- terrain_volume_mesher.gd extracts max(y-height, -void_distance) using consistent
+  tetrahedral cells. Real surface openings, floors, walls, ceilings, normals and
+  UVs. Pure worker CPU arrays, cancellation, explicit voxel and vertex budgets.
+- Terrain exports saveable volume chunk arrays plus semantic keys. Only chunks
+  intersecting caves use volumetric surfaces; other chunks remain heightfields.
+  Per-chunk local height/void signatures allow regional reuse. Native runtime
+  mesh and collision use the same triangles. Preview cutaway filters surface
+  triangles and wireframe is viewport-only.
+- Generation job builds cave arrays before committing source and meshes. Errors
+  discard the result. Cancel/failed signatures prevent automatic retry loops.
+  Workspace automatically regenerates invalid derived cave geometry after sculpt
+  history changes; saves wait for jobs and reject incomplete cave geometry.
+- Cave menu: network/tunnel/chamber creation, path/chamber point handles,
+  dig/fill/smooth tools, cutaway, wireframe. Point drag uses a private resource,
+  one async action on release, Escape/RMB cancel. Shift-click inserts on the
+  nearest visible path segment; RMB/Delete removes points without deleting the
+  terrain. The last two tunnel points are retained. Inspector has source, chamber,
+  point XYZ and detail controls. Cave/editor preview state is saved per tab.
+- terrain_data_hash.gd canonicalizes dictionary keys. ResourceSaver sorts keys;
+  insertion-order hashes previously invalidated reopened cave caches. FIXED and
+  tested. This helper is also used by terrain generator and erosion resources.
+
+New actual evidence:
+- terrain_cave_geometry: 12 pure geometry checks passed. Connected void, floors,
+  ceiling/walls, true opening, orientation, determinism, budgets/cancel/network.
+  Fixture: 1,611 vertices, 1,600 triangles, 3,840 cells, 102.608 ms.
+- terrain_cave_cache_verified: runtime 11 native checks + erosion workspace 9
+  passed. Includes camera pixels inside cave, native collision, dig, cutaway,
+  source/cache persistence after save/reopen.
+- terrain_cave_handles: 11 native workspace checks passed, including actual
+  viewport handle drag preview/commit, undo and saved cave/cutaway state.
+- terrain_cave_boundaries_physics: seams 4 + physics 2 checks passed. Adjacent
+  chunks share 47 boundary vertices. Local dig rebuilds one chunk and preserves
+  untouched native mesh/collision. Scene rigid body rests on underground floor
+  at (0.001546, -4.690104, 0.002825); rewind/seek reproduces position.
+- environment_sky_time: world 9 native checks passed. Native sky TIME wrapper
+  preserves original shader, uses scene time and rewinds, including existing
+  opt-in world ownership/restore and actual camera pixels.
+- terrain_advanced_ui_verified: native advanced noise + erosion inspector built
+  with selected terrain and expanded controls, all 9 workspace checks pass.
+
+Current cave follow-up before declaring this slice finished:
+- Test new dig/fill strength and local smoothing, actual brush stroke transactions,
+  fill restoring volume, cancellation/failed-budget retry behavior.
+- Add SDF slice/debug UI and explicit cave point/path/chamber add/remove options
+  where useful. Cave wireframe works; underground navigation reuses normal fly.
+- Stress cancellation/memory and save while generation is pending.
+- Re-run affected terrain/environment tests after the new cave integration.
+- LOD, full hydrology/water/shorelines, biomes and smooth material layer systems
+  remain unimplemented. Vegetation remains NEXT after the entire terrain task.
+
+Authorized queue (do not lose or reorder):
+1. Environment Creator foundation: e248c7b1-65c5-49e8-ae30-0da550edecf9 spec.
+2. CURRENT: C:/Users/User1/.codex/attachments/12534cae-3b3e-4c71-a7e7-4d53f03f686a/Pasted text.txt
+3. NEXT: C:/Users/User1/.codex/attachments/8d0f837c-cd46-4bae-b1bd-cf12467d7feb/Pasted text.txt
+   Procedural Vegetation and Natural Objects. Fully read, including middle
+   materials/environment/overrides/seasonal sections. Not implemented yet.
+
+The user prohibits application export. Direct edits, tests and app launches are
+authorized. Do not make a ZIP, commit, push or reset unrelated local changes.
+No subagent delegation authorized by current instructions.
+
+Implemented terrain work so far (NOT the complete advanced terrain task):
+- terrain/terrain_generator.gd: ten physical generation profiles (Flat, Hills,
+  Mountainous, Island, Archipelago, Desert, Canyon, Plateau, Coastal, Custom).
+  Multiscale Simplex/Perlin/ridged/cellular/domain-warped noise with actual controls.
+  Twelve ordered analytic geological landforms (connected ridge range, mountain,
+  ridge, valley, canyon, cliff, plateau, mesa, hill, basin, crater, dunes), add/min/
+  max/replace composition and circular masks. Heightfield cliffs have NO overhangs.
+- terrain/terrain_erosion.gd: true conservative grid hydraulic water/sediment
+  transport and separate talus-based thermal relaxation. Deterministic rainfall,
+  actual erosion/deposition/heights/water/flow/accumulation fields; regional masks;
+  cancellation. Modifier resources remain editable in authored order.
+- KiwiEnvironmentTerrain evaluates generation -> ordered erosion -> authored
+  sculpt deltas. Derived fields live alongside the source. Base cache is mutex-
+  guarded, at most 16 entries / estimated 64 MiB. Cache arrays are immutable;
+  prepare allocates a NEW _base before writing a different source to avoid corrupting
+  cached previous states. Cache avoids recomputing erosion on history restore.
+- Terrain editable proxy meshes now use explicit triangles. Steep nonplanar quads
+  failed generic Model validation and prevented opening noisy terrains. Native
+  chunk rendering/collision already used the same triangle topology.
+- Large generation and ALL erosion edits use worker-owned CPU resources; cancel,
+  stale-source checks and atomic history commit retained. Preview native chunk
+  uploads use a per-frame budget. Scene runtime remains synchronous for physics.
+- Terrain menu now contains 13 real sculpt brushes: Raise, Lower, Smooth, Flatten,
+  Level to Height, Terrace, Noise, Ridge, Valley, Pinch/Sharpen, Relax, Erode, Stamp.
+  Sparse undo/redo, strength/falloff/spacing, circle/square, X/Z symmetry. Stamp
+  loads a project image. Brushes update affected native meshes/colliders.
+- Workspace UI exposes profiles, advanced noise, ordered landform and erosion
+  controls, enabled toggles, movement/reorder/delete, parameters and circular masks.
+  Added brush/editor state is captured per tab/save. No modal viewport-blocking
+  terrain parameter dialog.
+
+Actual evidence in .godot/verification:
+- environment_final_checks: 16/16 native Forward+ scripts passed. Foundation
+  documents/material/scatter/runtime/jobs/upload/world/clipboard/workspace/scene,
+  Model interaction/workspace, timeline physics, fog rendering and actor picker.
+  Superseding targeted reset/picker fixes passed afterwards.
+- environment_reset_state: document 16, workspace 12, generation 12 checks pass.
+- environment_picker_verified: workspace 13 and world 7 checks pass.
+- environment_app_launch: launched actual project Forward+, exit 0. Only existing
+  root-certificate-store warning. No app export produced.
+- environment_upload_fixed: 64 chunks, initial queue setup .873 ms; worst single
+  chunk pass 14.471 ms. Final foundation suite measured .732 / 15.038 ms.
+- environment_final_checks runtime: 1,000 actual repeated Box meshes in one
+  MultiMesh; first runtime 69.901 ms, native reported node count 15. Fixture was
+  corrected from unsupported "Cube" earlier, and empty assets are now rejected.
+- terrain_erosion_verified: generation 33 + erosion 12 checks passed headless.
+  Hydraulic 25x25 x30 steps 101.951 ms; thermal 17x17 x50 steps 19.349 ms;
+  ground+suspended sediment mass error -0.0000293321 in the fixture.
+- terrain_editor_erosion_fixed: native editor 9 checks + generation 33 + document
+  16 + background generation 12 passed. Includes valid steep terrain, async job,
+  native collision, undo/redo, save/reopen. Cached reopen .035 ms in that run.
+- terrain_brush_verified: 41 brush checks + workspace 13 + erosion workspace 9
+  passed natively. Every brush edits samples and has exact sparse undo/redo.
+  Local Erode conserves material. Cached reopen .069 ms in that run.
+- environment_sky_time is CURRENTLY running: new native Environment sky shader
+  manual TIME wrapping and coordinator timeline update test. Inspect result.
+
+Remaining terrain specification work — do not claim completion:
+- True 3D SDF/voxel caves, actual openings through terrain, floors/walls/ceilings,
+  editable paths/chambers/entrances, local carve/fill, cutaway/debug, collision.
+- Chunk LOD and mixed-LOD seams, camera priority, render distance/detail controls.
+- Drainage/river networks, junctions, editable paths, channel carving, actual water
+  meshes/flow metadata, waterfalls, lakes/ocean depth and shoreline fields.
+- Climate/biome resources, normalized spatial weights, geological/biome geometry
+  dependency order, cave biome fields, painted masks and reusable environmental
+  suitability for the NEXT vegetation task.
+- Smooth material layers/triplanar normals/masks with biomes/slope/height/water,
+  avoiding claims that current categorical two-material cell painting is blending.
+- More masks/stamps, bake/reset/pipeline controls and regional dirty propagation
+  across all derived systems. Real large-world budgets/performance measurements.
+- Full A–AI integration/visual/regression tests, latest app launch after terrain.
+
+Next implementation design considered, NOT implemented yet:
+Use a true scalar solid field max(y-height(x,z), -cave_void_sdf) and consistent
+tetrahedral grid extraction for affected native chunks. Terrain and cave surfaces
+must be one field so entrances are real openings. Worker-only CPU arrays, native
+mesh upload on main thread, saveable derived data with source signatures. Bounded
+voxel counts and regional rebuilds required; do not run millions of voxel samples
+on the UI thread. Cave floors/walls/ceilings must render and collide, with sensible
+normals and shared chunk-border samples. Do not put tunnel decoration behind an
+unmodified heightfield and call it a cave.

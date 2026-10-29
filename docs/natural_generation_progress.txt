@@ -1,0 +1,99 @@
+Natural objects — active continuation, 2026-10-27
+
+LATEST CHECKPOINT (supersedes older remaining notes below):
+- 44 source starters now (Cactus added), distinct palmate/lobed/rounded leaves,
+  curved multi-segment grass blades, ribbed connected cactus arms, seeded deadwood.
+  Every tested limb has a stitched parent junction; closed wood edges pass.
+- Natural source workers support cancellation, bounded 200000 vertices, semantic
+  CPU artifact cache (estimated64MiB/24 entries, cloned arrays/resources). Scalar
+  and branch source edits supersede/cancel old jobs, release one history action;
+  saves flush latest generation, cancelled edits restore saved status. Model save
+  now merges workspace state to preserve source inspector folds.
+- Vine path editor, saved source path and surface attachment snapshot, true closest
+  triangle projection with clearance; preserves source geometry, safe collapsed
+  paths and explicit path/surface complexity budgets.
+- Six procedural natural cluster presets create ordinary editable child components
+  with stable identities. Seed changes actual geometry; manual child geometry and
+  poses survive repeated regen; exact undo/reopen and spacing warnings tested.
+  Natural objects/clusters save as reusable ordinary Model resources.
+- Seasons clone native material and leave mesh unchanged. Optional wind uses
+  leaf-local UV weight and controlled timeline uniforms. Native changed-time pixels
+  differ and rewind byte-exactly. Scene, Model and Environment use shared timing.
+- Generic LOD no longer deletes disconnected foliage: wood gets reduced indices;
+  leaf coverage retains full representation until clustered silhouette LOD exists.
+- Real native 20000 grass clumps, ONE batch, 1200512 visible primitives,
+  generation/upload660.389ms, tracked CPU delta73861148B in natural_morphology.
+  Earlier natural_scale reported522 primitives (grass vanished under generic LOD);
+  that was FIXED and the stronger visible-population assertion now passes.
+  No claim of millions of instances or a hard real-time frame guarantee.
+- natural_morphology:5/5 native scripts PASS (generator105, actual render1,
+  cluster6, vine5, population5 checks). natural_async_save:3/3 native PASS;
+  natural_cache_verified:2/2 headless PASS, including async-save10 checks.
+  natural_terrain_regression:4/4 native PASS. Direct LOD-toggle stale terrain key
+  regression fixed; native terrain still8192→534 primitives with seam protection.
+- Latest normal Forward+ app launch exits0, log natural_app_launch.log; only known
+  Windows certificate-store warning. No application export.
+- Remaining follow-up: custom leaf assets, richer ecological interlayer rules,
+  scatter viewport instance handles, explicit density/clustered foliage LOD,
+  broad full-spec acceptance. Architecture source/UI is NEXT, not implemented yet.
+
+USER: finish all queued specifications, test and launch, DO NOT export application.
+Do not treat this checkpoint as completion or stop before remaining implementation.
+
+Implemented in shared Model/Environment flow (no separate editor/material engine):
+- natural_generator.gd: pure editable polygon generator, source parameters in
+  ordinary KiwiModelComponent.generator/parameters. 17 geometrically distinct
+  tree profiles, 8 plants, 7 geological rock profiles, 6 deadwood/cave props.
+- Actual curved tapered ring tubes and exposed roots. Parent side triangles are
+  removed and stitched to branch/root rings. Manifold wood edges tested; most
+  branches have real shared-topology junctions, not just intersecting primitives.
+  Independent seeded path streams preserve sibling limbs under local pruning.
+  Attachment metadata associates real folded leaf geometry with actual twigs.
+  Palm ribs and paired leaflets, narrow conifer needles, branching broadleaves.
+- Native existing Natural Material engine for bark/stone and normal editable
+  material slots. Rock uses triplanar projection. Plant stem/cap/petal materials.
+- Nature submenu in Environment toolbar and searchable Model create menu.
+  Source property controls, individual branch length/thickness/rotation/prune/reset,
+  make-editable action. Saves generated natural models as ordinary reusable Model
+  resources through existing component save (usable in existing scatter palette).
+- Component.render_mesh shared by Model, Scene, Environment and asset loader;
+  natural_render generates real native LOD indices with existing mesh optimizer.
+  Shared optimizer now handles unindexed sources by indexing first, and null
+  source indices safely. Original terrain indexed path is retained.
+- Tree collider triangle metadata excludes leaves. Existing Scene physics keeps
+  complete visual/deformation data and separate collider points/bounds/faces;
+  static Environment/scatter collider uses same source wood triangles. Decorative
+  plants default no generated collider. Existing physics engine remains unchanged.
+- Scatter per-candidate RNG/IDs survive rejection changes. Saved deletion,
+  transform and palette overrides; clustering and temperature/humidity/shore
+  filters. UI individual removal, reset and promote-to-editable model hierarchy;
+  promotion and original-instance removal one undo/redo action, exact world pose.
+- Cave surface domains ray-march real shared cave distance field, bisect boundary,
+  align inward normals; floor/ceiling/wall and 3D biome filters. Bounded attempts,
+  cancellation every8 cave candidates. Cave props use +Y growth from attachment
+  so ceiling normal alignment points stalactites into the cave.
+
+Evidence .godot/verification/:
+- natural_topology:100 checks passed (before newer junction/LOD changes).
+- natural_native:workspace6, real render1, scatter stability5 native pass.
+- natural_foliage:render, generator100, async scatter native pass.
+- natural_caves_verified:9 boundary/alignment/determinism checks pass.
+- natural_connected_native currently running: generator103 and LOD/collision8
+  pass natively; remaining workspace/render/terrainLOD results must be inspected.
+- terrain_cross_regression:8/8 native scripts pass across Environment documents,
+  UI/Scene integration, Model interaction, Natural Materials, physics, Clipboard,
+  combined terrain acceptance. No app export.
+- Earlier natural_lod_verified contains a FIXED null-index error and timeout;
+  natural_stitched contains earlier failed junction/LOD tests. Preserve failed
+  reports; do not count those runs as passing evidence.
+
+Still requires full spec acceptance, NOT complete:
+- Rich crown/leaf morphology and branch-junction quality across extreme controls,
+  custom leaf assets, surface-following vines, detailed deadwood/cave categories,
+  realistic fracture/rock cluster systems, source presets/preview library polish.
+- Seasons/wind, rich ecological interlayer competition, cave climate growth
+  variation, interactive scatter-instance viewport picking/transforms, promotion
+  rig/structural ID remapping audit, detailed LOD/distance/density controls.
+- Async cancellable natural source editing, explicit geometry budgets/cache,
+  forest-scale native frame/memory profiling, complete A–AI visual regression.
+- Architecture spec remains to implement AFTER vegetation.

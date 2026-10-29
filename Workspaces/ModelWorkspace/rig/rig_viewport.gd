@@ -66,6 +66,8 @@ func sync() -> void:
 	for item in document.components:
 		if not canvas.visuals.has(item.id): continue
 		var visual: MeshInstance3D=canvas.visuals[item.id]
+		if visual is KiwiSurfaceGrowthInstance:
+			visual.growth_skeleton=nodes.get(item.skeleton_id); visual.update_growth(); continue
 		if not nodes.has(item.skeleton_id):
 			visual.skin=null; visual.skeleton=NodePath(); visual.material_override=null; heat_signature.erase(item.id); continue
 		var armature := document.component(item.skeleton_id); var skeleton: Skeleton3D=nodes[item.skeleton_id]

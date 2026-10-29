@@ -1,0 +1,125 @@
+# Advanced Compositing Workspace — Progress
+
+Updated 2026-10-29
+
+## Implemented in this continuation
+
+- A standalone, saveable `KiwiCompositingDocument` stores composition dimensions,
+  pixel aspect, frame rate, duration, color settings, layers, graph resources,
+  masks, render settings and workspace state.
+- A dedicated Compositing tab is available from the existing new-tab menu and
+  scene tabs retain, save, reopen and close composition documents.
+- The editable layer stack supports image, solid, video-footage, adjustment,
+  mask, group, editable text/shape, CGI/VFX image-pass and linked-composition kinds;
+  visible/lock, opacity, transforms, masks, blend mode and timeline ranges are
+  stored without rewriting source footage or images.
+- Layer stack operations include add, delete, duplicate, reorder, group/ungroup,
+  visibility, lock, solo, copy and paste. Group layers composite their children
+  into an isolated intermediate before group-level transform, mask and opacity.
+- Layer properties and groups are stored as a hierarchy, rather than relying on
+  UI tree order. Group/solo evaluation and per-layer graph references persist in
+  the document.
+- `KiwiCompositeBuffer` carries channel/precision/color/alpha/time/source and
+  depth metadata. CPU image processing uses RGBAF buffers, normalizes common
+  image/video sources into linear sRGB with straight alpha, supports premultiplied
+  input normalization, and uses source-over plus the listed arithmetic and
+  Porter-Duff layer blends. The interactive viewer applies a preview-only sRGB
+  display transform; rendered source buffers remain linear and float.
+- Adjustment layers use a shared image evaluator and blend the adjusted result
+  by layer opacity and grayscale/alpha mask coverage.
+- Adjustment layers and graph Color Grade nodes expose editable master and
+  per-channel RGB curves. Curve points can be added, dragged and removed; preview
+  updates while editing and a completed drag is one undoable change.
+- A first animation slice stores editable per-layer position, rotation, scale and
+  opacity keys in the composition resource. Keys interpolate at the playhead,
+  update the preview and inspector, and property edits update existing tracks.
+  The inspector can insert all four transform/opacity tracks at the current time.
+- Video footage layers use Kiwi's FFmpeg-backed seekable `ActorVideo` frame cache,
+  composition-time clip ranges, source offset and playback speed. The viewer
+  retries while asynchronous frames are decoding.
+- Text and primitive rectangle/ellipse/triangle/polygon shape layers rasterize
+  into the same linear float compositor. Graphics builds use the current fallback
+  or chosen project font; headless render tests use a small deterministic bitmap
+  fallback so they can still validate text alpha.
+- Linked composition layers load and evaluate the referenced editable resource
+  at its mapped time. A document identity stack detects direct and indirect cycles
+  and produces a diagnostic instead of unbounded recursion.
+- A basic frame scrubber and preview playback control evaluate footage at the
+  selected composition time. The displayed preview frame is saved as workspace
+  state.
+- A first MP4 export path renders timeline frames through the compositor and
+  encodes a silent H.264/yuv420p video with the available FFmpeg. It writes
+  temporary frame files under a unique user-data folder and removes them after
+  the encode. This is an SDR, silent preview/export path; it does not preserve
+  timeline audio or alpha and is not a substitute for the full export pipeline.
+- The GraphEdit workspace preserves node positions and typed edges, rejects
+  invalid/cyclic connections, supports per-node preview, edit/duplicate/delete,
+  and provides functional Image Source, Layer Source, Solid Color, Over, Merge,
+  Mask, Blur, Chroma Key, Luma Key, Color Grade, Alpha Extract and Output evaluation paths. A layer may
+  associate an editable processing graph; the layer renderer evaluates that graph
+  through the same float buffer/blend engine as the ordinary stack.
+- Graph outputs and complete compositions use signature/time keys for bounded
+  evaluation caching. Connected image input nodes are evaluated lazily.
+- Save, Save As, dirty state, layer and graph edits, and layer operations use
+  document resources and undo/redo snapshots.
+
+- Group duplication and cross-document copy/paste now preserve descendants and animation ownership. Graph references are remapped individually. Deletion removes animation tracks belonging to deleted layers.
+- PNG RGBA and float scene-linear EXR sequences are available from the header. Export refuses to overwrite existing sequence files. EXR round-trip coverage verifies HDR values above 1 and fractional alpha.
+- Blur uses a separable sliding filter and premultiplied coverage to avoid transparent-color fringes. Animated transform tracks scale correctly in reduced-resolution previews.
+
+## Latest verification
+
+Godot 4.6.1 targeted headless regressions passed:
+
+- `compositing_core_test` (24 checks): float/alpha compositing, opacity,
+  adjustments, typed ports/cycles, graph evaluation and graph cache, linked layer
+  processing, group/solo, transformed grayscale/soft masks, primitive shapes,
+  editable text, chroma/luma keying, curves, nested compositions/cycle rejection
+  and resource save/load.
+- `compositing_workspace_test` (15 checks): workspace preview, adding layers,
+  undo/redo, graph validation/search and editable document save/load.
+- Curve inspector edits and undo are covered by the workspace regression.
+- Position and opacity key interpolation and evaluator application are covered
+  by the core regression.
+- That workspace test also encodes and verifies a short silent MP4 using FFmpeg.
+- `video_link_test`: its existing video actor/audio checks and added compositor
+  frame decoding / source-time mapping checks.
+
+The latest core/workspace regression logs are
+`.godot/verification/compositor_output_verified_compositing_core_test.log` and `.godot/verification/compositor_hdr_verified_compositing_workspace_test.log`; the latest video
+integration log is
+`.godot/verification/compositor_broader_pass1_video_link_test.log`.
+Godot reports its existing Windows certificate-store message; tests also report a
+small resource/ObjectDB leak at process shutdown, which needs separate tracing.
+The normal app launch with an explicit workspace log path completed with exit 0 (`compositor_startup_oct29.log`). It reported a per-user clipboard-directory write failure in this restricted environment, the certificate-store warning and the existing shutdown resource leak. Earlier default-log startup crashed during per-user log rotation.
+
+## Not complete
+
+This is a usable core slice, not completion of the 73-section compositor spec.
+Remaining major requirements include:
+
+- Real-time scene/CGI/VFX rendering and a proper render-pass API for beauty,
+  alpha, depth, normals, motion vectors, shadows and reflections. Current CGI/VFX
+  layers only accept explicit baked image inputs; they are not live scene renders.
+- Image/video drag-and-drop and asset browser, roto workflows, depth conversion
+  and spatial real-world occlusion. Basic image-backed masks plus chroma and
+  luminance graph keyers are implemented; production roto/keying workflows are not.
+- Full group pass-through modes, nested-composition copy/duplicate semantics, and a proper reusable node-group/preset library.
+- The full node catalog, conversion nodes, frame-delay nodes, graph frames/comments,
+  frames/comments, multi-select, graph clipboard, auto-layout and node-level
+  parameter exposure.
+- Full color management, white balance, curves, wheels, selective correction,
+  LUT support, scopes, HDR/EXR output transforms and complete high-precision
+  export.
+- Glow, distortion, light wrap, motion blur, depth of field, temporal denoise,
+  grain and the rest of the advanced effect/equipment library.
+- Complete Kiwi timeline keyframing integration for every layer/node parameter, source
+  frame-rate/variable-rate mapping and synchronized scene, audio, tracking,
+  physics and VFX sampling.
+- Full render/export workflow, video/audio muxing, export cancellation/recovery, caching
+  controls, tiles/ROI, render diagnostics, performance/visual benchmarks and the
+  spec's broad regression matrix.
+
+Do not describe the broad compositing request as finished until those systems
+have working implementations and relevant acceptance tests. Do not export the
+application.

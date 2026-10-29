@@ -3,7 +3,7 @@ extends RefCounted
 ## Renders the actual scene SubViewport at discrete timeline times, then encodes it.
 
 static func render(editor: ActorTimelineEditor, destination: String, width: int,
-		height: int, fps: int, progress: Callable = Callable()) -> String:
+		height: int, fps: int, progress: Callable = Callable(),options: Dictionary={}) -> String:
 	var encoder := ActorVideo.executable("ffmpeg")
 	if encoder.is_empty(): return "FFmpeg is required to export an MP4 video."
 	var viewport := editor.get_node_or_null("../../../../World/SubViewport") as SubViewport
@@ -15,6 +15,9 @@ static func render(editor: ActorTimelineEditor, destination: String, width: int,
 	if not DirAccess.dir_exists_absolute(output_directory):
 		return "The output directory does not exist."
 	var frame_count := maxi(1, ceili(editor.video_duration * fps))
+	var samples:=clampi(int(options.get("motion_samples",1)),1,8); var shutter:=clampf(float(options.get("shutter",.5)),0,1)
+	if shutter<=0.: samples=1
+	var input_count:=frame_count*samples; var previous_sample:=0.
 	var frame_directory := ProjectSettings.globalize_path("user://scene_export/" + ActorData.new_id())
 	var error := DirAccess.make_dir_recursive_absolute(frame_directory)
 	if error != OK: return "Could not create temporary frame directory."
@@ -22,6 +25,12 @@ static func render(editor: ActorTimelineEditor, destination: String, width: int,
 	var old_playing := editor.playing
 	var old_size := viewport.size
 	var old_update := viewport.render_target_update_mode
+	var old_msaa:=viewport.msaa_3d
+	if options.has("msaa"): viewport.msaa_3d=clampi(int(options.msaa),0,3)
+	var old_growth_quality: Variant=viewport.get_meta("kiwi_final_growth") if viewport.has_meta("kiwi_final_growth") else null
+	viewport.set_meta("kiwi_final_growth",true)
+	var old_capture: Variant=viewport.get_meta("kiwi_scene_frame_capture") if viewport.has_meta("kiwi_scene_frame_capture") else null
+	viewport.set_meta("kiwi_scene_frame_capture",true)
 	var old_camera := viewport.get_camera_3d()
 	var free_camera := viewport.get_node_or_null("Freecam/Head/Camera3D") as Camera3D
 	var old_free_mask := free_camera.cull_mask if free_camera != null else 1
@@ -37,8 +46,8 @@ static func render(editor: ActorTimelineEditor, destination: String, width: int,
 	viewport.size = Vector2i(width, height)
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	var failure := ""
-	for frame in frame_count:
-		editor.canvas.playhead = float(frame) / fps
+	for frame in input_count:
+		editor.canvas.playhead = temporal_sample_time(frame,samples,fps,shutter)
 		failure = await _wait_video_frames(editor, editor.canvas.playhead)
 		if not failure.is_empty(): break
 		editor._evaluate_runtimes()
@@ -46,6 +55,14 @@ static func render(editor: ActorTimelineEditor, destination: String, width: int,
 			await editor.get_tree().process_frame
 			editor._evaluate_runtimes()
 		_render_camera_for_time(editor, viewport, free_camera, editor.canvas.playhead)
+		failure = await _wait_environment_geometry(editor)
+		if not failure.is_empty(): break
+		# All actors and the export camera have now been sampled. Synchronize fog
+		# ownership before this exact frame rather than waiting for a later process tick.
+		var environment_world:=viewport.get_node_or_null("KiwiEnvironmentWorld")
+		if environment_world!=null: environment_world._process(0.)
+		var fog_environment:=viewport.get_node_or_null("KiwiFogEnvironment")
+		if fog_environment!=null: fog_environment._process(0.)
 		editor._update_camera_overlays()
 		for index in particle_states.size():
 			var state: Dictionary = particle_states[index]
@@ -53,14 +70,18 @@ static func render(editor: ActorTimelineEditor, destination: String, width: int,
 			var active: bool = state.node.is_visible_in_tree() and bool(state.node.get("emitting"))
 			if active and not bool(state.active): state.node.restart()
 			if active and state.node.has_method("request_particles_process"):
-				state.node.request_particles_process(1.0 / fps)
+				state.node.request_particles_process(1.0 / fps if samples==1 else maxf(0.,editor.canvas.playhead-previous_sample))
 			state.active = active
 			particle_states[index] = state
 		if DisplayServer.get_name() == "headless":
 			await editor.get_tree().process_frame
 			await editor.get_tree().process_frame
 		else:
-			await RenderingServer.frame_post_draw
+			# The first resized Forward+ frame also allocates volumetric buffers and
+			# uploads initial 3D concentration textures. Two draw passes can still
+			# return the uninitialized black target. Warm those resources at the
+			# SAME sampled time; no particle/physics request is repeated here.
+			for pass_index in (6 if frame==0 else 2): await RenderingServer.frame_post_draw
 		var image := viewport.get_texture().get_image()
 		if image == null or image.is_empty():
 			failure = "The viewport returned an empty frame."
@@ -69,10 +90,16 @@ static func render(editor: ActorTimelineEditor, destination: String, width: int,
 		if image.save_png(frame_path) != OK:
 			failure = "Could not write a rendered frame."
 			break
-		if progress.is_valid(): progress.call(frame + 1, frame_count, "Rendering")
+		previous_sample=editor.canvas.playhead
+		if progress.is_valid() and (frame+1)%samples==0: progress.call((frame+1)/samples, frame_count, "Rendering")
 		await editor.get_tree().process_frame
 	viewport.size = old_size
 	viewport.render_target_update_mode = old_update
+	viewport.msaa_3d=old_msaa
+	if old_growth_quality==null: viewport.remove_meta("kiwi_final_growth")
+	else: viewport.set_meta("kiwi_final_growth",old_growth_quality)
+	if old_capture==null: viewport.remove_meta("kiwi_scene_frame_capture")
+	else: viewport.set_meta("kiwi_scene_frame_capture",old_capture)
 	if free_camera != null: free_camera.cull_mask = old_free_mask
 	editor.canvas.playhead = old_time
 	editor.playing = old_playing
@@ -88,11 +115,11 @@ static func render(editor: ActorTimelineEditor, destination: String, width: int,
 			if state.node.has_method("request_particles_process"):
 				state.node.request_particles_process(maxf(0.0, old_time))
 	if not failure.is_empty():
-		_cleanup_frames(frame_directory, frame_count)
+		_cleanup_frames(frame_directory, input_count)
 		return failure
 	if progress.is_valid(): progress.call(frame_count, frame_count, "Encoding")
 	var arguments := PackedStringArray(["-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-		"-framerate", str(fps), "-i", frame_directory.path_join("frame_%06d.png")])
+		"-framerate", str(fps*samples), "-i", frame_directory.path_join("frame_%06d.png")])
 	var audio_filters := PackedStringArray()
 	var audio_count := 0
 	for index in editor.model.actors.size():
@@ -117,7 +144,9 @@ static func render(editor: ActorTimelineEditor, destination: String, width: int,
 		arguments.append_array(PackedStringArray(["-filter_complex", ";".join(audio_filters), "-map", "0:v:0", "-map", "[aout]"]))
 	else:
 		arguments.append_array(PackedStringArray(["-map", "0:v:0"]))
+	if samples>1: arguments.append_array(PackedStringArray(["-vf","tmix=frames=%d:weights='%s',select='not(mod(n+1,%d))',setpts=N/(%d*TB)"%[samples,"1 ".repeat(samples).strip_edges(),samples,fps]]))
 	arguments.append_array(PackedStringArray(["-frames:v", str(frame_count),
+		"-r",str(fps),
 		"-c:v", "libx264", "-preset", "medium",
 		"-crf", "18", "-pix_fmt", "yuv420p", "-movflags", "+faststart", output]))
 	if audio_count > 0:
@@ -127,18 +156,22 @@ static func render(editor: ActorTimelineEditor, destination: String, width: int,
 		arguments.insert(arguments.size() - 1, "192k")
 	var job := OS.execute_with_pipe(encoder, arguments, false)
 	if job.is_empty():
-		_cleanup_frames(frame_directory, frame_count)
+		_cleanup_frames(frame_directory, input_count)
 		return "FFmpeg could not start."
 	var stderr: String = ""
 	while OS.is_process_running(job.pid):
 		stderr += job.stderr.get_buffer(4096).get_string_from_utf8()
 		await editor.get_tree().process_frame
 	var exit_code := OS.get_process_exit_code(job.pid)
-	_cleanup_frames(frame_directory, frame_count)
+	_cleanup_frames(frame_directory, input_count)
 	if exit_code != 0 or not FileAccess.file_exists(output):
 		return "Video encoding failed. " + stderr.right(500)
 	return ""
 
+
+static func temporal_sample_time(frame: int,samples: int,fps: int,shutter: float) -> float:
+	var nominal:=float(frame/samples)/fps
+	return maxf(0.,nominal+((float(frame%samples)+.5)/samples-.5)*shutter/fps) if samples>1 else nominal
 
 static func _render_camera_for_time(editor: ActorTimelineEditor, viewport: SubViewport,
 		fallback: Camera3D, time: float) -> Camera3D:
@@ -152,6 +185,30 @@ static func _render_camera_for_time(editor: ActorTimelineEditor, viewport: SubVi
 	if chosen == null: chosen = fallback
 	if chosen != null and viewport.get_camera_3d() != chosen: chosen.make_current()
 	return chosen
+
+
+static func _wait_environment_geometry(editor: ActorTimelineEditor) -> String:
+	var actors: Array[Dictionary] = []
+	for index in editor.model.actors.size():
+		var actor := editor.model.actors[index]
+		if actor.type_id != &"environment_asset" or not editor.model.clips[index].contains_time(editor.canvas.playhead): continue
+		var runtime := editor._runtime_for_clip(editor.model.clips[index].id)
+		if is_instance_valid(runtime) and runtime.has_method("render_geometry_ready"):
+			actors.append({"runtime":runtime,"title":actor.title})
+	if actors.is_empty(): return ""
+	var deadline := Time.get_ticks_msec() + 90000
+	while true:
+		var all_ready := true
+		for entry: Dictionary in actors:
+			var runtime: Object = entry.runtime
+			if not is_instance_valid(runtime): continue
+			var issue := str(runtime.call("render_geometry_error")) if runtime.has_method("render_geometry_error") else ""
+			if not issue.is_empty(): return str(entry.title)+": "+issue
+			if not bool(runtime.call("render_geometry_ready")): all_ready = false
+		if all_ready: return ""
+		if Time.get_ticks_msec() >= deadline: return "Timed out preparing environment geometry for the export camera."
+		await editor.get_tree().process_frame
+	return ""
 
 
 static func _wait_video_frames(editor: ActorTimelineEditor, time: float) -> String:

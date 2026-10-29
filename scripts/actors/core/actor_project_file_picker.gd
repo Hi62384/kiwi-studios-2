@@ -474,6 +474,7 @@ func _path_allowed_uncached(path: String) -> bool:
 			or (allowed_native_types.has("KiwiImageDocument") and native_resource is KiwiImageDocument) \
 			or (allowed_native_types.has("KiwiTransformationImage2D") and native_resource is KiwiTransformationImage2D) \
 			or (allowed_native_types.has("KiwiModelDocument") and native_resource is KiwiModelDocument) \
+			or (allowed_native_types.has("KiwiEnvironmentDocument") and native_resource is KiwiEnvironmentDocument) \
 			or (allowed_native_types.has("KiwiRigPreset") and native_resource is KiwiRigPreset) \
 			or (allowed_native_types.has("Material") and native_resource is Material) \
 			or (allowed_native_types.has("KiwiImagePatternPreset") and native_resource is KiwiImagePatternPreset) \

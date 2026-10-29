@@ -1,0 +1,214 @@
+Powder materials, transport and destructible geometry
+===================================================
+Godot 4.6.1. Extends the existing actor registry, property inspector, modeling
+topology, timeline physics, offline query space, resource picker and clipboard.
+No separate physics timeline or material workspace. No application export.
+
+Powder workflow
+---------------
+Add actor > Simulation > Powder. Properties > Appearance has seven illustrated
+recipes: Sand, Snow, Dirt, Gravel, Dust, Salt and Sugar. Choose a recipe, choose
+Both / Appearance only / Physics only, then click the checkmark to apply.
+One application, including changes to spacing required by larger radii, is one
+undo action. Source dimensions, parenting and clip timing are not overwritten.
+
+Rounded, angular, irregular and crystal representations use cached geometry
+variants. Custom mode accepts up to three Mesh resources. Detail is manually
+selectable (low/distant, balanced, close-up); there is not automatic distance LOD.
+Seeded IDs retain mesh variant, orientation and surface random values in motion.
+These are visual representations: collisions remain spherical, and independent
+physical grain rotation/angular momentum is not solved.
+
+Colors, roughness variation, metallic/specular response, opacity, local UV
+scale/rotation/offset, texture blend/tint, procedural mineral detail and normal
+strength are editable/animatable. Albedo, normal and roughness slots support
+images and procedural Noise Images through the usual project/clipboard picker.
+Standard 3D, spatial Shader Material and Natural Material overrides reuse the
+existing adapters. Overrides replace built-in surface shading; their own shader
+must consume instance variation if desired. Canvas/sky/fog shaders are rejected
+for grain surfaces. There is one shared surface per batch, not one per grain.
+
+Expand the Powder Material resource to edit it; right-click the slot for Save As,
+Load, Make Unique, Clear or Super Clipboard. Its name is editable. Saved assets
+share appearance; embedded recipes/Make Unique are independent. Built-ins are
+fresh recipes, never global mutable preset resources. Clearing a reference does
+not delete a project file; use the existing filesystem delete action for that.
+The ellipsis menu can capture current settings, restore a built-in, adopt saved
+physics defaults, reactivate deposits at the playhead, or save attached grains as
+an ordinary mesh resource.
+
+The material's physics values are RECIPE DEFAULTS. The actor's existing physical
+properties remain the simulation authority. Adopt saved physics explicitly to
+copy new defaults into the actor. Appearance linkage may be disabled to customize
+local visual controls; unlink copies the current appearance so it does not jump.
+Appearance edits/keyframes, including nested saved-resource properties, do not
+invalidate trajectories. Adopted radius, density, friction, etc. do invalidate.
+
+Transport workflow
+------------------
+Properties > Deposition & Transport: enable deposition. Other controls adjust
+adhesion, settling speed, attached coating limit, compaction, collision release,
+detachment exposure, wind/fluid erosion and airborne classification. Existing
+density/friction/cohesion, aerodynamic drag, turbulence and wind are reused.
+The source-time Reactivate field releases deposits without deleting their mass.
+Physics > Powder surface on a supporting object controls accumulation, adhesion
+and maximum attached coating. Freeze, Recalculate and Bake are the existing
+physics actions. All effects stop on pause and replay from timeline checkpoints.
+
+Settled grains retain packed IDs, radii, masses and surface-local attachment
+records. Integration and moving constraints skip attached grains. Sparse surface
+cells derive coverage, thickness and mass. They follow rigid/animated supports;
+bone/deformable collision proxies provide approximate attachments. Moving solid
+queries release displaced grains. Wind and fluid shear overcome weight/friction,
+cohesion, adhesion and compaction over time. Released grains re-enter the existing
+granular/fluid coupling and may settle again. Airborne classification refers to
+the same physical grains, not duplicated decorative particles.
+
+Limits: this is a grain-resolution hybrid, not a continuous high-resolution
+surface coating or a compressed microscopic-material solver. Static deposits
+still participate in the spatial contact hash and retain per-grain inventory.
+There is no volumetric dust renderer, erosion of underlying mesh topology,
+porous flow, chemical mixing, absorption or mud model. Very fine dust needs an
+appropriate artistic simulation scale because native collision precision and
+CPU particle budgets are finite. Supporting objects need compatible colliders.
+
+Destruction workflow
+--------------------
+Select an ordinary Basic Shape or Basic Mesh, Properties > Destruction. Enable
+it, choose Manual / Physics / Combined, and add operations. Manual editing does
+not require enabling a separate dynamic rigid-body toggle. Operations have stable
+IDs, editable timing, enable/remove/reorder controls and contextual parameters.
+Float/vector parameters have normal keyframe buttons. Position in viewport (or
+Damage D in the viewport toolbar) exposes a draggable center, with Ctrl snapping
+and Escape cancellation. Each drag is one undo action even after actor selection
+changes. The source mesh remains intact; operations and bake data save in scenes.
+Numeric/vector drags preview immediately. Keyed controls (including viewport
+radius scrolling) insert a keyframe rather than overwriting the base value.
+Removing an operation removes its animation tracks in the same undo action;
+undo restores both, so old tracks cannot resurrect a deleted operation.
+
+Supported real topology/geometry operations:
+- Plane split with capped interiors.
+- Seeded multi-plane and impact-biased fracture into independent convex pieces.
+- A narrow geometric crack/crevice made by clipping out a channel.
+- Curved vertex bending, localized dents, twisting and stretching.
+- Plane tearing of open/thin sheets into independently moving regions.
+- Sphere/polyhedral, box and cylindrical carving using convex half-space cuts.
+
+Cuts preserve exterior UV/material assignments and generate interior UVs/normals/
+tangents. An interior color or compatible material can be supplied. Fragments have
+stable identities, individual world transforms, inherited motion, volume-weighted
+mass and convex query colliders. The original unbroken collider is disabled.
+Carved pieces use compound convex colliders; static concave deformed surfaces can
+use triangle collision, while dynamic concavity uses an explicit convex proxy.
+Save evaluated mesh creates a normal reusable mesh at the playhead without
+overwriting source geometry. Geometry conversion is capped at 150,000 vertices;
+grain custom-instance shading may need adaptation on a standalone snapshot mesh.
+
+Limits: solid cuts/fractures currently require CLOSED CONVEX components. Model
+components imported as separate scene mesh actors can be edited independently.
+Open sheets support plane tears, not arbitrary freehand tear propagation or
+strain-driven rebuilding of a cloth graph. Skinned/rigged topology changes and
+non-white vertex-colored inputs are explicitly rejected with the source intact;
+make a static posed/textured copy first. There is no arbitrary concave Boolean,
+arbitrary cutting mesh, drawn crack-path graph, branching crack solver, FEM or
+structural-collapse engine. Bending/dents are geometric approximations. Impact
+triggers use available rigid-contact energy, not a solved continuum stress field.
+Fragment motion uses the shared query world with approximate rigid response,
+not exact compound inertia or fully coupled fragment/grain momentum exchange.
+
+Material-dependent damage
+-------------------------
+The Destruction Material slot/preset selector provides Glass, Steel, Aluminum,
+Wood, Stone, Concrete, Plastic, Ceramic and Rubber. These are editable illustrative
+artistic energy recipes, not experimentally calibrated engineering materials.
+Strength/toughness change failure thresholds; hardness and bendability change dent
+depth and yielding; brittleness favors cracking/shattering instead of ductile
+deformation; density can optionally derive mass from source volume. Directional
+weakness, branching/count bias, irregularity, fragment size, seed, fatigue and rate
+sensitivity affect actual response and split planes. Explicit advanced yield/
+fracture energies, stiffness and tensile/compressive/shear coefficients remain
+authoritative when enabled; basic controls do not overwrite them each step.
+
+Damage is recorded in local spatial cells, so small repeated impacts accumulate
+locally. Actor-level physical materials, separate imported component actors and
+two explicit spherical local material regions are supported. Regional assignment
+overrides actor assignment; an explicit physical association on a visual material
+is the fallback. Interior/exterior visual associations remain separate from
+physical coefficients. Save/load/Make Unique/Super Clipboard use ordinary objects.
+Manual Geometry Editing bypasses physical resistance unless Physical resistance
+is enabled on an operation; its energy then limits cutting/deformation.
+
+Limits: regions select local response coefficients; fracture still operates on a
+compatible component, not a fully bonded heterogeneous solid. There is no face-
+painting assignment UI, inter-material connection-strength solver, realistic wood
+fiber model, spiderweb crack propagation, rough non-planar cut interiors or tensile
+stress solver. 'Branching' is a deterministic fragmentation/count/direction bias,
+not an explicit branching fracture network. Elastic recovery is a geometric
+response model. Physics damage events currently originate in rigid contact motion.
+
+Performance and verification
+----------------------------
+At most eight grain geometry batches (one per geometry variant), shared materials,
+cached geometry, stable custom instance data, no actor/node per grain. Destruction
+limits: 20,000 source vertices, 48 pieces, up to 16 requested pieces per fracture,
+24 cached preparations and a 32 MiB preparation-geometry budget. Existing physics
+checkpoint/bake limits apply. Geometry is reused when operations are unchanged.
+Large sources, many contacts and complex cutting remain CPU-heavy; use baking.
+
+Regression reports/logs and native screenshots are in .godot/verification/.
+New tests cover recipes, geometry/UVs, stable grain identity, image dependencies,
+saved/shared/unique resources, clipboard, appearance keyframes/cache behavior,
+surface deposition/following, wind/fluid detachment, foot and rolling-cylinder
+displacement, exact inventory/replay/bakes, real closed cuts, carving collision
+holes, independent fragments, material-dependent drops, local damage, inspector
+buttons and viewport undo/redo. Existing Powder, Fluid, rigid/soft/cloth/rope,
+timeline, model geometry/import, scene serialization, inspector and shader tests
+are run alongside them. Final report names/results are recorded in the delivery.
+The Windows engine emits a root-certificate-store warning at startup. Some broad
+resource/UI tests retain shutdown resource warnings; assertions and script-error
+logs are checked independently instead of treating exit status alone as success.
+
+Verified delivery, 2026-10-26
+-----------------------------
+31 distinct regression scripts have passing latest results, including native
+Main scene launches, actual inspector clicks, viewport pointer gestures and
+rendered screenshots. Two focused scripts also pass with the OpenGL compatibility
+renderer. Headless editor import completes without parse/script errors, and
+git diff --check is clean. This is not a full application export/build artifact.
+
+Reports under .godot/verification/ (use the newest entry for a repeated test):
+- powder_destruction_regressions.json: broad existing/new coverage; its two
+  initial class-registration failures were fixed and rerun below.
+- powder_transport_interactions.json: geometry/timeline reruns and native UI.
+- powder_destruction_final.json: 9/9, including saved material editing.
+- powder_transport_visual.json: 3/3, including native Powder workspace.
+- destruction_parameter_undo_final.json: 3/3, keyed numeric/vector edits and UI.
+- destruction_keyed_controls.json: 1/1, 16 damage-handle/animation/undo checks.
+- powder_destruction_compatibility.json: 2/2 on OpenGL compatibility.
+- powder_destruction_delivery_import.log: final headless editor import.
+
+An earlier saved-material test had an unmounted inspector in its test setup and
+stalled; the setup was repaired and the test subsequently passes in the final
+report. Intermediate failed/aborted logs are retained, not presented as passes.
+Deliberately invalid shaders in existing compiler tests still emit their marked
+expected diagnostics. Root-certificate and shutdown-resource warnings noted
+above remain; no claim of a completely warning-free engine shutdown is made.
+
+Measured on this machine (RTX 3060 Laptop GPU; timings are not FPS guarantees):
+- 27,000-grain source generation: 33.007 ms.
+- Initial 27,000-grain seeded geometry/identity/buffer setup: 178.412 ms.
+  This includes new variant/orientation setup; the old single-sphere preview
+  measurement in prior notes is NOT representative of this renderer.
+- 512-grain granular CPU solver: 39.132 ms mean step, 10,136 neighbor checks.
+- Unit-cube topology work: crack about 3 ms; box carving about 3 ms;
+  cylindrical carving about 6 ms; polyhedral sphere carving about 34 ms.
+- Foot: 13 release events, 8 moved grains. Rolling cylinder: 12 releases,
+  12 moved grains. Fluid: 39 releases (including reattachment/release cycles),
+  36 moved grains. Each conserves the original mass and replays identically.
+
+Native captures: powder_material_workspace.png, destruction_workspace.png,
+powder_footprint.png, powder_wheel_track.png and powder_fluid_erosion.png.
+The three interaction captures are small controlled physical test scenes, not
+claims of a production-scale microscopic coating or terrain erosion solver.
+The unsupported capabilities listed in the sections above remain unsupported.

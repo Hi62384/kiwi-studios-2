@@ -29,10 +29,11 @@ func _choice(key: String, title: String, choices: Array, parent: VBoxContainer) 
 	_property(key,title,parent,false)
 	var input:=OptionButton.new(); input.name="Physics_"+key; input.fit_to_longest_item=false; parent.add_child(input)
 	for text: String in choices: input.add_item(text)
-	if key=="mode" and actor.type_id==&"fluid":
+	if key=="mode" and (actor.type_id in [&"fluid",&"powder"] or int(settings.type)==9):
 		for index in [0,2]: input.set_item_disabled(index,true)
-		input.get_popup().set_item_tooltip(0,"Use Freeze to hold the reconstructed liquid surface."); input.get_popup().set_item_tooltip(2,"Spring-guided motion is not a liquid control mode.")
-	if key=="mode" and settings.bake.get("frames",[]).is_empty():
+		input.get_popup().set_item_tooltip(0,"Use Freeze to hold the grain state, or turn off Simulate grains for source preview." if actor.type_id==&"powder" else "Use Freeze to hold the reconstructed liquid surface.")
+		input.get_popup().set_item_tooltip(2,"Spring-guided motion is not a granular control mode." if actor.type_id==&"powder" else "Spring-guided motion is not a liquid control mode.")
+	if key=="mode" and settings.bake.get("frames",[]).is_empty() and not settings.bake.get("cache") is KiwiPhysicsBakeCache:
 		input.set_item_disabled(4,true); input.get_popup().set_item_tooltip(4,"Use Bake… to create baked physics first.")
 	input.select(clampi(int(settings[key]),0,choices.size()-1)); input.item_selected.connect(func(value: int): _change(key,value,true))
 func _number(key: String, title: String, parent: VBoxContainer, low: float=0.0, high: float=1000.0, step: float=.01, keyed: bool=true) -> void:
@@ -94,9 +95,31 @@ func _fold(title: String) -> VBoxContainer:
 	if not categories.has("Physics:"+title): inspector.ui_state.set_category_expanded(actor.id,"Physics:"+title,false)
 	return inspector._stateful_category(title,actor.id,panel,"Physics")
 func _build() -> void:
+	if int(settings.type)==9:
+		_heading("Fog · timeline-controlled transport")
+		_check("enabled","Simulation enabled",panel)
+		_number("activation","Activation (source seconds)",panel,0,86400)
+		_number("end","Stop at source seconds (-1 = no stop)",panel,-1,86400)
+		_number("steps","Fixed steps / scene second",panel,30,120,1,false)
+		_choice("mode","Control",KiwiPhysicsSettings.MODES,panel)
+		_events(); _actions(); return
+	if actor.type_id==&"powder":
+		_heading("Powder · timeline-controlled granular contacts")
+		_number("gravity","Gravity (m/s²)",panel,0,1000); _vector("gravity_direction","Gravity direction",panel)
+		_vector("wind","Wind velocity (m/s)",panel)
+		var collision:=_fold("Collision")
+		_check("collision","Collisions enabled",collision); _number("layer","Collision layer bits",collision,1,2147483647,1,false); _number("mask","Collision mask bits",collision,0,2147483647,1,false)
+		_target("attachment","attachment_bone","Source attachment",panel); _vector("pivot","Source offset",panel)
+		_check("inherit_velocity","Inherit source velocity",panel)
+		_number("activation","Activation (source seconds)",panel,0,86400)
+		_number("end","Stop at source seconds (-1 = no stop)",panel,-1,86400)
+		_number("steps","Fixed steps / scene second",panel,30,240,1,false)
+		_choice("mode","Control",KiwiPhysicsSettings.MODES,panel)
+		_events(); _actions(); return
 	_check("enabled","Physics",panel,true)
 	if not settings.enabled: return
-	if actor.type_id!=&"fluid": _choice("type","Physics type",KiwiPhysicsSettings.TYPES,panel)
+	if KiwiGrowthPhysics.data(actor)!=null: _heading("Surface growth · guide simulation")
+	elif actor.type_id!=&"fluid": _choice("type","Physics type",KiwiPhysicsSettings.TYPES,panel)
 	else: _heading("Fluid · density-constrained liquid")
 	_choice("mode","Control",KiwiPhysicsSettings.MODES,panel)
 	_number("activation","Activation (source seconds)",panel,0,86400)
@@ -136,8 +159,21 @@ func _build() -> void:
 		_check("rope_end","Attach end",panel,true)
 		if settings.rope_end: _target("end_actor","end_bone","End attachment",panel); _vector("end_offset","End offset",panel)
 	if kind in [1,4,5]: _pins()
+	if kind==8:
+		_number("particles","Guide budget",panel,1,128,1,false)
+		_number("stretch","Stretch resistance",panel,0,1)
+		_number("bend","Bend resistance",panel,0,1)
+		_number("recovery","Return to groom",panel,0,100)
+		_vector("wind","Wind force",panel)
+		_number("iterations","Constraint iterations",panel,1,24,1,false)
+		_heading("Roots follow the animated surface. Bakes store guide points, not every strand.")
+		var correct:=Button.new(); correct.text="Edit guide motion…"; panel.add_child(correct); correct.pressed.connect(func():
+			var editor:=_editor()
+			if editor!=null: preload("res://Workspaces/ModelWorkspace/growth/growth_motion_ui.gd").open(editor,actor,inspector))
 	if kind in [1,4]: _heading("Point collisions against rigid colliders. Self-collision is not supported.")
 	var collision:=_fold("Collision")
+	if kind in [0,2] and int(settings.body_mode)==0:
+		var water:=_fold("Water response"); _check("water_interaction","Environment water",water); _number("water_buoyancy","Buoyancy strength",water,0.,10.); _number("water_drag","Water drag",water,0.,10.)
 	_check("collision","Collision enabled",collision)
 	if kind in [0,2]:
 		_choice("shape","Collision shape",["Automatic","Box","Sphere","Capsule","Cylinder","Convex hull","Static triangle mesh"],collision)
@@ -147,6 +183,11 @@ func _build() -> void:
 	elif kind!=6: _number("radius","Collision radius",collision,.002,10)
 	_number("layer","Collision layer bits",collision,1,2147483647,1,false)
 	_number("mask","Collision mask bits",collision,0,2147483647,1,false)
+	if kind in [0,1,2,3,4,5]:
+		var surface:=_fold("Powder surface")
+		_check("powder_accumulation","Allow powder accumulation",surface)
+		_number("powder_adhesion","Powder adhesion (N/grain)",surface,0,2,.001)
+		_number("powder_max_coating","Maximum attached coating (m)",surface,.001,10)
 	var advanced:=_fold("Advanced")
 	if kind==6:
 		_target("attachment","attachment_bone","Source attachment",advanced); _vector("pivot","Source offset",advanced)
@@ -334,10 +375,19 @@ func _actions() -> void:
 	for action: String in ["Bake…","Clear cache","Recalculate","Freeze"]:
 		var button:=Button.new(); button.text=action; controls.add_child(button)
 		button.pressed.connect(_action.bind(action,button,status))
+	if KiwiGrowthPhysics.data(actor)!=null:
+		var clear:=Button.new(); clear.text="Clear bake"; controls.add_child(clear); clear.pressed.connect(func():
+			var before:=KiwiPhysicsSettings.authored(actor); var after:=before.duplicate(true); after.mode=int(before.bake.get("source_mode",1)); after.bake={}
+			model.history.create_action("Clear growth bake"); model.history.add_do_method(KiwiPhysicsSettings.assign.bind(model,actor,after)); model.history.add_undo_method(KiwiPhysicsSettings.assign.bind(model,actor,before)); model.history.commit_action())
 func _action(action: String, button: Button, status: Label) -> void:
 	var editor:=_editor()
 	if editor==null: return
 	if action=="Freeze": editor.physics.freeze(model,actor); return
+	if action=="Bake…" and (KiwiGrowthPhysics.data(actor)!=null or int(settings.type)==9):
+		var control:=preload("res://scripts/actors/physics/destruction/destruction_workflow_control.gd").new(); inspector.add_child(control); control.host=inspector; control.actor=actor; control.status=status; control.bake_dialog(editor)
+		var dialog: Node=control.find_child("DestructionBakeDialog",true,false)
+		if dialog!=null: dialog.tree_exited.connect(control.queue_free)
+		return
 	if action in ["Clear cache","Recalculate"]:
 		if action=="Recalculate" and int(KiwiPhysicsSettings.authored(actor).mode)==4: _change("mode",int(KiwiPhysicsSettings.authored(actor).bake.get("source_mode",1)),true)
 		editor.physics.signature=""; editor.physics.mark_dirty(); editor._evaluate_runtimes(); return

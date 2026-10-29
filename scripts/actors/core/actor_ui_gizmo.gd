@@ -94,10 +94,12 @@ func _process(_delta: float) -> void:
 				if camera_preview.world_3d != scene_viewport.find_world_3d():
 					camera_preview.world_3d = scene_viewport.find_world_3d()
 				preview_lens.global_transform = source.global_transform
-				preview_lens.fov = source.fov
-				preview_lens.near = source.near
-				preview_lens.far = source.far
-				preview_lens.environment = scene_viewport.find_world_3d().environment
+				for property: String in ["projection","fov","size","near","far","keep_aspect","frustum_offset","h_offset","v_offset","attributes","compositor"]: preview_lens.set(property,source.get(property))
+				preview_lens.cull_mask=source.cull_mask&1
+				preview_lens.environment = source.environment if source.environment!=null else scene_viewport.find_world_3d().environment
+				var dimensions: Vector2i=scene_viewport.size; var preview_size:=Vector2i(640,maxi(1,roundi(640.0*dimensions.y/maxi(1,dimensions.x))))
+				if camera_preview.size!=preview_size: camera_preview.size=preview_size
+				for property: String in ["use_hdr_2d","msaa_3d","screen_space_aa","use_taa","transparent_bg","positional_shadow_atlas_size","positional_shadow_atlas_16_bits"]: camera_preview.set(property,scene_viewport.get(property))
 				preview_material = runtime.get("camera_shader_material") as ShaderMaterial
 				preview_active = true
 	_sync_preview_2d()
@@ -137,7 +139,7 @@ func _sync_preview_2d() -> void:
 
 func _preview_rect() -> Rect2:
 	var width := minf(220.0, maxf(1.0, size.x - 24.0))
-	var height := 24.0 + width * 9.0 / 16.0
+	var height := 24.0 + width * float(camera_preview.size.y)/maxi(1,camera_preview.size.x)
 	if not preview_user_moved:
 		preview_position = Vector2(12, maxf(12.0, size.y - height - 12.0))
 	preview_position = preview_position.clamp(Vector2(12, 12),

@@ -1,0 +1,12 @@
+extends "res://scripts/actors/tests/surface_growth_test.gd"
+func run() -> void:
+	var terrain:=KiwiEnvironmentTerrain.new(); terrain.resolution=33; terrain.dimensions=Vector2(16,16); terrain.voxel_height=.5; var cave:=KiwiTerrainCave.new(); cave.roughness=0.; cave.chambers=PackedVector4Array([Vector4(0,-1,0,2)]); terrain.caves=[cave]; terrain.hydrology=KiwiTerrainHydrology.new(); terrain.hydrology.automatic_rivers=false; terrain.hydrology.automatic_lakes=false; terrain.hydrology.ocean_enabled=true; terrain.hydrology.sea_level=.2
+	check(terrain.prepare_water() and terrain.water_valid() and absf(terrain.height(16,16)+3.)<.001,"Hydrology samples the actual exposed cave floor through a surface opening")
+	var query:=terrain.water_at(Vector3(0,-1,0)); check(not query.is_empty() and query.inside and absf(query.depth-3.2)<.002,"Water depth and submerged queries include the real open cave void rather than its former roof height")
+	check(terrain.prepare_volumes() and terrain.volumes_valid(),"Cave geometry regenerates against the same water-aware ground field")
+	var document:=KiwiEnvironmentDocument.new(); var item:=document.add_terrain(terrain); var runtime:=KiwiEnvironmentRuntime.new(); root.add_child(runtime); runtime.configure(document); var chunk:=runtime.nodes[item.id].get_node("Chunk_0_0") as MeshInstance3D; var hit:=chunk.mesh.generate_triangle_mesh().intersect_ray(Vector3(0,-1,0),Vector3.DOWN)
+	check(not hit.is_empty() and absf((hit.position as Vector3).y+3.)<.03 and runtime.nodes[item.id].has_node("Water"),"Rendered flooded opening and solid cave floor share the actual generated terrain mesh")
+	var key:=terrain.water_key; cave.chambers[0]=Vector4(0,-1,0,2.5); check(not terrain.water_valid() and terrain.prepare_water() and terrain.water_key!=key and terrain.water_at(Vector3(0,-1,0)).depth>3.6,"Editing a cave invalidates drainage and updates the water bed and depth")
+	var previous:=terrain.water_delta.duplicate(); check(not terrain.prepare_water(func(): return true) or terrain.water_delta==previous,"Cancellation never publishes partially sampled cave water data")
+	terrain.hydrology=null; terrain.prepare_water(); terrain.prepare_volumes(); runtime.sync(); check(absf(terrain.height(16,16))<.001 and not runtime.nodes[item.id].get_node("Water").visible,"Removing water restores the original height source while retaining the real cave field")
+	runtime.queue_free(); await process_frame; print("TERRAIN CAVE WATER: %d checks, %d failures"%[checks,failures]); quit(failures)

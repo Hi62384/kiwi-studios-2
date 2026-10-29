@@ -1,0 +1,98 @@
+Volumetric fog implementation progress — 2026-10-27
+
+Uses the existing native FogVolume / Forward+ renderer. Existing custom fog shaders
+retain their source, parameters and scene-controlled time. Assigning one explicitly
+bypasses built-in appearance; clearing it restores the cached built-in material.
+
+Scene workflow:
+- Lighting > Fog Volume or Global Fog. Appearance and Density sections create normal
+  Kiwi Fog Appearance and Fog Density Field objects. These use the normal project
+  resource picker, Save/Save As, shared references, Make Unique, clipboard and nested
+  property-keyframe paths.
+- Global fog uses World shape. A per-viewport coordinator chooses the lowest active
+  actor ID as global owner, disables background volumetric density while it owns the
+  atmosphere, preserves unrelated Environment settings and restores the original
+  environment when fog ends. Local fog remains additive to intentional global fog.
+- Existing shapes retain IDs: Ellipsoid, Cone, Cylinder, Box, World. Additional Sphere,
+  Capsule and closed Mesh boundaries use explicit distance/occupancy masks. Closed
+  mesh inputs must be saved native Mesh resources, at most 10,000 triangles. The
+  shared volume validator rejects open/nonmanifold/degenerate surfaces. Occupancy is
+  a cached 32-cubed volume normalized to the actor's Volume Size. This is rigid mesh
+  attachment, not fully deforming mesh-boundary support.
+
+Appearance:
+- Base/secondary colors and up to four editable gradient colors with keyframable
+  stop positions; vertical/horizontal/radial/directional, local/world mapping.
+- Density multiplier, power contrast, offset, threshold and maximum. Zero source
+  density remains zero unless a positive offset/contributing field is supplied.
+- Opacity scales extinction. Additional absorption increases extinction and lowers
+  scattering albedo proportionally, preserving the scattering coefficient. Native
+  volumetric path-length attenuation applies; no transparent mesh alpha substitute.
+- Scattering albedo plus emission color/energy. Anisotropy remains environment-wide.
+- Density/color native Texture3D resources; color/density/detail/mask Kiwi Image or
+  Noise Image objects. Explicit planar XY or equal-weight triplanar 2D mapping,
+  transform, tiling, strength and density-texture contrast. Triplanar is deliberately
+  equal-weight in a participating medium, where no surface normal exists.
+- One density field and four ordered appearance influences share one shader pass.
+  Density combinations: Add, Multiply, Maximum, Minimum, Subtract, Replace; color
+  influences use tint interpolation, emission influences add emission. Influence
+  fields can use a reusable local-space field mask. Nested mask chains are bypassed
+  explicitly. Masks modulate influence strength, preserving unmasked density.
+- Six appearance presets preserve actor transform, shape and painted density.
+
+Fields:
+- Uniform, height, radial, directional, true 3D noise, volume/painted texture and
+  primitive shape masks. Noise: smooth simplex, Perlin, fractal, ridged, cellular,
+  domain-warped; seed/frequency/octaves/lacunarity/gain/threshold/contrast. No TIME.
+- Macro and detail use separate influences, not another density engine.
+- Generated fields use bounded 16/32/64-cubed or custom 8–64-cubed trilinear textures
+  and a 32-entry cache.
+  Simple color/optical edits only change uniforms. Noise parameter edits prepare
+  a new cached volume synchronously; high-quality edits may pause briefly.
+- Painted density uses sparse 32-cubed authoring, independent of texture quality.
+  Axis/depth slice painter with 3D spherical Add/Subtract/Set/Smooth/Reset brushes,
+  radius, strength, falloff, preview, one action per stroke and Escape cancellation.
+  The scene viewport painter shares exactly the same voxel brush evaluator. It
+  provides view/X/Y/Z planes, depth, mirrored axes, interpolated stroke spacing,
+  Ctrl subtraction, a projected 3D brush footprint, a cursor, atomic undo and Escape
+  cancellation. Slice painting remains available for precise depth inspection.
+
+Verification obtained:
+- fog_core_verified: headless appearance and fields pass (14 + 8 checks at that time).
+- fog_delivery: six native Forward+ scripts pass: fog rendering, appearance, fields,
+  actor catalog, complete scene/camera integration and multiple growth sources.
+- fog_spatial_pixels / fog_masks_verified: native gradient, 3D noise, extinction,
+  environment ownership and custom-shader rendering pass. Intermediate failures
+  are retained and are not counted as passes.
+- fog_camera_paint_final: four native scripts pass, including 20 actual rendering /
+  binding checks, six real viewport-pointer brush checks, eight slice/mesh checks
+  and 15 appearance/serialization/keyframe checks. Camera environment overrides
+  preserve their authored settings and restore when fog ends.
+- fog_growth_regressions: seven native growth, shader and clipboard scripts pass.
+- fog_optical_acceptance: 23 native assertions pass, including actual path-length
+  attenuation, opacity and rotated local gradients. fog_video_determinism encodes
+  correctly timed three-frame fog output; growth scene-video regression also passes.
+- See volumetric_lighting_progress.txt for subsequent native light/shadow, camera
+  temporal-history safeguards and project-wide sampling controls.
+- Normal Forward+ application startup completed. Missing recent projects previously
+  attempted to load an empty resource path; this was fixed. Its retry log contains
+  only the existing Windows certificate-store warning.
+- Uniform update measured 0.119–0.152 ms per edit in the small native fixture, excluding
+  rendering. Closed Box Mesh 32-cubed preparation measured about 82–121 ms; this is a
+  simple fixture, not a complex mesh performance guarantee.
+
+Scope limits and remaining acceptance coverage:
+- Primitive composition uses ordinary field influences: first Replace, then Maximum
+  for union, Minimum for intersection or Subtract for removal. It remains inside the
+  actor bounds; it is not an unbounded mesh CSG solver. Distance/shape tests verify
+  all six primitives and the occupancy combination rules.
+- Falloff uses editable power curves. Gradients support four colors, and influences
+  use compact arrow controls for ordering. These are bounded editors rather than an
+  unlimited gradient/composition workspace.
+- Expensive noise/mesh preparation is cached and synchronous. Fully asynchronous
+  volume preparation, broader dependency invalidation and exhaustive texture-transform
+  / optical-path-length pixel coverage remain follow-up work. Those checks must not
+  be claimed complete merely because resource binding and formula tests pass.
+- Advanced fog lighting and physical fog motion are out of scope for these specs.
+
+No application export, ProjectBridge ZIP, commit or branch was made.

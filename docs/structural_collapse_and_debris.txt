@@ -1,0 +1,233 @@
+Structural collapse, physical debris and destruction effects
+============================================================
+Godot 4.6.1. This extends the existing timeline physics, offline collision world,
+material-damage and convex fracture engines. No independent physics process,
+engineering workspace, application export or ProjectBridge ZIP is introduced.
+
+Build a structure
+-----------------
+1. Add Basic Shape / Basic Mesh actors, or import a model with separate components.
+2. Properties > Structure: switch Enabled on and choose Dynamic
+   element, Fixed foundation or Animated support. Ordinary Physics controls still
+   supply mass, gravity, velocities, forces and timed impulses. The structural
+   role supplies the rigid body mode while structural simulation is enabled.
+3. Choose a target and joint type, then click +. Assemble selection enables a
+   group of selected meshes without merging them or changing scene parenting.
+4. Set breaking force (N), torque (N.m), strength multiplier and stiffness (N/m).
+   Joint details contains directional resistance, damping, accumulated/initial
+   damage, endpoint offsets, orientation and material-strength linking.
+5. Find nearby reviews bounds-based candidates among selected meshes at the
+   chosen tolerance. Clicking a candidate explicitly accepts it. Finding nearby
+   objects, importing a hierarchy or touching another object NEVER welds it.
+6. Edit joint in viewport / Joints J exposes selectable endpoint/direction
+   handles. Drag endpoints to move their local pivot; drag direction to orient
+   the joint. Ctrl snaps, Shift-wheel edits strength, Escape cancels/exits.
+   Gold/blue identify the two endpoints. Incoming links can be opened from the
+   target inspector. The normal transform tools remain available outside Joints.
+
+Connections and load approximation
+-----------------------------------
+Weld: positional and orientation constraints.
+Hinge: positional constraints, with rotation free about the configured Y axis.
+Slider: transverse and orientation constraints, with bounded axial travel.
+Cable/distance: radial constraint, optionally tension-only with slack.
+Spring: compliant radial constraint. Set length and stiffness to tune stretch.
+
+The solver predicts existing rigid motion, then iterates compliant XPBD rigid
+joint constraints. Translational and rotational correction impulses estimate
+reaction forces and moments. Geometry size/mass set approximate scalar inertia;
+lever arms contribute to bending utilization. Gravity, forces, motion and
+collisions therefore change measured joint loads rather than simply counting
+connections. Strength, directional multipliers and accumulated damage determine
+failure. Prevent failure protects stress failures; an explicit Break at event
+still wins. Constraints cease when broken. Connected unanchored islands fall.
+
+Island topology is rebuilt when nodes or intact links change. Contacts are a
+separate directed compressive support relation, not permanent welds. A platform
+may remain resting on a column after its weld breaks: that is intentional. The
+overlay uses green-to-red estimated utilization, red broken links and support
+markers. These are approximate artistic loads, NOT certified stress analysis.
+
+Stress/torque work is fed into the existing local material-damage engine. Slender
+members receive a bounded compression amplification. Material yield, toughness,
+brittleness, hardness, directionality and advanced coefficients then determine
+dent/crack/fracture outcomes. This is not a continuum buckling/FEM solver.
+Escalating automatic physical damage may replace earlier automatic dents/cracks
+with fracture of the original closed source, because the existing cutter cannot
+fracture arbitrary concave deformed topology. Authored manual operation order is
+unchanged. Local accumulated damage remains. Compatible surviving fragment
+material retains its attachment; destroyed/missing attachment material releases.
+
+Modeling integration
+---------------------
+The Model Workspace provides structural role and Connect selected components
+controls. Connections/configuration save on each component. Model instantiation
+preserves their stable IDs and relationships as individual scene mesh actors.
+Scene and model assembly duplication remaps internal targets; scene copies clear
+external targets rather than silently joining the original. Renaming is safe.
+Missing targets produce warnings. World-space bakes of copies must be rebuilt.
+The Scene Structure inspector is the detailed joint editor, not a second model
+engineering workspace. Model hierarchy remains independent from mechanical links.
+
+Directing and timeline behavior
+-------------------------------
+Diamond buttons keyframe strength, stiffness, enable/protection, endpoints,
+orientation and numeric joint controls. Break at uses source time (-1 disables).
+Support activation/role can be animated. Existing Physics force/impulse events
+remain usable. Authored edits are undoable; simulation steps generate no undo
+entries. Deleting a connection removes its tracks in the same undo action.
+Checkpoints/bakes preserve geometry, fragments, joint integrity/damage, islands,
+events and transforms. Pause does not advance. Rewind restores earlier support
+and fracture states; seeking reconstructs fixed-step simulation. Appearance-only
+surface/effect edits do not invalidate trajectories. Physical edits do.
+
+Physical debris workflow
+-------------------------
+Properties > Destruction enables the existing operations/material damage.
+Properties > Debris & Effects controls physical debris, collisions, budgets,
+fracture impulse, secondary fracture, automatic effects and a custom VFX resource.
+Advanced controls are collapsed. A zero impulse multiplier keeps only inherited
+source translation/rotation. The authored operation's impulse is an explicit
+artistic separation impulse, not a physically inferred explosion.
+
+Real generated geometry is retained. Fragments have stable IDs, volume-weighted
+mass, world transforms, linear/angular motion and convex collision hulls. Small
+pieces can use sphere proxies. Their center and inertia use bounded approximations
+(bounds center / scalar inertia), not exact mesh integrals. Material friction and
+restitution supply contact defaults; disable that advanced option to use the
+actor's Physics contact settings. Material density derives mass only when the
+existing Use material density for mass option is enabled.
+
+Fragments collide with each other and compatible rigid/animated actors, exchange
+impulses and can feed secondary impact energy into the existing damage engine.
+Energetic brittle chunks may fracture again. Minimum size, energy threshold,
+secondary depth and count limits prevent runaway recursion. Source geometry and
+original colliders are restored on rewind; the intact collider is disabled while
+fragments are active. Settled fragments can sleep and wake on nearby motion.
+
+Kernel-sampled fluid drag and approximate buoyancy exchange opposite momentum
+with fluid samples. Real fragment hulls displace liquid via existing boundary
+queries. Powder queries also see fragment hulls and exchange grain contact
+impulses. These couplings are approximations, not resolved hydrodynamics or
+continuous granular terrain. Full two-way cloth/soft-body pressure and a new
+fragment-to-character skin collider are NOT supplied: existing deformable point
+queries can hit debris, but debris does not solve a new deformable surface model.
+
+Copy debris to editable actors creates an ordinary mesh-actor snapshot under a
+point, in one undo action. Original simulation remains intact; copied actors have
+physics disabled by default to avoid accidentally doubling simulated mass. This
+is a copy, not transfer of ownership out of an active simulation inventory.
+
+Automatic effects
+------------------
+Physical fracture, impact, scraping, secondary fracture and overload events carry
+time, source/fragment identity, contact position/normal, relative velocity,
+intensity and deterministic seed. Per-contact time deduplication and thresholds
+prevent resting contacts producing bursts every step. Glass/ceramic makes chips;
+metal makes energetic impact/scraping sparks (not cold-cut sparks); wood makes
+splinters/sawdust; stone/concrete/dirt makes dust and chips. Current material and
+artist overrides select the rendering rules. Custom Destruction VFX Preset objects
+can replace or augment automatic rules and use ordinary save/load/Make Unique/
+clipboard references. Materials can supply a default effect family/preset.
+
+Physical fragment mass and visual particle detail are separate. Particle detail
+does not add mass or a second set of physical grains. Godot particle draw meshes
+and materials are rendered in pooled MultiMeshes. An analytic burst-age adapter
+reconstructs positions/colors at scene time instead of free-running GPU simulation.
+Changing playback/export FPS cannot change event times or random samples. Dust
+is soft billboard particle shading, not a volumetric solver. No full smoke, heat,
+combustion or material micro-fracture solver is implied; stylization uses custom
+colors/sizes/motion, not a dedicated M2DO renderer.
+
+Limits and practical performance
+--------------------------------
+Structure: up to 512 elements / 1,024 explicit joints; quality 2-32 iterations.
+Debris: 256 physical pieces scene-wide, per-actor budget up to 256; existing convex
+geometry operations retain their 48-piece / 20,000-source-vertex limits. More
+complex cuts are refused clearly, preserving source geometry, rather than silently
+dropping mass. Secondary fracture is limited to depth 0-4 and at most four children
+per split. Events: 96 per actor, 512 recent-contact stamps, up to 8,192 visible VFX
+particles. Existing checkpoint/bake budgets include estimates for debris/events.
+Each important physical piece has an internal mesh node, not an ordinary actor;
+visual microdetail is batched. Geometry preparations and collision exclusions are
+cached. Large structures are CPU-heavy and should be baked, not promised 60 FPS.
+
+No arbitrary concave/rigged topology cutting, exact inertia tensor, arbitrary
+joint angular limits/motors, face-painted structural bonds, continuum FEM, cable
+collision, or realistic heterogeneous welded-solid fracture is added. Different
+playback-speed actors in one constrained assembly are not a calibrated physical
+unit system; prefer a shared playback rate. Discrete fixed-step queries/approximate
+rotation can still miss extreme-speed/thin contacts; raise quality/use smaller
+time steps or bake suitable artistic motion. Candidate detection is conservative
+world-AABB proximity, not automatic precise surface welding.
+There is no merged-rigid-cluster solver or complete sleeping-island optimization:
+intact joint networks continue fixed-step constraint evaluation. Island detection
+is cached while topology is unchanged, but a topology change rebuilds the small
+assembly graph rather than incrementally repartitioning only affected subgraphs.
+
+Verification records
+----------------------
+Native tests, regression reports and screenshots live in .godot/verification/.
+The delivery report lists the actual final passing runs and measured performance.
+Intermediate integration/test-fixture failures are retained in earlier logs;
+they are not presented as passing results. Root-certificate-store and some
+existing broad-test shutdown resource warnings may remain. No application was
+exported; short scene-video validation clips are temporary and removed afterwards.
+
+Measured on this machine, 2026-10-26 (not a real-time FPS guarantee):
+- Isolated joint solve, 12 iterations: 16 elements / 15 joints about 5.7 ms;
+  64 / 63 about 36.1 ms; 128 / 127 about 78.9 ms per step. Stable topology needed
+  one island rebuild across the benchmark. Full scene/collision costs are extra.
+- A small secondary-impact debris scenario measured about 2.9 ms for its last
+  debris step while 1,006 visual particles were displayed. This is not a
+  worst-case 256-fragment performance claim.
+- The two-floor test carried approximately 55.6 N on each foundation connection.
+  After one directed support break, the other exceeded its 80 N limit (about
+  94 N at failure), releasing both connected floors. Independently supported
+  sections and loose compressive contacts are covered by separate tests.
+
+Native collision filtering was also repaired: the completed excluded-RID list
+must be assigned to Godot, not appended to the temporary returned by its getter.
+This prevents overlapping welded components creating false collision overloads.
+Powder intrusion queries independently inspect real contact penetration when a
+native overlap reports zero travel, so excluding the supporting floor does not
+hide a wheel's penetration into attached grains.
+
+Final validation, 2026-10-26
+----------------------------
+30 distinct relevant scripts have passing final results:
+- structural_delivery_regressions_a.json: 9/9 destruction, rigid/timeline,
+  integration, native workspace and fluid-boundary regressions.
+- structural_delivery_regressions_b.json: 14/14 fluid/powder, model, scene,
+  inspector, clipboard, actor-type and picker regressions, after collision fixes.
+- structure_rest_query_final.json: 11/11 targeted follow-ups, including the
+  21-check structural constraints suite and 5-check mutual collision suite.
+- structural_export_final.json: 2/2 native UI/video and debris/VFX scripts.
+  The 11-check UI test exercises actual clicks and a viewport handle drag;
+  12/24 FPS scene exports match transforms, event ledgers AND the visible
+  MultiMesh particle-buffer hashes at corresponding times.
+- structural_edge_cases.json: performance scenario checks (16/64/128 elements).
+- structural_video_buffers.json: its fluid-drag follow-up passes; its earlier
+  UI test had a test-local variable-name parse error, fixed and rerun in
+  structural_export_final.json. Do not use that older UI entry as a final result.
+- structure_final_compatibility.json: 2/2 debris/VFX and collision scripts pass
+  with OpenGL compatibility rendering as well as the native Forward+ runs.
+- structure_debris_final_source_import.log: final headless editor import has
+  no parse/script errors. git diff --check is clean.
+
+Focused coverage includes break thresholds, all five constraint types, torque,
+damage accumulation, gravity sharing, directed support removal, two-floor
+progressive collapse with collisions enabled, independent partial collapse,
+loose contact versus parenting, material-dependent fracture, surviving fragment
+attachments, duplication/remapping, scene saving, rewind/pause/baking, mass
+conservation, secondary fracture/damage, rigid and fluid momentum transfer,
+effect families, deterministic VFX, native editor undo/redo and scene-video output.
+The 3-check debris_fluid_test additionally verifies exact opposite drag momentum
+and mass-dependent buoyancy in a controlled fixture.
+
+Known diagnostic output remains: the Windows certificate-store warning, deliberate
+invalid-shader compiler diagnostics in existing tests, and shutdown resource/RID
+warnings in broad resource/actor-type tests. There are no failing assertions or
+unhandled script errors in the selected final results. Native screenshots include
+structure_workspace.png and debris_effects.png. Temporary validation videos were
+removed. The tests do not certify engineering accuracy or the unsupported cases.

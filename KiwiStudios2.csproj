@@ -1,0 +1,13 @@
+<Project Sdk="Godot.NET.Sdk/4.6.1">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="scenes/**/*.cs" />
+    <Compile Include="Workspaces/**/*.cs" />
+    <Compile Include="scripts/**/*.cs" Exclude="scripts/actors/audio/windows_loopback.cs" />
+  </ItemGroup>
+</Project>

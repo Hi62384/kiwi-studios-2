@@ -13,6 +13,10 @@ var grid := MeshInstance3D.new()
 var visuals: Dictionary = {}
 var evaluated: Dictionary = {}
 var signatures: Dictionary = {}
+var preview_hidden: Dictionary={}
+var upload_budget_usec:=4000
+var _material_scope: Dictionary={}
+var _natural_preview_time:=0.
 var tool := "Move"
 var local_axes := false
 var xray := false
@@ -62,9 +66,11 @@ var _selected_lookup: Dictionary = {}
 var _weights := PackedFloat32Array()
 var _weights_radius := -1.
 var rig_tool: KiwiRigViewport
+var groom_tool:=KiwiGroomTool.new()
 const COLORS := [Color("f3848c"),Color("8bddae"),Color("85bdff")]
 
 func _ready() -> void:
+	groom_tool.canvas=self
 	rig_tool=KiwiRigViewport.new(); rig_tool.canvas=self; rig_tool.editor=KiwiRigEditor.new(session)
 	focus_mode=Control.FOCUS_ALL; clip_contents=true; custom_minimum_size=Vector2(220,200)
 	viewport.own_world_3d=true; viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS; viewport.msaa_3d=Viewport.MSAA_2X
@@ -93,14 +99,17 @@ func set_view(view: String) -> void:
 		"Bottom": yaw=0; pitch=PI/2-.0001
 	camera.projection=Camera3D.PROJECTION_ORTHOGONAL; update_camera()
 func frame(all: bool=false) -> void:
-	var points := PackedVector3Array()
+	var points := PackedVector3Array(); var state:=session.document.hierarchy_state(session.selected)
 	for item in session.document.components:
-		var included := all or session.selected.has(item.id)
-		for id in session.selected:
-			if session.document.is_descendant(item.id,id): included=true; break
+		var included: bool=all or state.selected[item.id]
+		if preview_hidden.has(item.id): continue
 		if not included: continue
+		if item.growth!=null and visuals.has(item.id) and visuals[item.id].mesh!=null:
+			var visual: MeshInstance3D=visuals[item.id]; var box:=visual.mesh.get_aabb()
+			for corner in 8: points.append(visual.global_transform*(box.position+box.size*Vector3(corner&1,(corner>>1)&1,(corner>>2)&1)))
+			continue
 		if item.mesh==null: continue
-		var transform := session.document.world_transform(item)
+		var transform: Transform3D=state.poses[item.id]
 		for vertex in item.mesh.vertices: points.append(transform*vertex)
 	if points.is_empty(): target=Vector3.ZERO; distance=7; camera.size=6; update_camera(); return
 	var box := AABB(points[0],Vector3.ZERO)
@@ -114,25 +123,39 @@ func rebuild_grid() -> void:
 		mesh.surface_set_color(Color("325368") if i==0 else Color(.025,.04,.055)); mesh.surface_add_vertex(Vector3(i*grid_step,0,-40*grid_step)); mesh.surface_add_vertex(Vector3(i*grid_step,0,40*grid_step))
 	mesh.surface_end(); grid.mesh=mesh
 func sync() -> void:
-	var live := {}
+	session.document.prepare_growth()
+	var live := {}; var live_materials: Dictionary={}; var state:=session.document.hierarchy_state(); var started:=Time.get_ticks_usec(); var uploaded:=false; var deferred:=false; var budgeted:=session.document.components.size()>64
 	for item in session.document.components:
 		live[item.id]=true
 		if not visuals.has(item.id):
-			var visual := MeshInstance3D.new(); world.add_child(visual); visuals[item.id]=visual
-		var visual: MeshInstance3D=visuals[item.id]; visual.transform=session.document.world_transform(item); visual.visible=session.document.visible_component(item)
+			var visual: MeshInstance3D=KiwiSurfaceGrowthInstance.new() if item.growth!=null else MeshInstance3D.new(); world.add_child(visual); visuals[item.id]=visual
+		var visual: MeshInstance3D=visuals[item.id]; visual.transform=state.poses[item.id]; visual.visible=state.visible[item.id] and not preview_hidden.has(item.id)
+		for material in item.surface_materials:
+			if material is ShaderMaterial: live_materials[material.get_instance_id()]=true
+		if item.growth!=null:
+			if visual is KiwiSurfaceGrowthInstance: visual.configure(item)
+			continue
 		if item.mesh==null: visual.mesh=null; continue
 		var signature := hash([item.mesh.vertices,item.mesh.faces,item.mesh.uv,item.mesh.materials,item.mesh.smooth,item.modifiers,item.surface_materials,item.skin_mesh,item.binding.revision if item.binding!=null else 0])
 		if signatures.get(item.id,0)!=signature:
+			if budgeted and uploaded and Time.get_ticks_usec()-started>=upload_budget_usec: deferred=true; continue
 			var mesh := KiwiModelModifiers.evaluate(item); evaluated[item.id]=mesh
-			visual.mesh=item.skin_mesh if item.skin_mesh!=null else (item.binding.source_mesh if item.binding!=null else mesh.render_mesh(item.surface_materials)); signatures[item.id]=signature
+			visual.mesh=item.skin_mesh if item.skin_mesh!=null else (item.binding.source_mesh if item.binding!=null else item.render_mesh(_material_scope)); signatures[item.id]=signature; uploaded=true
 		visual.transparency=1. if wireframe else (.65 if xray else 0.)
 	for id in visuals.keys():
 		if not live.has(id): visuals[id].queue_free(); visuals.erase(id); evaluated.erase(id); signatures.erase(id)
+	for id in _material_scope.keys():
+		if not live_materials.has(id): _material_scope.erase(id)
 	if rig_tool!=null: rig_tool.editor.session=session; rig_tool.sync()
-	_pending_sync=false; overlay.queue_redraw()
+	_pending_sync=deferred; overlay.queue_redraw()
+func flush_preview() -> void:
+	while _pending_sync and is_inside_tree(): sync(); await get_tree().process_frame
 func _process(delta: float) -> void:
 	if not is_visible_in_tree(): return
 	if _pending_sync: sync()
+	_natural_preview_time+=delta
+	var visited_materials: Dictionary={}
+	for visual: Node in visuals.values(): preload("res://Workspaces/ModelWorkspace/natural_render.gd").time(visual,_natural_preview_time,visited_materials)
 	if _navigating:
 		var velocity := Vector3.ZERO
 		if Input.is_physical_key_pressed(KEY_W): velocity-=camera.basis.z
@@ -151,9 +174,9 @@ func pick(point: Vector2, excluded: Array[String]=[]) -> Dictionary:
 	if _pending_sync and (visuals.is_empty() or (not _pressed and not _drag and not _extruding)): sync()
 	var r := ray(point); var best := INF; var result := {}
 	for item in session.document.components:
-		if excluded.has(item.id) or not session.document.editable_component(item) or not visuals.has(item.id): continue
+		if excluded.has(item.id) or preview_hidden.has(item.id) or not session.document.editable_component(item) or not visuals.has(item.id): continue
 		var visual: MeshInstance3D=visuals[item.id]
-		if visual.mesh==null or visual.mesh.get_surface_count()==0 or absf(visual.transform.basis.determinant())<.000001: continue
+		if not visual.is_visible_in_tree() or visual.mesh==null or visual.mesh.get_surface_count()==0 or absf(visual.transform.basis.determinant())<.000001: continue
 		var inverse := visual.transform.affine_inverse(); var origin: Vector3=inverse*r.origin; var direction: Vector3=(inverse.basis*r.direction).normalized()
 		if visual.mesh.get_aabb().intersects_ray(origin,direction)==null: continue
 		var triangle_mesh := visual.mesh.generate_triangle_mesh()
@@ -207,7 +230,7 @@ func box_select(rect: Rect2, additive: bool) -> void:
 	if session.mode=="Object":
 		if not additive: session.selected.clear()
 		for item in session.document.components:
-			if item.locked or not session.document.visible_component(item) or item.mesh==null: continue
+			if item.locked or preview_hidden.has(item.id) or not session.document.visible_component(item) or item.mesh==null: continue
 			var p := session.document.world_transform(item)*item.mesh.bounds().get_center()
 			if rect.has_point(project(p)) and visible_point(p) and not session.selected.has(item.id): session.selected.append(item.id)
 	else:
@@ -410,6 +433,7 @@ func snap_target(point: Vector2) -> Dictionary:
 
 func _draw_overlay() -> void:
 	if session==null: return
+	if groom_tool.active(): groom_tool.draw(); return
 	if rig_tool!=null and rig_tool.editor.enabled: rig_tool.draw(); return
 	for item in session.document.components:
 		if item.mesh==null or not session.document.visible_component(item): continue
@@ -449,6 +473,9 @@ func _draw_overlay() -> void:
 		if show_normals:
 			for f in item.mesh.faces.size():
 				var p := transform*item.mesh.center(f); overlay.draw_line(project(p),project(p+transform.basis*item.mesh.normal(f)*.15),Color("85ccf1"),1,true)
+	_draw_handles_and_navigation()
+
+func _draw_handles_and_navigation(custom_hint: String="") -> void:
 	var data := geometry()
 	if not data.is_empty():
 		for i in 3:
@@ -472,6 +499,7 @@ func _draw_overlay() -> void:
 		if not hit.is_empty():
 			var pixel_radius := project(hit.point+camera.basis.x*radius).distance_to(project(hit.point)); overlay.draw_arc(_mouse,pixel_radius,0,TAU,64,Color("84e6ca"),1.5,true)
 	var hint := "RMB fly · MMB orbit · Shift+MMB pan · Wheel zoom · F frame · 1–4 selection · W/E/R transform"
+	if not custom_hint.is_empty(): hint=custom_hint
 	if _drag: hint=tool+"  "+_numeric+"  · X/Y/Z constrain · Shift+axis plane · Ctrl snap · Enter confirm · Esc cancel"
 	elif _extruding: hint="Push/pull %.3f · Type a distance · Ctrl snap · Enter confirm · Esc cancel"%_extrude_amount
 	elif _create_phase>0: hint="Drag footprint, release, then set height · Click confirms · Esc cancels"
@@ -522,6 +550,7 @@ func sculpt_at(point: Vector2, previous: Vector2, erase: bool=false) -> void:
 	item.mesh=mesh; item.generator=""; session.changed.emit()
 
 func _gui_input(event: InputEvent) -> void:
+	if not _navigating and not _panning and not _orbiting and groom_tool.handle(event): overlay.queue_redraw(); accept_event(); return
 	if rig_tool!=null and not _navigating and not _panning and not _orbiting and rig_tool.handle_event(event): overlay.queue_redraw(); accept_event(); return
 	if event is InputEventMouseMotion:
 		var previous := _mouse; _mouse=event.position

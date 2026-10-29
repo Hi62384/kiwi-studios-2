@@ -3,9 +3,11 @@ extends RefCounted
 const SHAPES := ["Box","Sphere","Cylinder","Cone","Capsule","Plane","Torus","Prism","Gear","Pipe","Bolt","Arch","Stairs","Beam","Panel"]
 
 static func defaults(kind: String) -> Dictionary:
+	if preload("res://Workspaces/ModelWorkspace/natural_generator.gd").accepts(kind): return preload("res://Workspaces/ModelWorkspace/natural_generator.gd").defaults(kind)
 	return {"size":Vector3(.25,.25,3) if kind=="Beam" else (Vector3(2,.1,2) if kind=="Panel" else Vector3.ONE),"radius":.5,"height":1.,"segments":24,"teeth":16,"tooth_depth":.12,"hole":.325 if kind=="Pipe" else 0.,"steps":6,"inner_ratio":.7}
 
 static func create(kind: String, parameters: Dictionary = {}) -> KiwiModelMesh:
+	if preload("res://Workspaces/ModelWorkspace/natural_generator.gd").accepts(kind): return preload("res://Workspaces/ModelWorkspace/natural_generator.gd").generate(kind,parameters).mesh
 	var settings := defaults(kind); settings.merge(parameters,true); parameters=settings
 	var dimensions: Vector3=parameters.get("size",Vector3.ONE)
 	var radius: float=parameters.get("radius",.5); var height: float=parameters.get("height",1.)
@@ -94,8 +96,15 @@ static func prism(profile: PackedVector2Array, height: float, hole: float=0., to
 		for i in count: bottom.append(count-1-i); top.append(count+i)
 		result.add_face(bottom)
 		if top_scale>0.: result.add_face(top)
-	# Profiles wind counterclockwise in XZ, giving clockwise exterior faces.
+	# Determine each wall normal from its profile edge, not its distance from
+	# the origin: offset profiles may lie entirely on one side of the origin.
+	var area:=0.
+	for i in count: area+=profile[i].cross(profile[(i+1)%count])
 	for f in result.faces.size():
-		var n := result.normal(f); var c := result.center(f)
-		if f<count and n.dot(Vector3(c.x,0,c.z))<0: result.faces[f].reverse(); result.uv[f].reverse()
+		var expected:=Vector3.ZERO
+		if f<count:
+			var edge:=profile[(f+1)%count]-profile[f]; expected=Vector3(edge.y,0.,-edge.x)*(1. if area>=0. else -1.)
+		elif hole<=0.:
+			expected=Vector3.DOWN if f==count else Vector3.UP
+		if not expected.is_zero_approx() and result.normal(f).dot(expected)<0.: result.faces[f].reverse(); result.uv[f].reverse()
 	return result

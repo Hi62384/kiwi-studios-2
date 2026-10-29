@@ -1,0 +1,19 @@
+extends "res://scripts/actors/tests/destruction_authoring_workspace_test.gd"
+func run() -> void:
+	root.size=Vector2i(1500,950); root.gui_embed_subwindows=true; var folder:=ProjectSettings.globalize_path("user://environment-scene-"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.new("Environment scene test"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.loaded_project=project
+	var main: Node=load("res://scenes/Main.tscn").instantiate(); root.add_child(main); await settle(12); var tabs:=get_first_node_in_group("actor_scene_tabs") as ActorSceneTabs; editor=tabs.timeline
+	tabs.new_environment(); await settle(5); var first_index:=tabs._active_index; var workspace:=tabs.environment_workspace; var first:=workspace.session; var terrain_id:=first.document.components[0].id; var file:=folder.path_join("Landscape.tres"); var error:=await workspace.save_to(file)
+	check(error==OK and tabs.documents[first_index].type=="environment","Environment Creator opens as a normal savable workspace tab")
+	first.environment().workspace_state["marker"]="first"; tabs.new_environment(); await settle(); var second:=workspace.session; second.regenerate_terrain(second.document.components[0].id,{"base_height":2.}); tabs._capture_current(); tabs._open_index(first_index); await settle()
+	check(workspace.session==first and workspace.session!=second and workspace.session.environment().terrain(terrain_id).base_height==0.,"Two environment tabs preserve independent data and undo sessions")
+	tabs._environment_to_scene(file); await settle(5); var scene_index:=tabs._active_index; var actor:=editor.model.selected_actor(); var runtime: Node=editor._runtime_for_clip(editor.model.clip_for_actor_id(actor.id).id)
+	check(actor.type_id==&"environment_asset" and runtime.content is KiwiEnvironmentRuntime and runtime.content.nodes.has(terrain_id),"To Scene creates one linked Environment Asset actor with real terrain content")
+	var clip:=editor.model.create_actor(editor.registry.get_definition(&"basic_shape"),0.,{&"position":Vector3(0,3,0)}); clip.start_time=0.; clip.duration=5.; clip.layer=1; var cube:=editor.model.actor_for_id(clip.actor_id); cube.values[&"physics"]={"enabled":true,"bounce":0.,"friction":.8}; editor.model.changed.emit(); await seek(1.5)
+	check(editor.physics.display_states.has(cube.id) and absf((editor.physics.display_states[cube.id].pose as Transform3D).origin.y-.5)<.15,"Existing offline rigid-body physics collides with environment terrain")
+	tabs._capture_current(); tabs._open_index(first_index); await settle(); workspace.session.regenerate_terrain(terrain_id,{"base_height":1.}); error=await workspace.save_to(file); tabs._capture_current(); tabs._open_index(scene_index); await settle(); await seek(1.5)
+	runtime=editor._runtime_for_clip(editor.model.clip_for_actor_id(actor.id).id)
+	check(error==OK and runtime.content.document.terrain(terrain_id).base_height==1.,"Saving an environment refreshes linked scene instances without replacing their actor")
+	check(absf((editor.physics.display_states[cube.id].pose as Transform3D).origin.y-1.5)<.15,"Linked terrain updates invalidate and rebuild existing scene collision caches")
+	var before:=tabs.documents.size(); tabs._filesystem_resource_opened(file); await settle(); check(tabs.documents.size()==before and tabs.documents[tabs._active_index].type=="environment","Double-clicking an open environment file activates its existing tab")
+	var thumbnail:=await FileOperations.get_file_thumbnail(file); check(thumbnail!=null,"Saved environment files receive a dedicated preview thumbnail")
+	editor.physics.dispose(); editor.model.history.clear_history(); main.queue_free(); await settle(); print("ENVIRONMENT SCENE: %d checks, %d failures"%[checks,failures]); quit(failures)

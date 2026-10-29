@@ -1,0 +1,189 @@
+Architecture checkpoint — 2026-10-28
+
+LATEST NATIVE CHECKPOINT (supersedes older pending lists below):
+Linked module UI, runtime resolution, inactive-tab refresh, source defaults and
+finishes passed native Forward+ tests (architecture_module_workspace: 4/4;
+architecture_linked_runtime_verified: 5/5). Reset removes locally generated source
+parts, and an active-tab index guard protects source refresh during tab closure.
+
+Sixteen standalone parametric architecture components are now available from Model
+Create and Environment Build menus: walls/corners, columns/pillars/beams, separate
+hinged doors and glass windows, stairs, railings, floors, roof sections, arches,
+balconies, porches, foundations and trim. Contextual dimensions, column profiles,
+door angle and Make Editable reuse native Model history and rendering. Native
+architectural_components_test passes 38 checks, including atomic child creation,
+undo/redo, saved resources, offset prism normals and minimum glass dimensions.
+
+Optional interior baseboard/crown/depth controls create actual trim solids, stop
+at openings and use the trim material slot. Source cache keys include their
+dimensions. architecture_trim_test passes seven native checks including source
+regeneration, doorway clearance, save/reopen and undo/redo.
+
+Architecture destruction testing exposed two genuine integration defects:
+rendered triangle conversion lost intentionally separate solid sections, and
+offset prism side normals were oriented relative to the origin. Native topology
+is now retained for architectural physics capture; the existing destruction
+engine partitions disconnected closed convex cells without welding doorways.
+Prism normals use profile-edge winding, including translated profiles. The native
+architecture_prism_fracture suite passes 5/5 (architecture destruction 6 checks,
+geometry 31, Model geometry 72, destruction geometry 15, finishes 8). An expanded
+doorway-preservation test is added and requires the next rerun after a test-side
+inferred-bool parse error was corrected. No arbitrary concave-solid fracture is
+claimed; connected unsupported concave surfaces still fail safely.
+
+The next world-generation specification has now been read in full (2,740 lines).
+Initial source/region/road work is in progress; see world_generation_progress.txt.
+Weather, reusable-environment and particle/VFX specifications remain queued.
+
+This is an implementation checkpoint, not a claim that the complete architecture
+specification or the whole queued project is finished.
+
+Shared Model / Environment architecture now has native editable component sources,
+2D/Split/3D plan editing, independent levels, rectangular rooms and shared walls,
+real rectangular and arched wall holes, hinged/sliding doors, glazing/frames,
+four roof types with unsupported-footprint warnings, four staircase types,
+floor/ceiling shafts, railings, foundations and structural support connections.
+Cutaway is editor-only; native scene instances retain their roofs and ceilings.
+Camera, plan and cutaway states survive normal save/reopen. Regeneration preserves
+component identities and explicit manual geometry/pose/material/structure overrides;
+incompatible procedural edits fail atomically instead of damaging a manual mesh.
+Material changes preserve mesh identity. Existing undo/redo handles source edits.
+
+Compound collision reuses the existing timeline physics engine. Separate convex
+wall panels and triangulated floor solids preserve doors and shafts. Structural
+physics is opt-in in the inspector; empty hierarchy groups never become bodies.
+Foundation depth is editable. Native shader previews now synchronize authored
+materials/code/parameters and controlled timeline time without retaining live actors.
+
+Constrained automatic rectangular layouts add seeded room wings, a central hallway,
+real interior door holes and windows placed within individual room spans. Explicit
+room/exterior/stair connectivity metadata is saved with the ordinary model hierarchy.
+Reachability and pedestrian opening-clearance warnings accompany regeneration.
+Unsupported/nonrectangular automatic layouts are rejected; manual editing remains.
+
+Verified reports in .godot/verification:
+- architecture_structure: geometry, workspace and collision pass; initial simulation
+  test contained a test-side Vector3/Transform3D parse error, subsequently corrected.
+- architecture_simulation_fixed: full native timeline simulation passes five checks,
+  including assembled stability, compound bodies and deterministic rewind.
+- architecture_compound_verified: four native scripts pass (collision, live shaders,
+  natural LOD/collision, architecture history).
+- architecture_cutaway_verified: four native scripts pass.
+- architecture_layout: three CPU scripts pass (layout 10, history 10, geometry 22).
+- architecture_styles_verified: four native scripts pass, including all 12 style
+  presets (28 checks), layout, actual workspace, and structural simulation.
+- architecture_cache_verified: four native scripts pass. Bounded 64 MiB/256-entry
+  CPU mesh cache returns independent editable copies, and changing one opening
+  rebuilds only one wall cache entry. Three-level warm generation measured 25.777 ms
+  on this run; this does not include native GPU upload or establish a frame-rate claim.
+- architecture_modules: four native scripts pass (modules 9, workspace 13,
+  collision 5, layout 10). Model/furniture insertion preserves native hierarchy and
+  structural references. Anchor mating is exact under rotated and nonuniformly
+  scaled parent transforms, and saves/undoes through existing history/resources.
+
+Styles now include all twelve requested starting families, using actual facade
+framing, porches, buttresses, pilasters, fins, braces and corner spires rather than
+only material recoloring. Source detail width/type remain editable; rooms persist.
+The inspector exposes existing-model/furniture insertion and anchor alignment.
+
+Terrain foundation shaping now uses a removable polygon/plane generator layer,
+evaluated after erosion and before retained authored sculpt samples. Original
+noise, generator layers and sculpt edits remain editable. The UI offers target
+terrain, blend distance, update and remove. Committed building or terrain transforms
+and source footprint edits automatically refresh existing linked foundations in
+the same history transaction; dragging does not repeatedly regenerate terrain.
+Near-vertical links are disabled until a usable orientation is restored. Normal
+terrain regeneration prepares water, biome, cave and collision data through the
+existing path. Deleting a building removes its owned foundation layer in the same
+undo transaction. Initial height tests caught a Godot Plane sign error, corrected.
+architecture_foundation_fixed passes geometry/blend/noise/undo/save checks.
+architecture_linked_foundation additionally verifies automatic transform updates,
+combined movement undo and deletion cleanup (13 foundation checks).
+Normal application launch: architecture_app_launch.log, exit 0, Forward+.
+
+Architecture portability now passes seven checks: duplicated source identities,
+independent terrain foundation links, internal structural connections, procedural
+regeneration independence, complete Super Clipboard snapshot, insertion beneath a
+new transformed parent, and detaching a copied individual wall from its original
+procedural key. A shared Model reference-remapping helper also preserves skeleton
+and growth source links during duplicate, reusable environment insertion, asset
+module insertion and scatter promotion. The older environment portability and
+natural cluster suites pass after these changes (architecture_portability 4/4).
+
+architecture_integration_checkpoint: all eight native Forward+ scripts pass:
+portability, linked foundations, twelve styles, CPU cache/local geometry reuse,
+actual architecture editor, full Environment-to-Scene/physics refresh flow,
+vegetation geometry generation and linked shader code/parameter/time behavior.
+Unchanged procedural components now also retain their actual native authored mesh
+resource identities during regeneration. Follow-up identity tests cover this.
+architecture_mesh_identity: 3/3 native scripts pass (history 11, modules 9,
+cache 4), following the unchanged-resource preservation change.
+
+CURRENT FOLLOW-UP (2026-10-28): inspector source generation now runs in owned CPU
+jobs. Superseding requests use the latest pending source; cancellation never installs
+partial geometry. Save waits for completion. Undo/redo cancel a pending edit before
+touching completed history. Jobs remain attached to their original session when
+switching tabs; newer document actions cancel stale results. architecture_async
+passes all four native scripts, including ten dedicated job/history/save/tab checks
+and the existing natural-object asynchronous suite.
+
+Stairs now have actual upper landing geometry spanning the shaft-to-floor gap for
+all four styles, including spiral exits. Multi-level stairs cut intermediate floors
+and ceilings. Clearance warnings cover riser height, tread run, narrow width and
+spiral headroom. The expanded geometry suite passes 31 native checks.
+
+LATEST FOLLOW-UP (supersedes older remaining lists):
+- Separate exterior/interior face materials, interior partitions, floor and ceiling
+  slots. Material assignment preserves mesh identity. Manual UV and face-material
+  edits are recognized as procedural overrides, with a compatible legacy hash path.
+  architecture_finishes_test: eight checks pass in native Forward+.
+- Eight-level / 96-room scale case: 725 native components, 12,674 vertices,
+  9,523 polygon faces, 96 windows, 690 convex wall pieces. Initial rendering setup
+  exposed repeated shader compilation (10,251.648 ms, tracked CPU delta391,009,679B).
+  Shared immutable compiled shaders and scoped material instances reduced setup
+  to about2,622ms /31MB. Generating tangents before native upload removed per-surface
+  GPU readbacks: measured1,482.666ms /31,255,248B. These are observed setup costs,
+  not FPS or total GPU-memory guarantees. Actual building pixels were inspected.
+- Model and Environment previews now budget native component uploads per frame;
+  indexed hierarchy traversal avoids repeated ancestor scans. Save waits for a
+  complete preview, and scene physics waits for all structural collision uploads.
+  Dedicated architecture_upload_test: nine checks pass, including stale queue
+  rejection and physics readiness. Existing terrain upload scheduling passes.
+- Native scene test now covers separate hinged door actors, keyframed rotation,
+  independent walls, linked geometry/hinge-pivot/floor-elevation updates and native
+  scene serialization (nine checks). Default source values reconcile recursively
+  while preserving custom instance properties and animated fields (six checks).
+  Shared source snapshots avoid loading the entire model file per actor.
+- Reusable modules now have native source bindings, explicit refresh/reset/make
+  unique controls, nested resolution, source dependency cycle checks, stable IDs,
+  one-step batch undo and preservation of local mesh/pose/material overrides.
+  Linked models resolve in saved environments and dependent render caches.
+  Missing sources retain saved geometry/physics with a warning. Conflicting local
+  procedural, rig-rest, or groom/surface edits require an explicit reset/rebind or
+  making the instance unique, rather than discarding those edits.
+  Module links: nine CPU checks pass; runtime: five CPU checks pass. Native runtime
+  rerun and broader linked UI/regression acceptance are pending.
+
+Still required before full architecture acceptance: richer exterior details,
+complete linked-module rig/groom/clipboard and destruction acceptance, remaining
+integration acceptance and the remaining A–AH specification cases. No unrestricted
+polygon layout solver or navigation mesh bake is claimed.
+
+Next queued task, requested after architecture:
+C:/Users/User1/.codex/attachments/67ee3382-18ae-4923-a771-87df13bfa0fd/Pasted text.txt
+Large-Scale Procedural World Generation, Roads, Cities, Forests & Environmental
+Object Placement. Preserve this order and reuse terrain/scatter/building systems.
+After that, queued 2026-10-28:
+C:/Users/User1/.codex/attachments/47e43db3-8b2f-4358-abb0-d61cca057f1b/Pasted text.txt
+Advanced Environmental Systems, Weather, Wind, Atmosphere (read full specification
+before implementation; this follows the large-scale world task).
+The user prohibits exporting the application. No application export was performed.
+
+Queued after weather, requested 2026-10-28:
+C:/Users/User1/.codex/attachments/a7f2051b-6a55-4042-9c60-89fb787fa4ad/Pasted text.txt
+Editable, Reusable Environments with Unified Modeling/Environment workflows.
+Read the complete specification before implementation. Preserve the earlier order.
+
+Queued after reusable environments, requested 2026-10-28:
+C:/Users/User1/.codex/attachments/cf6decec-a48a-4dc3-93bc-4da185022807/Pasted text.txt
+Universal Particle/VFX Actor with Customizable Emitters. Read fully before starting.

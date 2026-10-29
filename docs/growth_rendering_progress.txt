@@ -1,0 +1,130 @@
+Growth/rendering/baking work in progress — 2026-10-27
+
+User request remains active: finish outstanding grooming/destruction baking and
+camera work, then the attached growth appearance specification, then rendering /
+simulation baking, then fog shapes/density, then fog appearance/scattering.
+Do not export the application. Scene-video acceptance tests are allowed and delete
+their temporary MP4s. Do not claim the complete backlog is finished yet.
+
+Specifications read and queued:
+- e462ceea-2df0-40c9-a14e-c00dfd02d1f1: editable growth properties/styles/materials.
+- ca4d1824-3b60-4d65-9f78-6b0f6e583367: growth rendering/animation/baking.
+- 33848100-08a9-4484-9c4b-364012de1350: global/local fog shapes and density fields.
+- 4652fe0f-68f1-44b0-9e53-36f13af35af4: fog appearance/scattering/noise/textures.
+All are Pasted text.txt under C:/Users/User1/.codex/attachments/<id>/.
+The two new fog specifications have NOT been implemented yet.
+
+Implemented since the preceding delivery:
+- Camera preview copies projection/orthographic size/aspect/offsets, attributes,
+  compositor, camera environment override, viewport AA/HDR settings and aspect.
+  scene_data_test now isolates its green target from white particle overlays.
+  Added portrait/projection/exposure/environment assertions; Forward+ and OpenGL
+  runs pass without weakening the pixel-color assertion.
+- Chunked external physics baking with fresh transaction directories, manifests,
+  SHA256 verification, bounded decoded cache, exact-file rollback, clipboard
+  dependency collection, missing/corrupt chunk status. Embedded caches still work.
+- Partial recalculation verifies source-input hashes before reusing a prefix and
+  resumes on a fixed-step checkpoint. Atomic undo/redo/cancellation retained.
+- Reusable baked rigid/destruction assemblies carry the full interacting scene,
+  immutable bake cache, source settings, timing and independent remapped IDs.
+  Parent transforms and clip placement retime actual fragment states and VFX.
+  Physical edits invalidate portable replay. Other physics types explicitly refuse
+  portable assembly capture; they require recalculation after copying.
+- Weighted multi-guide interpolation, guide lock/length/rotation, clump start/end
+  profiles and variation, per-strand numerical editing, true plane/curve cuts,
+  occlusion filtering, persistent brush presets and color painting.
+- Native reusable KiwiGrowthStyle and KiwiGrowthMaterial resources. Built-in hair,
+  fur and feather styles, native save/load, make unique; material UI includes
+  multistop gradients, procedural noise textures/normal conversion, external image
+  sources, mappings, coat patterns and feather markings/shaft/vane controls.
+- Actual ribbon/card/rounded/tube cross sections, transported orientation, taper,
+  twist and asymmetric feather vanes. One-click independent undercoat/guard coat.
+- Shared realistic strand-direction shader with primary/secondary highlight
+  lobes, roughness/backlight approximation; stylized bands/edge outlines and
+  simplified stable strand representation. Custom material mode preserves data.
+  Cutout, alpha hash and MSAA alpha-to-coverage shader variants are cached.
+- Scene appearance parameters use the existing inspector/keyframe system and do
+  not invalidate guide physics. Instance-specific rendering/motion state.
+- Guide physics adapter uses the existing fixed-step point-constraint controller,
+  checkpoints, group bake, freeze and serialization. At most 128 guides, 9 points
+  per guide. Root frames use the actual skinned triangle/barycentric attachment.
+- Post-bake guide offsets/rotation/retiming/freeze/interval blending are visual
+  corrections; they do not claim to resolve new collision interactions.
+- Dense GPU attachment updates source vertices and bounded guide textures while
+  retaining static strand geometry. CPU reference for small grooms/custom shaders.
+  Native CPU/GPU pixel tests cover actual guide motion and multi-bone attachment.
+- Distance LOD reduces actual strand/subdivision counts with stable root ranking,
+  gradual shader coverage and width compensation. Final rendering restores full
+  coverage and 16 subdivisions without changing the fixed 8-segment physics guides.
+- Optional 2/4/8 temporal subframe averaging in scene video rendering, with MSAA
+  options. This is an export alternative to per-strand motion vectors, not a claim
+  of accurate strand velocity-buffer motion blur. Averaging is encoded-image-space.
+
+Actual measurements / evidence (.godot/verification):
+- growth_full_regression.json: initially 25/26 Forward+ tests passed. The only
+  failure was a missing category on the new hidden growth flag; fixed afterwards.
+- growth_followup.json: actor_picker_test, bake_assembly_test, debris_vfx_test and
+  scene_data_test all passed natively after that fix.
+- growth_gl_validation.json: GPU, material coverage variants and scene_data all
+  passed on OpenGL. Camera pixel/projection assertions pass on both renderers.
+- growth_gpu_skin.json: 9 native GPU checks pass, including rendered CPU/GPU
+  comparison, genuine pixel changes and no strand-buffer rebuild on bone motion.
+- growth_export_check.json: 10 checks pass on native Forward+, with real 12/24 fps
+  scene videos, matching guide poses at corresponding times, and a 2-sample blur
+  video with the correct duration. A harmless missing get_meta(null) diagnostic
+  was found and fixed afterwards; rerun to confirm that log is clean.
+- growth_gpu_performance.json: 8,000 roots, 63 draw calls. Initial GPU preparation
+  651.931 ms. Steady isolated CPU guide-upload/update 0.378–0.531 ms; 1,584 bytes
+  uploaded over 12 updates (11 changes, one unchanged sample). This excludes full
+  physics/frame cost. Total process static memory monitor ~173.7 MB, not asset-only.
+- CPU local grooming: 8,000 roots, 115–140 touched, 6/63 chunks rebuilt; complete
+  brush+geometry cost 37.8–51.8 ms in camera_and_growth_lod report.
+- LOD fixture: 4,000 roots; 43,384 near vertices, 3,920 far, 67,048 final.
+  Far rebuild 115.574 ms. Source/groom/physics identities preserved.
+- bake_assembly_retry.json and groom_detail_check.json pass.
+- feather_render_check: actual red band pixels and independent blue shaft pixels
+  verified; source markers and UVs are functional, not just stored settings.
+- growth_showcase.png has real/stylized hair, two coat layers, marked feathers.
+  Inspected visually. It is a simple geometry proxy example, not a production
+  human/wolf/bird asset. Bright highlights obscure thin feather markings at this
+  viewing scale; the dedicated feather pixel test verifies them clearly.
+
+Latest implementation / validation update, 2026-10-27:
+- Local assignments now support strands, protected roots, source faces, guides,
+  clumps and entire components. A bounded 16-region list is editable/reorderable.
+  Regions batch by material, share GPU pose tables for built-in shading and use
+  CPU deformation for arbitrary custom shaders. Material-only changes preserve
+  the physical bake and root distribution.
+- Material/style presets have representative thumbnails, inline names, duplicate,
+  save/load, shared-link and Make Unique controls. Project files provide deletion.
+  Undo restores shared material relationships; semantic asset IDs distinguish copies.
+- Existing Kiwi ShaderMaterial/Natural Material assets adapt through the common
+  material converters. Nested noise images refresh; custom shader TIME and uniform
+  keyframes follow scene time. Same-second Image Workspace saves invalidate textures.
+- growth_preset_final: five native Forward+ scripts pass, including workspace UI,
+  resource sharing, guide physics, regions and actual scene-video checks. The latter
+  log is clean of the previously fixed get_meta(null) diagnostic.
+- fog_delivery: six native Forward+ scripts pass, including the unchanged camera
+  pixel check and new growth_multi_source_test (six assertions). Two imported models
+  have independently animated hair/feather roots, separate forces, matching bakes
+  and deterministic backward seeks.
+- dense_growth_many_guides latest measurement: 8,000 roots, 63 draw calls;
+  initial preparation 712.285 ms; isolated CPU update 0.546–1.014 ms for one guide,
+  0.800–2.758 ms for 32 guides. This excludes physics and is not a complete frame
+  guarantee. Latest renderer samples: CPU 0.562 ms, GPU 0.247 ms; observed frames
+  mostly 16.2–17.1 ms under vsync. Process static memory about 174.8 MB.
+
+Important constraints:
+- Hair highlights/backlighting/iridescence are real-time approximations, not an
+  offline fiber BSDF. Simulation uses at most 128 guides and existing bounded
+  point contacts, not full strand-to-strand self-collision.
+- The showcase contains simple geometry proxies, not production human/wolf/bird
+  assets. Temporal scene-video blur averages encoded image samples; it is not
+  a renderer velocity-buffer implementation.
+- Rerun relevant suites after subsequent changes. Source import and diff-check
+  currently pass. Windows certificate-store and some existing shutdown RID/resource
+  warnings remain. Keep intermediate failed logs honest, not counted as passes.
+- Historical no-GPU/no-streaming/camera-failure claims in the earlier delivery
+  document have been corrected. Intermediate failed reports remain on disk.
+- Preserve unrelated pre-existing tasks.txt trailing-blank removal and all other
+  user changes. No commit/branch/ZIP/subagent/application export requested.

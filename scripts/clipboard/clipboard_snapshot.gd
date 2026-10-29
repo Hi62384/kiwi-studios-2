@@ -59,6 +59,17 @@ func capture(value: Variant,path: String) -> bool:
 	if result!=OK: error="Unable to write the resource snapshot (error %d)."%result
 	return result==OK
 func clone_value(value: Variant,field: String="") -> Variant:
+	if value is KiwiPhysicsBakeCache:
+		var id: int=value.get_instance_id()
+		if resources.has(id): return resources[id]
+		var clone:=value.duplicate(false) as KiwiPhysicsBakeCache; resources[id]=clone; clone.resources=[]
+		for resource: Resource in value.resources: clone.resources.append(clone_value(resource))
+		clone.records=clone_value(value.records); clone.chunks=[]; clone.storage_root=""
+		for original: Dictionary in value.chunks:
+			var chunk:=original.duplicate(true)
+			if chunk.has("file"): chunk.file=copy_file(str(chunk.file))
+			clone.chunks.append(chunk)
+		return clone
 	if value is ActorObjectReference and value.source==ActorObjectReference.Source.ASSET:
 		if not FileAccess.file_exists(value.asset_id) or not safe_resource(value.asset_id): error="Missing or unsafe resource dependency: "+value.asset_id; return null
 		var object:=ResourceLoader.load(value.asset_id,"",ResourceLoader.CACHE_MODE_IGNORE) as ActorObjectData

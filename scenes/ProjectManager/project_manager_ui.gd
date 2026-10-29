@@ -29,7 +29,7 @@ const ProjectManager = preload("uid://d3wgvbquosu7f")
 var selected_panel_display: ProjectManagerProjectDisplay
 
 func selected_panel_display_is_invalid() -> bool:
-	if selected_panel_display == null: return true
+	if not is_instance_valid(selected_panel_display): return true
 	return selected_panel_display.error_cover.visible
 
 
@@ -74,10 +74,12 @@ func open_project_button_pressed() -> void:
 
 
 func update_displayed_projects() -> void:
+	selected_panel_display = null
 	NodeOperations.delete_children(project_display_container)
 	
 	for project_path: String in project_manager.get_saved_projects().project_paths:
-		var project: Project = ResourceLoader.load(project_manager.get_project_file_path_in_project_dir(project_path))
+		var resource_path: String = project_manager.get_project_file_path_in_project_dir(project_path)
+		var project: Project = ResourceLoader.load(resource_path) as Project if not resource_path.is_empty() and ResourceLoader.exists(resource_path) else null
 		
 		if (project == null and filter_project_line_edit.text != "") or !(filter_project_line_edit.text == "" or project.project_name.contains(filter_project_line_edit.text)):
 			continue

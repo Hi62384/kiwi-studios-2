@@ -1,0 +1,19 @@
+extends "res://scripts/actors/tests/environment_generation_test.gd"
+func run() -> void:
+	var terrain:=KiwiEnvironmentTerrain.new(); terrain.resolution=33; terrain.dimensions=Vector2(16,16); terrain.biomes=KiwiTerrainBiomes.new(); terrain.biomes.definitions=[KiwiTerrainBiomes.starter(0),KiwiTerrainBiomes.starter(1)]; terrain.biomes.definitions[1].temperature=Vector2(1000,2000); terrain.biomes.definitions[1].landforms=[{"type":"Dunes","height":4.,"width":4.,"length":10.}]; terrain.prepare(); terrain.prepare_biomes(); var document:=KiwiEnvironmentDocument.new(); var item:=document.add_terrain(terrain); var workspace:=Workspace.new(); root.add_child(workspace); workspace.open_source(document); workspace.session.select(item.id)
+	for i in 8: await process_frame
+	var canvas:=workspace.canvas; canvas.camera.position=Vector3(0,12,8); canvas.camera.look_at(Vector3.ZERO); canvas.environment_tool="Paint biome"; canvas.biome_tool.biome_id="forest"; canvas.brush_strength=.5; canvas.brush_radius=2.; terrain=workspace.session.environment().terrain(item.id); var before:=terrain.biomes.signature(); var history:=workspace.session._undo.size(); var index:=16+16*33; var original: PackedFloat32Array=(terrain.biome_data.weights.forest as PackedFloat32Array).duplicate(); var down:=InputEventMouseButton.new(); down.button_index=MOUSE_BUTTON_LEFT; down.pressed=true; down.position=canvas.project(Vector3.ZERO); canvas._gui_input(down)
+	check(not canvas.biome_tool._stroke.is_empty() and terrain.biomes.signature()==before and terrain.biome_data.weights.forest[index]>.1 and absf(terrain.height(16,16))<.00001,"Biome painting previews exact regional suitability while authored masks and biome landform geometry remain unchanged")
+	for i in 3: await process_frame
+	var chunk:=canvas.renderer.nodes[item.id].get_node("Chunk_0_0") as MeshInstance3D; check(chunk.material_overlay is ShaderMaterial and (chunk.material_overlay.get_shader_parameter("weights") as Texture2D).get_image().get_pixel(16,16).r>.1,"A live viewport heatmap shows the selected biome even when it has no assigned material")
+	var up:=down.duplicate(); up.pressed=false; canvas._gui_input(up); await drain(workspace); terrain=workspace.session.environment().terrain(item.id)
+	check(workspace.session._undo.size()==history+1 and terrain.biomes.paint_masks.forest[index]>.4 and terrain.height(16,16)>.2,"Releasing a biome stroke regenerates real biome landforms and commits exactly one complete undo action")
+	workspace.session.undo(); terrain=workspace.session.environment().terrain(item.id); check(terrain.biomes.signature()==before and terrain.biome_data.weights.forest==original and absf(terrain.height(16,16))<.00001,"Undo restores original masks, source geometry and exact non-preview suitability fields")
+	workspace.session.redo()
+	for i in 5: await process_frame
+	terrain=workspace.session.environment().terrain(item.id); var signature:=terrain.signature(); canvas.environment_tool="Erase biome"; down.position=canvas.project(Vector3(0,terrain.height(16,16),0)); canvas._gui_input(down); var escape:=InputEventKey.new(); escape.keycode=KEY_ESCAPE; escape.pressed=true; canvas._gui_input(escape)
+	check(canvas.biome_tool._stroke.is_empty() and not canvas._painting and terrain.signature()==signature and workspace._generation_jobs.is_empty(),"Escape cancels biome erasing and restores preview fields without changing source or starting generation")
+	canvas.environment_tool="Select"
+	for i in 3: await process_frame
+	check((canvas.renderer.nodes[item.id].get_node("Chunk_0_0") as MeshInstance3D).material_overlay==null,"Leaving the mask tool removes the editor-only biome overlay")
+	workspace.session._undo.clear(); workspace.session._redo.clear(); workspace.queue_free(); await process_frame; print("TERRAIN BIOME PAINT: %d checks, %d failures"%[checks,failures]); quit(failures)

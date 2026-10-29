@@ -41,6 +41,15 @@ func restore(states: Array[Dictionary]) -> void:
 		model.restore_animation(state.actor, state.tracks)
 
 func edit(primary: ActorData, key: StringName, value: Variant) -> void:
+	if primary.type_id==&"powder" and key==&"powder_link_appearance":
+		KiwiPowderMaterial.link(model,targets(primary,key,value),bool(value)); return
+	if primary.type_id==&"powder" and key==&"powder_material":
+		var current:=ActorAnimation.resolve_reference(primary.get_value(key)) if primary.get_value(key) is ActorObjectReference else null
+		var next:=ActorAnimation.resolve_reference(value) if value is ActorObjectReference else null
+		var mode:=1 if next==null or (current!=null and current.get_value(&"material_id","")==next.get_value(&"material_id","")) else 0
+		KiwiPowderMaterial.apply(model,targets(primary,key,value),value,mode); return
+	if primary.type_id==&"powder" and key==&"powder_advanced_material":
+		KiwiPowderSettings.switch_mode(model,targets(primary,key,value),bool(value)); return
 	if primary.type_id in [&"video", &"video_2d"] and key in [&"video", &"linked_audio_actor"]:
 		model.edit_property(primary, registry.get_definition(primary.type_id), key, value)
 		return

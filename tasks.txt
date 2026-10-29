@@ -450,7 +450,6 @@ HAIR AND FUR----------------------------------------
 -realistic and stylized/M2DO rendering with animation and simulation baking
 
 
-
 VOLUMETRIC FOG--------------------------------------
 -global and local volumetric fog actors with editable shapes and density fields
 -editable appearance (color, density, opacity, scattering, noise, textures, etc.)
@@ -489,6 +488,3 @@ MOTION TRACKING AND CGI-------------------------------
 -CGI integration into footage (tracked objects, lighting/shadow matching, reflections, motion blur, depth, and occlusion)
 -footage manipulation (rotoscoping, green-screen keying, masking, stabilization, object removal, and video repair)
 -advanced compositing (layers, nodes, render passes, color correction, CGI/VFX integration, and non-destructive editing)
-
-
-

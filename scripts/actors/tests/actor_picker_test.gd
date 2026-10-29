@@ -32,7 +32,7 @@ func run() -> void:
 	var editor := load("res://Workspaces/SceneWorkspace/Timeline.tscn").instantiate() as ActorTimelineEditor
 	root.add_child(editor)
 	var definitions := editor.registry.get_definitions()
-	check(definitions.size() == 26 and editor.registry.get_definition(&"fluid") != null and editor.registry.get_definition(&"skeleton_rig") != null and editor.registry.get_definition(&"transform_image_2d") != null, "Catalog includes Fluid, skeleton rig, Transform Image 2D and useful 2D/3D primitives")
+	check(definitions.size() == 29 and editor.registry.get_definition(&"environment_asset")!=null and editor.registry.get_definition(&"global_fog")!=null and editor.registry.get_definition(&"powder") != null and editor.registry.get_definition(&"fluid") != null and editor.registry.get_definition(&"skeleton_rig") != null and editor.registry.get_definition(&"transform_image_2d") != null, "Catalog includes Environment Asset, Global Fog, Powder, Fluid, skeleton rig, Transform Image 2D and useful 2D/3D primitives")
 	check(editor.registry.get_object_definition(&"material") != null, "Material resource type is registered from catalog")
 	var shader_material_definition := editor.registry.get_object_definition(&"shader_material")
 	check(shader_material_definition != null and shader_material_definition.base_type == &"material", "ShaderMaterial is registered as a creation-compatible Material type")
@@ -386,7 +386,7 @@ func run() -> void:
 	picker.search.text = ""
 	picker.rebuild()
 	var lighting_types := picker._matches.map(func(index: int): return definitions[index].type_id)
-	check(picker._matches.size() == 5 and lighting_types.has(&"light_3d") and lighting_types.has(&"directional_light")
+	check(picker._matches.size() == 6 and lighting_types.has(&"global_fog") and lighting_types.has(&"light_3d") and lighting_types.has(&"directional_light")
 		and lighting_types.has(&"world_environment") and lighting_types.has(&"fog_volume")
 		and lighting_types.has(&"reflection_probe"), "Category filter")
 	picker.search.text = "no-such-actor"

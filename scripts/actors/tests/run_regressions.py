@@ -15,6 +15,58 @@ import tempfile
 import time
 
 
+def terminate_process_tree(process: subprocess.Popen) -> None:
+    """Stop this test's console and GUI children without taskkill/WMI hangs."""
+    if os.name != "nt":
+        process.kill()
+        return
+    import ctypes
+    from ctypes import wintypes
+
+    class ProcessEntry(ctypes.Structure):
+        _fields_ = [("size", wintypes.DWORD), ("usage", wintypes.DWORD),
+                    ("pid", wintypes.DWORD), ("heap", ctypes.c_size_t),
+                    ("module", wintypes.DWORD), ("threads", wintypes.DWORD),
+                    ("parent", wintypes.DWORD), ("priority", wintypes.LONG),
+                    ("flags", wintypes.DWORD), ("name", wintypes.WCHAR * 260)]
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+    kernel.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    for name in ("Process32FirstW", "Process32NextW"):
+        function = getattr(kernel, name)
+        function.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry)]
+        function.restype = wintypes.BOOL
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    snapshot = kernel.CreateToolhelp32Snapshot(2, 0)
+    entries = []
+    if snapshot and snapshot != ctypes.c_void_p(-1).value:
+        try:
+            entry = ProcessEntry()
+            entry.size = ctypes.sizeof(entry)
+            more = kernel.Process32FirstW(snapshot, ctypes.byref(entry))
+            while more:
+                entries.append((entry.pid, entry.parent))
+                more = kernel.Process32NextW(snapshot, ctypes.byref(entry))
+        finally:
+            kernel.CloseHandle(snapshot)
+    owned = [process.pid]
+    for parent in owned:
+        owned.extend(pid for pid, owner in entries if owner == parent and pid not in owned)
+    for pid in reversed(owned):
+        handle = kernel.OpenProcess(1, False, pid)
+        if handle:
+            try:
+                kernel.TerminateProcess(handle, 1)
+            finally:
+                kernel.CloseHandle(handle)
+    if process.poll() is None:
+        process.kill()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--godot", required=True)
@@ -57,19 +109,31 @@ def main() -> int:
         with log_path.open("wb") as log:
             process = subprocess.Popen(command, cwd=root, env=environment,
                                        stdout=log, stderr=subprocess.STDOUT, **options)
+            compile_failed = False
             try:
-                code = process.wait(timeout=args.timeout)
+                deadline = time.monotonic() + args.timeout
+                while True:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(command, args.timeout)
+                    try:
+                        code = process.wait(timeout=min(.5, remaining))
+                        break
+                    except subprocess.TimeoutExpired:
+                        # A script that never compiled cannot reach its own
+                        # quit(). Stop only this runner's process tree promptly.
+                        with log_path.open("rb") as diagnostics:
+                            prefix = diagnostics.read(262144)
+                        compile_failed = (b"SCRIPT ERROR: Parse Error:" in prefix
+                                          or b"SCRIPT ERROR: Compile Error:" in prefix)
+                        if compile_failed:
+                            terminate_process_tree(process)
+                            code = process.wait(timeout=10)
+                            break
             except subprocess.TimeoutExpired:
                 timed_out = True
-                if os.name == "nt":
-                    # Godot's console executable starts a child GUI process.
-                    # Stop this test's process tree, not unrelated editor runs.
-                    subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                   creationflags=subprocess.CREATE_NO_WINDOW)
-                else:
-                    process.kill()
-                code = process.wait()
+                terminate_process_tree(process)
+                code = process.wait(timeout=10)
         text = log_path.read_text(encoding="utf-8", errors="replace")
         script_errors = "SCRIPT ERROR:" in text or "Parse Error:" in text
         # Negative compiler tests explicitly delimit their expected diagnostics.
@@ -78,7 +142,8 @@ def main() -> int:
         shader_error = "SHADER ERROR:" in checked_text
         passed = code == 0 and not timed_out and not script_errors and not shader_error
         result = {"test": case.stem, "passed": passed, "exit_code": code,
-                  "timeout": timed_out, "seconds": round(time.monotonic() - started, 3),
+                  "timeout": timed_out, "compile_error": compile_failed,
+                  "seconds": round(time.monotonic() - started, 3),
                   "renderer": args.renderer, "log": str(log_path.relative_to(root))}
         results.append(result)
         print(json.dumps(result), flush=True)

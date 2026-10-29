@@ -82,7 +82,7 @@ func uv_at(face: int, point: Vector3) -> Vector2:
 		if y>=-.0001 and z>=-.0001 and y+z<=1.0001: return result
 	return fallback
 
-func validate() -> PackedStringArray:
+func validate(thorough: bool=true) -> PackedStringArray:
 	var errors := PackedStringArray()
 	for vertex in vertices:
 		if not vertex.is_finite(): errors.append("Non-finite vertex"); break
@@ -92,7 +92,7 @@ func validate() -> PackedStringArray:
 		for index in face:
 			if index<0 or index>=vertices.size(): valid=false
 		if not valid: errors.append("Invalid face %d"%f); continue
-		if normal(f).length_squared()<.5 or triangles(f).is_empty(): errors.append("Degenerate face %d"%f)
+		if thorough and (normal(f).length_squared()<.5 or triangles(f).is_empty()): errors.append("Degenerate face %d"%f)
 		if f<uv.size() and uv[f].size()!=face.size(): errors.append("Invalid UV corners")
 	return errors
 
@@ -117,15 +117,14 @@ func render_mesh(surface_materials: Array[Material] = []) -> ArrayMesh:
 				face_normals.append(normals[index].normalized() if smooth else normal(f))
 				texcoords.append(uv[f][corner] if f<uv.size() else Vector2.ZERO)
 		if positions.is_empty(): continue
-		var arrays := []; arrays.resize(Mesh.ARRAY_MAX)
-		arrays[Mesh.ARRAY_VERTEX]=positions; arrays[Mesh.ARRAY_NORMAL]=face_normals; arrays[Mesh.ARRAY_TEX_UV]=texcoords
-		result.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
+		# Generate tangents from CPU vertices before the one native upload. Creating
+		# an intermediate ArrayMesh and reading it back stalls once per surface.
+		var builder:=SurfaceTool.new(); builder.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for index in positions.size():
+			builder.set_normal(face_normals[index]); builder.set_uv(texcoords[index]); builder.add_vertex(positions[index])
+		builder.generate_tangents(); builder.commit(result)
 		if mat>=0 and mat<surface_materials.size(): result.surface_set_material(result.get_surface_count()-1,surface_materials[mat])
-	var tangent_mesh := ArrayMesh.new()
-	for surface in result.get_surface_count():
-		var builder := SurfaceTool.new(); builder.create_from(result,surface); builder.generate_tangents(); builder.commit(tangent_mesh)
-		tangent_mesh.surface_set_material(surface,result.surface_get_material(surface))
-	return tangent_mesh
+	return result
 
 static func from_mesh(source: Mesh) -> KiwiModelMesh:
 	var result := KiwiModelMesh.new(); var lookup := {}

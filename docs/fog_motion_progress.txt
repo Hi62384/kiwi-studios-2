@@ -1,0 +1,70 @@
+Fog movement integration — 2026-10-27
+
+Implemented
+- Shared KiwiTimelinePhysics type 9, not a second playback clock. Static,
+  Procedural, Simulated and Combined local modes; global fog exposes only static
+  and procedural. Local transport defaults to 8^3 / 30 Hz, custom up to 32^3.
+- Persistent concentration/velocity/pressure grids; conservative face flux,
+  pressure projection, mixing, expansion, seeded flow, decay, buoyancy, wind/gusts,
+  force/impulse events and local velocity fields. Rotated-domain buoyancy remains
+  world-up. CFL limiting emits an explanatory status instead of unstable values.
+- Point/sphere/box/disk/cone/closed-mesh sources, burst/continuous windows, seeded
+  spread, initial/inherited velocity, actor/bone following. Emitted density remains
+  in the world-fixed domain; moving-domain behavior is an explicit option.
+- Authored source field/shape initializes physical concentration. Optical material
+  controls remain separate and do not invalidate transport. Nested source resource
+  edits do invalidate it. Brush controls are excluded from physical signatures.
+- Static/kinematic/rigid/fragment colliders and shared character/deformable proxies.
+  Primitive occupancy and conservative convex bounds; solid face blocking,
+  displaced-density redistribution, moving-boundary influence. Occupancy loops
+  visit intersecting voxel regions instead of the entire domain per obstacle.
+- Reused native ImageTexture3D uploads and fog shader. Custom shaders require
+  kiwi_density, kiwi_density_world_to_unit and kiwi_simulation_enabled uniforms;
+  otherwise simulation remains calculated with an explicit rendering warning.
+- Shared checkpoints, backward seeks, fractional sampling, freeze/undo, baking,
+  scene serialization, external group bake controls. Variable-length bake chunks
+  stay under 16 MiB; binary search supports legacy 32-frame and adaptive chunks.
+- Actor/bone source IDs remap through per-actor overrides during duplication and
+  scene instantiation without editing shared emitter files. The inspector displays
+  remapped source selections and permits undoable reassignment.
+
+Evidence actually obtained
+- fog_motion_final_acceptance.json: ten native Forward+ scripts pass, including
+  motion obstacle/timeline/render, cloud field/render, actor picker, scene data,
+  shader time, growth physics and Super Clipboard resource regressions.
+- fog_motion_optimized.json: retests the regional occupancy optimization. Inspect
+  this report for the latest result rather than assuming it passed.
+- fog_motion_bake_storage.json: all four headless scripts pass: 108 storage checks,
+  7 interval checks, 9 reusable rigid-assembly checks, 12 standalone solver checks.
+- Motion timeline: 11 checks, obstacle integration: 8, rendered density: 2.
+  Actual darkness centroid moved from x=118.50 to 158.39 at 320x240 and rewound to
+  the original silhouette. Concentration mass 2.996369 plus tracked outflow
+  .003630 matches the injected volume 3.0.
+- A native 8^3 fixture measured solver/obstacle step 6.89–7.91 ms and texture upload
+  .230–.244 ms. This is one modest fixture, not production-scene performance.
+- 24/30/60 fps sampling schedules reproduce identical density at matching times.
+  Native video export with the new transported grid still needs dedicated coverage;
+  previous static fog/light video tests must not be presented as that coverage.
+- fog_motion_app_launch.log: actual Forward+ application startup; inspect completion
+  status. No application export was requested or performed.
+
+Limits / remaining motion acceptance
+- CPU reference implementation; larger grids may be slow. No GPU transport backend
+  or production-scale performance guarantee. Native fog rendering still uses GPU.
+- One-way obstacle coupling. Fog does not push rigid bodies. Primitive and convex
+  proxy flow is approximate; concave mesh obstacles require convex compounds.
+- No unconfigured visible-mesh collision is silently generated. Enable the normal
+  actor physics collider or use shared character/deformable proxies.
+- Domains are cubic in cell count with physical anisotropic dimensions. Structural
+  size/resolution changes restart concentration with a warning. No grid-resize
+  remapping or adaptive world streaming.
+- Fixed-grid diffusion smooths features. Native fog/froxel filtering further limits
+  thin detail. Custom shaders must opt into the sampler interface.
+- Sparse source count/influence count is bounded to four each. There is no unlimited
+  emitter stack editor. No literal fluid self-collision or meteorological model.
+- Broader moving-character, source-bone, external fog bake/cancel/reuse, changing
+  topology and long-duration visual acceptance still require dedicated fixtures.
+- Portable baked assemblies remain explicitly restricted to rigid/destruction
+  actors. Ordinary fog bakes work; do not claim portable fog assembly replay.
+
+No application export, ZIP, branch, commit or push was made.

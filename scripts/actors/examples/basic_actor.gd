@@ -92,7 +92,7 @@ func _ready() -> void:
 			particle_mesh.height = 0.16
 			particles.draw_pass_1 = particle_mesh
 			content = particles
-		&"fog_volume":
+		&"fog_volume", &"global_fog":
 			var fog := FogVolume.new()
 			fog_material = FogMaterial.new()
 			fog.material = fog_material
@@ -100,9 +100,11 @@ func _ready() -> void:
 		&"reflection_probe": content = ReflectionProbe.new()
 	if content != null:
 		add_child(content)
+	if content is FogVolume: preload("res://scripts/actors/fog/fog_environment.gd").attach(self)
 	parenting_anchor = Node3D.new()
 	parenting_anchor.name = "ParentingAnchor"
 	add_child(parenting_anchor)
+	if preload("res://Workspaces/ModelWorkspace/model_source_link.gd").register_actor(actor,self): add_to_group("model_instance_runtimes"); refresh_model_binding.call_deferred(str(actor.values.get(&"model_component_source","")))
 
 
 func _add_camera_guide(camera: Camera3D) -> void:
@@ -208,6 +210,7 @@ func evaluate(_time: float, values: Dictionary) -> void:
 		&"basic_mesh":
 			_update_model(values.get(&"mesh_path", ""))
 			_apply_material_reference(values.get(&"material"), null, true)
+			KiwiGrowthActor.apply(self,values)
 		&"text_3d":
 			content.text = values[&"text"]
 			var settings := ActorTextSettings.values(values.get(&"text_settings"))
@@ -236,8 +239,9 @@ func evaluate(_time: float, values: Dictionary) -> void:
 		&"world_environment": _apply_environment(values.get(&"environment"))
 		&"decal_3d": _apply_decal(values)
 		&"particles_3d": _apply_particles(values)
-		&"fog_volume": _apply_fog(values)
+		&"fog_volume", &"global_fog": _apply_fog(values)
 		&"reflection_probe": _apply_reflection_probe(values)
+	preload("res://scripts/actors/fog/fog_lighting.gd").apply_geometry(self,values)
 
 
 func _apply_decal(values: Dictionary) -> void:
@@ -305,6 +309,7 @@ func _apply_fog(values: Dictionary) -> void:
 		var emission: Color = values.get(&"emission", Color.BLACK)
 		fog_material.emission = emission * float(values.get(&"emission_energy", 1.0))
 		fog_material.edge_fade = values.get(&"edge_fade", 0.1)
+	preload("res://scripts/actors/fog/fog_actor.gd").apply(self,values)
 
 
 func _apply_camera_shader(value: Variant) -> void:
@@ -495,17 +500,19 @@ func _update_model(source: Variant) -> void:
 	var path := str(source)
 	var load_path := _godot_resource_path(path)
 	if resource == null and not load_path.is_empty() and ResourceLoader.exists(load_path):
-		resource = ResourceLoader.load(load_path, "", ResourceLoader.CACHE_MODE_IGNORE)
+		resource = preload("res://Workspaces/ModelWorkspace/model_source_link.gd").resolved_resource(load_path)
 	var instance: Node3D
 	var item: KiwiModelComponent=resource.component(component_id) if resource is KiwiModelDocument else (actor.values.get(&"model_component_data") as KiwiModelComponent if str(source)==str(actor.values.get(&"model_component_source","")) else null)
 	if item!=null and resource is KiwiModelDocument and actor.values.has(&"model_rig_bind_signature"):
 		var source_rig: KiwiModelComponent=resource.component(item.skeleton_id)
 		if source_rig==null or KiwiRigMath.bind_signature(source_rig.bones)!=int(actor.values[&"model_rig_bind_signature"]): item=actor.values.get(&"model_component_data") as KiwiModelComponent
 	if item!=null or (resource is KiwiModelDocument and not component_id.is_empty() and str(source)==str(actor.values.get(&"model_component_source",""))):
-		if item!=null and item.mesh!=null:
-			var visual := _new_mesh_instance(); visual.mesh=item.skin_mesh if item.skin_mesh!=null else (item.binding.source_mesh if item.binding!=null else KiwiModelModifiers.evaluate(item).render_mesh(item.surface_materials))
+		if item!=null and item.growth!=null:
+			var visual:=KiwiSurfaceGrowthInstance.new(); visual.configure(item,true); visual.visible=not bool(actor.values.get(&"model_component_hidden",false)); instance=visual
+		elif item!=null and item.mesh!=null:
+			var visual := _new_mesh_instance(); visual.mesh=item.skin_mesh if item.skin_mesh!=null else (item.binding.source_mesh if item.binding!=null else item.render_mesh())
 			visual.skin=item.skin
-			for i in mini(item.surface_materials.size(),visual.mesh.get_surface_count()): visual.set_surface_override_material(i,item.surface_materials[i])
+			for i in mini(item.surface_materials.size(),visual.mesh.get_surface_count()): visual.set_surface_override_material(i,visual.mesh.surface_get_material(i) if item.skin_mesh==null and item.binding==null else item.surface_materials[i])
 			visual.visible=not bool(actor.values.get(&"model_component_hidden",false)); instance=visual
 	elif resource is PackedScene:
 		instance = resource.instantiate() as Node3D
@@ -532,12 +539,17 @@ func _bind_model_skin() -> void:
 	for rig in get_tree().get_nodes_in_group("actor_skeleton_rigs"):
 		if rig.actor.id!=id: continue
 		for node in content.get_children():
+			if node is KiwiSurfaceGrowthInstance:
+				node.growth_skeleton=rig.skeleton; node.update_growth(); continue
 			if node is MeshInstance3D:
 				node.skeleton=node.get_path_to(rig.skeleton)
 				if bool(actor.values.get(&"model_skin_in_rig_space",false)): node.global_transform=rig.skeleton.global_transform
 		return
 
 func apply_rig_attachment() -> void:
+	if is_instance_valid(content):
+		for node in content.get_children():
+			if node is KiwiSurfaceGrowthInstance: _bind_model_skin(); node.update_growth()
 	if not actor.values.has(&"model_rigid_bone"):
 		# Mesh actors can be evaluated before their sibling rig. Resolve its final
 		# transform again after all actors, without waiting for the next frame.
@@ -558,6 +570,8 @@ func refresh_saved_model(path: String) -> void:
 	if ProjectSettings.globalize_path(source).replace("\\","/").simplify_path()==ProjectSettings.globalize_path(path).replace("\\","/").simplify_path():
 		loaded_model_path=""
 		_update_model(source)
+func refresh_model_binding(path: String) -> void:
+	if preload("res://Workspaces/ModelWorkspace/model_source_link.gd").refresh(actor,path): evaluate_transform(ActorAnimation.sampled_values(actor,actor.animation_time))
 
 
 func _new_light(kind: int) -> Light3D:
@@ -578,6 +592,7 @@ func _ensure_light(kind: int) -> void:
 	content = _new_light(kind)
 	add_child(content)
 	if old != null:
+		if old is Node3D: old.hide()
 		old.queue_free()
 
 
@@ -586,6 +601,7 @@ func _apply_light(values: Dictionary) -> void:
 	light.light_color = values.get(&"color", Color.WHITE)
 	light.light_energy = values.get(&"energy", 1.0)
 	light.shadow_enabled = values.get(&"shadows", true)
+	preload("res://scripts/actors/fog/fog_lighting.gd").apply_light(light,values)
 	if light is OmniLight3D:
 		light.omni_range = values.get(&"range", 5.0)
 	elif light is SpotLight3D:
@@ -648,6 +664,8 @@ func _configure_environment(environment: Environment, object: ActorObjectData) -
 	for key: StringName in environment_properties:
 		if object.values.has(key):
 			environment.set(environment_properties[key], object.values[key])
+	for key in [&"volumetric_fog_temporal_reprojection_enabled",&"volumetric_fog_temporal_reprojection_amount",&"volumetric_fog_ambient_inject"]:
+		if object.values.has(key): environment.set(str(key),object.values[key])
 
 
 func _apply_environment_background(environment: Environment, object: ActorObjectData) -> void:
@@ -862,6 +880,12 @@ func _create_shader_material(object: ActorObjectData) -> ShaderMaterial:
 
 
 func set_timeline_time(timeline_time: float) -> void:
+	preload("res://Workspaces/ModelWorkspace/natural_render.gd").time(content,timeline_time)
+	if content is FogVolume:
+		var local_time:=actor.animation_time if not is_nan(actor.animation_time) else timeline_time
+		preload("res://scripts/actors/fog/fog_motion_render.gd").procedural(self,ActorAnimation.sampled_values(actor,local_time),local_time)
+	for node: Node in find_children("*","MeshInstance3D",true,false):
+		if node is KiwiSurfaceGrowthInstance: node.set_growth_time(timeline_time)
 	if shader_material != null and shader_material.shader != null:
 		var uniform_name := str(shader_material.get_meta("kiwi_time_uniform", ""))
 		if not uniform_name.is_empty():

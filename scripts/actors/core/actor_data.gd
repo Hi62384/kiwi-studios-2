@@ -44,6 +44,9 @@ func get_value(property_id: StringName, fallback: Variant = null) -> Variant:
 
 ## Copies owned resources and containers; asset references retain their asset ID.
 static func copy_value(value: Variant) -> Variant:
+	# Completed bake chunks are immutable. Keep their shared geometry table and
+	# group identity rather than duplicating megabytes for every actor/history edit.
+	if value is KiwiPhysicsBakeCache: return value
 	if value is ActorObjectReference:
 		return value.copy_reference()
 	if value is ActorObjectData:

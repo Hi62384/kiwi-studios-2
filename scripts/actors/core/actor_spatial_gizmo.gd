@@ -20,11 +20,14 @@ var start_vector:=Vector3.RIGHT
 var drag_length:=1.
 var rig:=preload("res://scripts/actors/core/actor_skeleton_gizmo.gd").new()
 var physics_pins:=preload("res://scripts/actors/physics/physics_pin_gizmo.gd").new()
+var damage:=preload("res://scripts/actors/physics/destruction/destruction_gizmo.gd").new()
+var structure:=preload("res://scripts/actors/physics/structure/structure_gizmo.gd").new()
+var fog_paint:=preload("res://scripts/actors/fog/fog_paint_gizmo.gd").new()
 const COLORS=[Color("f27e81"),Color("84dc9e"),Color("80baff")]
 const EDGES=[[0,1],[0,2],[0,4],[1,3],[1,5],[2,3],[2,6],[3,7],[4,5],[4,6],[5,7],[6,7]]
-const PROXIES=[&"point_3d",&"remote_transform",&"light_3d",&"directional_light",&"skeleton_rig"]
+const PROXIES=[&"point_3d",&"remote_transform",&"light_3d",&"directional_light",&"skeleton_rig",&"powder",&"fog_volume",&"global_fog"]
 
-func _ready()->void: rig.spatial=self; physics_pins.spatial=self
+func _ready()->void: rig.spatial=self; physics_pins.spatial=self; damage.spatial=self; structure.spatial=self; fog_paint.spatial=self
 
 func camera()->Camera3D:
 	return editor.runtime_holder.get_viewport().get_camera_3d() if is_instance_valid(editor) and is_instance_valid(editor.runtime_holder) else null
@@ -43,6 +46,7 @@ func in_picture(point:Vector2)->bool:
 	return Rect2(Vector2.ZERO,Vector2(editor.runtime_holder.get_viewport().get_visible_rect().size)).has_point(gizmo.scene_point(point))
 func _visuals(node:Node,result:Array[VisualInstance3D],root:bool=true)->void:
 	if not root and node is ActorRuntime:return # Child actors own their bounds.
+	if node is FogVolume and node.shape==RenderingServer.FOG_VOLUME_SHAPE_WORLD:return
 	if node is VisualInstance3D and node.is_visible_in_tree() and not node is Light3D:
 		if (node.layers&camera().cull_mask)!=0:result.append(node)
 	for child in node.get_children():_visuals(child,result,false)
@@ -159,11 +163,17 @@ func handle_at(point:Vector2,data:Dictionary)->int:
 	return chosen
 func draw()->void:
 	if not enabled() or camera()==null:return
+	if fog_paint.active(): fog_paint.draw(); return
+	damage.draw()
+	structure.draw()
+	if structure.active(): return
+	if damage.active(): return
 	if physics_pins.active(): physics_pins.draw(); return
 	for clip in editor.model.clips:
 		var runtime:=editor._runtime_for_clip(clip.id)
 		if runtime==null or not runtime.active or runtime is ActorUIRuntime:continue
 		if editor.model.is_selected(clip.id):
+			if runtime is KiwiPowderRuntime: preload("res://scripts/actors/physics/powder/powder_gizmo.gd").draw(self,runtime)
 			var color:=Color("ffd078") if clip.id==editor.model.selected_id else Color("80bdff")
 			for line in box_lines(runtime):
 				gizmo.draw_line(line[0],line[1],Color(0,0,0,.65),4,true);gizmo.draw_line(line[0],line[1],color,1.6,true)
@@ -282,10 +292,16 @@ func finish(cancel:bool=false)->void:
 	# History owns the snapshot array after commit; do not clear it in place.
 	before=[];originals.clear();final_values.clear();editor.hints.end(gizmo)
 func sync()->void:
+	fog_paint.tick()
 	rig.sync()
+	if not structure.before.is_empty() and (not enabled() or primary()==null or primary().actor!=structure.actor): structure.cancel()
+	if not damage.before.is_empty() and (not enabled() or primary()==null or primary().actor!=damage.actor): damage.cancel()
 	if not before.is_empty() and (not enabled() or editor.model.selected_ids!=selection or not is_equal_approx(editor.canvas.playhead,sample_time)):finish(true)
 func handle_event(event:InputEvent)->bool:
 	if not enabled():return false
+	if fog_paint.handle_event(event): return true
+	if structure.handle_event(event): return true
+	if damage.handle_event(event): return true
 	if physics_pins.handle_event(event):return true
 	if rig.handle_event(event):return true
 	if not before.is_empty():
@@ -316,5 +332,8 @@ func hover(point:Vector2)->void:
 		gizmo.tooltip_text=mode.capitalize()+(" freely" if handle<0 else " "+["X","Y","Z"][handle])+" · Ctrl snaps · Esc cancels"
 		gizmo.mouse_default_cursor_shape=Control.CURSOR_MOVE if mode=="move" else Control.CURSOR_CROSS
 func _exit_tree()->void:
+	if fog_paint.painting and is_instance_valid(editor): fog_paint.finish(true)
+	if not structure.before.is_empty() and is_instance_valid(editor): structure.cancel()
+	if not damage.before.is_empty() and is_instance_valid(editor): damage.cancel()
 	if not rig.before.is_empty() and is_instance_valid(editor):rig.finish(true)
 	if not before.is_empty() and is_instance_valid(editor):finish(true)

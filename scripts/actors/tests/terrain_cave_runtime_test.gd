@@ -1,0 +1,21 @@
+extends "res://scripts/actors/tests/surface_growth_test.gd"
+func run() -> void:
+	var terrain:=KiwiEnvironmentTerrain.new(); terrain.resolution=33; terrain.dimensions=Vector2(16,16); var cave:=KiwiTerrainCave.new(); cave.radius=1.5; cave.radius_variation=0.; cave.roughness=0.; cave.paths=[PackedVector3Array([Vector3(0,1,-6),Vector3(0,-3,0)])]; cave.chambers=PackedVector4Array([Vector4(0,-3,0,2.)]); terrain.caves=[cave]
+	check(terrain.prepare_volumes() and terrain.volumes_valid() and terrain.volume_chunks_rebuilt==1,"Terrain prepares bounded saveable cave geometry for its affected native chunk")
+	var document:=KiwiEnvironmentDocument.new(); var item:=document.add_terrain(terrain); var view:=SubViewport.new(); view.own_world_3d=true; view.size=Vector2i(240,180); view.render_target_update_mode=SubViewport.UPDATE_ALWAYS; root.add_child(view); var runtime:=KiwiEnvironmentRuntime.new(); view.add_child(runtime); runtime.configure(document); var chunk:=runtime.nodes[item.id].get_node("Chunk_0_0") as MeshInstance3D
+	var shape:=chunk.get_node("Collision/Shape").shape as ConcavePolygonShape3D
+	check(shape.get_faces()==chunk.mesh.get_faces() and chunk.mesh.get_faces().size()>0,"Cave floors, walls, ceilings and entrances use the same real native rendering and collision triangles")
+	var ray:=chunk.mesh.generate_triangle_mesh().intersect_ray(Vector3(0,-3,0),Vector3.RIGHT); check(not ray.is_empty() and ray.position.x>1.8 and ray.position.x<2.2,"Shared environment runtime retains an actual interior cave wall")
+	var environment:=WorldEnvironment.new(); environment.environment=Environment.new(); environment.environment.background_mode=Environment.BG_COLOR; environment.environment.background_color=Color.BLACK; environment.environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR; environment.environment.ambient_light_color=Color.WHITE; environment.environment.ambient_light_energy=1.; view.add_child(environment); var camera:=Camera3D.new(); view.add_child(camera); camera.position=Vector3(0,-3,0); camera.look_at(Vector3(0,-3,2)); camera.current=true
+	if DisplayServer.get_name()!="headless":
+		for i in 5: await RenderingServer.frame_post_draw
+		var image:=view.get_texture().get_image(); var pixel:=image.get_pixel(120,90); check(pixel.g>.15 and pixel.g>pixel.b,"A real camera inside the cave renders its interior wall instead of a blank background")
+	var cached: PackedInt32Array=terrain.volume_chunks[Vector2i.ZERO].indices.duplicate(); check(terrain.prepare_volumes() and terrain.volume_chunks_rebuilt==0,"Unchanged cave fields reuse their saved generated chunk data")
+	cave.edits.append({"center":Vector3(3,-3,0),"radius":2.,"fill":false}); check(not terrain.volumes_valid() and terrain.prepare_volumes() and terrain.volume_chunks_rebuilt==1,"A local dig invalidates and remeshes its affected cave chunk")
+	runtime.sync(); var moved:=chunk.mesh.generate_triangle_mesh().intersect_ray(Vector3(0,-3,0),Vector3.RIGHT); check(not moved.is_empty() and moved.position.x>4.7,"Digging widens the actual cave wall and updates its native collision mesh")
+	var full_count:=chunk.mesh.get_faces().size(); runtime.cave_cutaway=true; runtime.sync(); check(chunk.mesh.get_faces().size()<full_count and chunk.mesh.get_faces().size()>0,"Preview cutaway removes surface terrain while retaining cave geometry")
+	runtime.cave_cutaway=false; runtime.sync(); check(chunk.mesh.get_faces().size()==full_count,"Leaving cutaway restores the complete authored terrain")
+	var path:="user://terrain-cave.tres"; ResourceSaver.save(document,path); var loaded:=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE) as KiwiEnvironmentDocument; var reopened:=loaded.terrain(item.id)
+	check(reopened.volumes_valid() and reopened.volume_chunks[Vector2i.ZERO].indices==terrain.volume_chunks[Vector2i.ZERO].indices and reopened.caves[0].edits.size()==1,"Saving and reopening preserves editable cave fields and their valid native geometry cache")
+	check(cached!=terrain.volume_chunks[Vector2i.ZERO].indices,"A dig changes native cave topology rather than only its appearance")
+	view.queue_free(); await process_frame; DirAccess.remove_absolute(path); print("TERRAIN CAVE RUNTIME: %d checks, %d failures"%[checks,failures]); quit(failures)

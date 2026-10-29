@@ -1,0 +1,206 @@
+POWDER / GRANULAR SOURCES, PHYSICS AND PHYSICAL PROPERTIES
+=======================================================
+
+Getting started
+---------------
+Scene Workspace > Add actor > Simulation > Powder.
+The normal Actor tab contains transforms, parenting and timeline Physics controls.
+Properties contains Powder, Source, Physical Properties and Preview sections.
+
+Powder: enable the actor, select Finite volume / Emitter / Volume + emitter,
+choose spacing, packing jitter and a saved seed. Simulate grains is on by default.
+Turn it off to preview source creation without integrating grain motion.
+
+For a first pile: add a wide, thin Basic Shape box as a floor, enable its Physics
+and choose Static collider. Place Powder above it and press Play. Visual geometry
+without Physics enabled is not automatically a collider. To pour, choose Emitter
+and set a finite supply or emission end time. Use lower grain counts while editing,
+then Bake for repeatable playback/rendering of more expensive scenes.
+
+Source: choose Box, Sphere/ellipsoid, Cylinder or Closed mesh actor. A mesh source
+uses the actual source actor's transformed, indexed triangles, including compatible
+multiple surfaces, child meshes and sampled skin geometry. It does not fill the
+bounding box. The source mesh is never modified. Point, Disk, Box and Sphere
+emitters have rate, start/end source times, direction, speed, initial velocity,
+spread, radius/dimensions and continuous/finite supply controls. Emission rate and
+other emitter controls can be animated. The total preview/simulation budget always
+applies, including when continuous supply is enabled.
+
+The initial finite volume is generated once at activation. Editing its structural
+settings invalidates/reconstructs it, but ordinary timeline playback does not
+reposition released grains when a parent moves. Emission samples the source's
+world transform at each recorded birth time. Actor > Physics provides actor/bone
+attachment, offset and optional inherited source velocity.
+
+Source errors are shown in the Powder status and physics status: missing source,
+open/nonmanifold/degenerate/inconsistently wound mesh, invalid dimensions, impossible
+grain spacing, empty sampling, excessive sampling cells or grain count. Over-budget
+finite volumes return no points, never an unexplained partial fill. Increase
+spacing, reduce the source size or raise Maximum grains. Mesh sampling requires
+closed, non-self-intersecting shells; robust self-intersection repair is not supplied.
+
+The source generator, dedicated granular solver and MultiMesh renderer are separate.
+Grains use packed positions/velocities, IDs, radii, masses, birth positions/times,
+source tags, contact counts, compaction and resting state. Cohesive bonds are also
+checkpointed. There is one instanced draw, not a Scene actor/node/body per grain.
+Only reusable sphere-query probes and actor/proxy collision geometry are registered
+with the native collision query world. Selected source guides are editor overlays
+and do not appear in scene-video rendering.
+
+Physical Properties
+-------------------
+Grain radius (metres): actual sphere contact radius and rendered size. Density
+(kg/m³) gives mass = density * 4/3 * pi * radius³. Seeded radius variation is in
+Advanced. Source spacing must accommodate the largest grain, independently of the
+preview mesh's tessellation. Defaults are deliberately coarse, visible spheres;
+this is not a microscopic dust solver or a claim to simulate millions of real grains.
+
+Friction: Simple-mode base coefficient, combined geometrically with the other
+surface/grain. Flowability derives static friction, sliding friction and rough-grain
+rolling resistance from this base. Increasing Flowability reduces resistance;
+it never writes over the authored friction or cohesion values during simulation.
+
+Advanced contact coefficients: copies the current effective Simple coefficients
+when enabled, as one undoable edit, then uses explicit static/dynamic/rolling values.
+Basic Friction and Flowability are hidden while Advanced mode is active. Returning
+to Simple mode derives a matching base static coefficient; an independently edited
+advanced dynamic/static ratio cannot be represented exactly by the Simple model.
+
+Cohesion (N/contact): actual tensile contacts/bonds, formed near touching grains,
+limited by tensile force and broken past the configured strain. It is not just drag.
+Compaction resistance changes compliant contact stiffness, with a hard penetration
+safety limit. Packing/contact history can strengthen bonds slightly. Grains rearrange
+and never shrink their stored radii to fake compression.
+
+Bounciness controls normal restitution, including grain/grain and surface impacts.
+Damping is exponential free-motion energy loss (1/s). Contact damping removes
+residual closing velocity. Wind influence multiplies aerodynamic response based on
+relative airflow, exposed area, density/mass and approximate contact sheltering.
+Small/light grains respond more strongly. Actor > Physics > Wind is airflow velocity
+in m/s; optional turbulence is seeded/time-driven, never wall-clock random.
+Existing gravity, source velocity, force and impulse events are used. Gravity alone
+does not accelerate denser grains faster in vacuum.
+
+Advanced also exposes gravity influence, bond breaking strain, air drag, fluid
+interaction strength, quality, substeps, iterations, safety speed, rest thresholds
+and optional bone/deformable collision proxies. All are connected to calculations.
+
+Animation and editing
+---------------------
+Density, friction/flowability (or Advanced coefficients), cohesion, restitution,
+damping, compaction resistance, wind, gravity influence, turbulence, fluid strength
+and supported source/appearance values use ordinary actor keyframes and curves.
+
+Radius/size distribution, volume shape/dimensions, spacing, seed, source mode,
+budget and base solver counts are structural, deliberately non-keyframable. Editing
+them regenerates/replays the source instead of interpolating grain counts or
+rebuilding the population every frame. Transform animation remains available.
+
+Standard inspector gesture handling gives one undo per slider/number drag and
+supports common-property multi-edit. Physical changes invalidate later checkpoints;
+color/roughness/source-guide changes reuse the physical cache. Normal scene saves
+store authored settings, tracks and references, not duplicate generated populations.
+Bakes and explicit Freeze store full packed state. Mesh/attachment and bond references
+are remapped when related actors are copied or scenes instantiated.
+
+Solver and supported interactions
+---------------------------------
+The CPU solver uses spatial hashing, pair deduplication, unilateral compliant
+position-based sphere constraints (XPBD), Coulomb static/dynamic positional friction,
+rough-grain tangential resistance, restitution and breakable tensile bonds. Adaptive
+substeps and swept native boundary queries limit tunnelling. Overlapping initial
+births are repaired without converting the repair into explosive stored energy.
+Resting suppresses residual drift, not gravity/support checks: removed supports,
+moving geometry, new contacts, forces and wind can wake the grains.
+
+Static, animated and dynamic rigid geometry uses the existing offline native query
+space, including static concave triangle colliders. The space is never continuously
+stepped by the engine. Moving surfaces supply linear/angular contact velocity.
+Dynamic bodies receive collected contact impulses/torques and positional response
+using an aggregate reduced-mass/stabilized approximation, rather than one independent
+infinite-mass impulse per grain. A confined pile supports a falling test block.
+The native test also increases that block from 2 kg to 20 kg: the bed compacts,
+the block remains supported, and grain radii are unchanged.
+
+Different Powder actors share the same contact solve, respecting layers/masks.
+Soft/cloth/rope simulation points have sphere proxies and receive point reactions.
+Animated skeletons use bone-origin sphere proxies with one-way response. These are
+approximate, discrete proxies, NOT sealed cloth triangles, full bone capsules,
+two-way animated-character dynamics, or complete watertight deformable coupling.
+
+Existing Fluid particles exchange kernel-sampled drag, displaced-volume buoyancy,
+flow velocity and mass-weighted contact/exclusion with grains. Fluid gets opposite
+drag/buoyancy momentum and contact displacement, not decorative splashes. Solid
+boundaries reproject coupling corrections. The liquid pressure solver stays separate.
+Frozen/baked actors act as prescribed/infinite-reservoir states, not a second live
+solver. Equal playback speeds are recommended for physically interpretable coupling.
+
+Timeline, persistence and limits
+-------------------------------
+All generation and integration is on KiwiTimelinePhysics's fixed scene-time clock.
+Pause performs no hidden stepping. Seek restores checkpoints and replays. IDs,
+velocities, emission fraction, bonds, contact/packing/rest state are restored.
+Clip trims/source offsets, playback speed and activation use the same timeline path.
+Fractional display interpolation respects births and activation/reset discontinuities.
+
+Actor > Physics offers Bake, Clear cache, Recalculate and Freeze. Baked playback and
+scene-video rendering use the same sampled state; rendering speed/frame rate does
+not advance a separate simulation. Bakes are capped at 4,096 fixed frames / 64 MiB
+per actor, checked during collection. Checkpoint estimates include cohesive bonds.
+
+Limits: sources at most 65,536 grains / 200,000 candidate cells / 100,000 triangles;
+contact broadphase at most 1,000,000 candidate pairs and 65,536 bonds per actor.
+Budget errors/warnings preserve grain identities; no silent particle thinning.
+CPU simulation above 4,096 grains produces an explicit performance warning. This
+is an interactive small-scene/coarse-grain foundation; large dense scenes should
+use lower resolution or baking. No GPU granular solver is included. Native collision
+queries and CPU contact work would still require synchronization/readback with a
+GPU path; the tested CPU path was preferred over a disconnected GPU visual effect.
+
+Other limitations: spherical grains have no independent orientation/spin/shape mesh
+collision; rolling is an effective resistance, not true nonspherical tumbling.
+Rigid feedback uses approximate inertia and stabilized aggregate impulses, not a
+monolithic rigid/grain constraint solve. Contacts have finite timestep/iteration
+accuracy. Fluid coupling is particle-resolution dependent and approximate, with
+safety velocity caps; it is not high-fidelity porous-flow/erosion/wetness simulation.
+No chemical mixing, absorption, mud or advanced continuous bulk-surface rendering
+is claimed. Grain-resolution deposition/transport and reusable materials are now
+described in powder_materials_and_destruction.txt. Extremely small grains remain
+limited by native collision skin/precision.
+
+Verification (Godot 4.6.1, Windows, Ryzen 7 6800H / RTX 3060 Laptop)
+-----------------------------------------------------------------
+New scripts: powder_source_test, powder_timeline_test, powder_solver_test,
+powder_fluid_test, powder_physics_test, powder_system_test, powder_workspace_test.
+They cover geometric interiors (including a torus hole), mesh errors, all source
+timing/seed/replay, copying/instancing, real floor and moving geometry contacts,
+piles, slope/friction/flow differences, cohesion/breakage, compaction, density/wind,
+restitution, support removal, rigid support, two-way fluid momentum/trajectories,
+parent/bone sources, cache invalidation/undo, scene round trips, native inspector
+gestures, batched rendering, freezing/baking and two temporary scene-video runs.
+Temporary test video files are removed; no application export is produced.
+
+Historical source/solver measurements before the material/transport extension
+(not guaranteed real-time rates; variant rendering has additional CPU cost):
+- 27,000-grain box generation: about 31-40 ms; CPU preview-buffer upload ~8.5 ms
+  in the native batched-preview check (not a complete GPU frame-time measurement).
+- 512 grains, 2 substeps / 6 iterations, free-space neighborhood benchmark:
+  about 40-60 ms per fixed step (no native-boundary or liquid-rendering costs).
+- 64-grain analytical-floor pile: ~0.35 m high, ~0.0022 m maximum pair overlap;
+  settled one-second drift below 0.0001 m in the recorded checks.
+- Native emitter test: 36 grains pile up and remain near rest after emission ends.
+- Sand/water test: coupled grains descend more slowly and alter liquid trajectories;
+  shared replay exactly reproduces the recorded grain and liquid arrays.
+
+Machine-readable results and screenshots are in .godot/verification/. See the
+powder_acceptance, powder_regressions and final edge-case reports for the actual
+tested revision/results. Existing Fluid/rigid/soft/cloth/rope, timeline, inspector,
+scene saving and viewport interaction regressions are run alongside the new scripts.
+At delivery, 20 distinct regression scripts passed, plus additional repeats for
+edge cases and two successful OpenGL-compatibility runs. The seven powder scripts
+contain 114 successful checks in their latest versions. Native Scene launches and
+temporary scene-video encoding were exercised; no application export was built.
+The broad actor_types_test passes its assertions but still emits the previously
+observed SkyShaderRD/texture/resource shutdown warnings; targeted powder runs do
+not emit those warnings. The Windows test environment also prints an unrelated
+root-certificate-store warning during engine startup.

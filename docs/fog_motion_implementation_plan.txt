@@ -1,0 +1,81 @@
+Authorized queue / active implementation plan — 2026-10-27
+
+Finished prior vertical slices and evidence are in volumetric_fog_progress.txt and
+volumetric_lighting_progress.txt. The lighting regression run
+fog_lighting_regressions.json passed all 11 native Forward+ scripts. App exports
+remain prohibited. Temporary scene-video test MP4s are allowed and removed.
+
+Current specification (fully read, including middle sections):
+C:/Users/User1/.codex/attachments/7bdc8488-9a05-4118-bc0f-af4808d37c88/Pasted text.txt
+Animated & Simulated Volumetric Fog Movement.
+
+Next queued specification (fully read, including styles/presets):
+C:/Users/User1/.codex/attachments/dc9d7805-0436-49bb-98f1-445c367a8137/Pasted text.txt
+Realistic & Stylized Volumetric Rendering for Clouds, Mist & Atmospheric Effects.
+Then queued Environment Creator Workspace (fully read, including middle sections):
+C:/Users/User1/.codex/attachments/e248c7b1-65c5-49e8-ae30-0da550edecf9/Pasted text.txt
+Functional terrain/sculpt/placement/scatter/hierarchy/materials + normal tabs,
+save/load, instanced linked Scene integration, Super Clipboard and bounded local
+updates. Reuse Model Workspace; do not implement future vegetation/city/weather
+generators as placeholders. This workspace is not implemented yet.
+
+Do not replace motion with scrolling shader coordinates. Do not start a second
+cloud solver. Do not claim these two queued specifications are already finished.
+
+Motion implementation direction:
+- Reuse KiwiTimelinePhysics fixed-step/checkpoint/bake/seek controller. Add a fog
+  type after existing growth type 8. No _physics_process or wall-clock stepping.
+- CPU reference grid: bounded packed concentration/velocity/pressure/solid arrays;
+  cached neighbor tables. Conservative donor-cell finite-volume face fluxes for
+  density, semi-Lagrangian velocity transport, pressure projection, zero flux
+  through solid faces, explicit open/closed boundaries, CFL substeps/clamping.
+  Diffusion is a separate conservative pair flux and dissipation is an explicit
+  exponential sink. Source injection adds actual represented concentration/momentum.
+- Reuse existing physics wind/forces and collider/proxy data. Static mesh occupancy
+  should be cached, moving obstacles update occupancy/boundary velocity. Moving
+  solids redistribute displaced density locally and influence surrounding flow;
+  do not just hide density inside bounds. Character/soft proxies can reuse the
+  existing fluid bridge's collision-proxy infrastructure.
+- Keep authored density/appearance immutable. Bake signatures include motion,
+  sources, physical source fields and obstacle dependencies; exclude appearance,
+  render quality and editing-brush controls.
+- Normal ActorObjectData emitter/velocity-field resources, bounded slots/layers,
+  existing actor/bone attachments and clipboard ID remapping. Continuous/burst,
+  point/sphere/box/disk/cone/closed-volume sources; previous emissions stay in the
+  domain, not parented to a moving source. Directed/vortex/radial/turbulent forces.
+- World-fixed domain by default, explicit move-with-actor alternative. Structural
+  dimensions/resolution changes reinitialize, never reinterpret old arrays.
+- Static / Procedural / Simulated / Combined modes. Global fog supports bounded
+  procedural movement; genuine physical simulations use local bounded domains.
+  Procedural time uses clip/scene time, never TIME. Combined detail does not replace
+  transported density. Custom shaders require an explicit supported density sampler
+  interface; preserve original code and warn on bypassed simulation rendering.
+- Upload cached concentration to reusable ImageTexture3D.update(), sample through
+  existing fog_surface shader and native light/shadow pipeline. No transparent cubes.
+- Shared controller freeze/bake/retime/clear and external compressed chunks. Extend
+  snapshot/blend/byte accounting for packed grid fields. Current bake cache assumes
+  fixed 32-frame chunks; adaptive bounded chunks plus first/count binary lookup may
+  be necessary for large grids. Do not remove 16 MiB chunk / 64 MiB resident limits.
+- Use modest interactive grids and explicit larger bake quality. Measure actual
+  step/obstacle/upload/cache costs and report CPU-reference limitations.
+
+Integration locations inspected:
+- physics_settings.gd authored/sample/configured/fingerprint/remap
+- timeline_physics.gd setup geometry, initialize, match type step, snapshot,
+  checkpoint byte estimate, blend, apply, freeze, bake_group
+- physics_inspector.gd _build/_actions
+- fog_actor.gd / fog_field.gd / fog_surface.gdshader
+- fluid_bridge.gd update_proxies and collision_world.gd bodies/place
+
+Implementation update:
+- fog_transport_solver.gd now contains an actual CPU reference solver, including
+  conservative density flux, velocity advection, pressure projection, seeded coherent
+  flow, vortex/radial fields, diffusion, expansion, exponential sinks, true injection,
+  moving-solid displacement/boundary velocity and explicit outflow accounting.
+- fog_transport_reference and fog_transport_projection_check pass all 12 headless
+  checks: transport, deterministic rho/v, conservation, sinks, wall/door occupancy,
+  moving-solid mass preservation and airflow, continuous source and vortex motion.
+- Scene/timeline/render integration is now implemented and tested. See
+  fog_motion_progress.txt and cloud_rendering_progress.txt for current evidence
+  and the remaining acceptance work. Environment Creator is still queued and is
+  NOT implemented. Do not claim these full queued specifications are finished.

@@ -19,9 +19,22 @@ uniform vec3 texture_flow = vec3(0.03,-0.05,0.02);
 uniform float texture_blend = 1.0;
 uniform float normal_strength = 0.25;
 uniform float liquid_time = 0.0;
+uniform bool terrain_surface = false;
+uniform float wave_strength = 0.03;
+uniform float wave_scale = 1.0;
+uniform vec2 wave_direction = vec2(0.8,0.3);
+uniform float flow_speed = 1.0;
 varying vec3 world_position;
 varying vec3 world_normal;
 void vertex() {
+ if (terrain_surface) {
+  vec2 direction = COLOR.b > 0.5 ? UV2 : wave_direction;
+  direction = normalize(direction + vec2(0.00001));
+  float phase = dot(VERTEX.xz,direction) * wave_scale - liquid_time * flow_speed;
+  float amplitude = wave_strength * smoothstep(0.0,0.3,COLOR.g * 20.0);
+  VERTEX.y += sin(phase) * amplitude;
+  NORMAL = normalize(NORMAL-vec3(direction.x*cos(phase)*amplitude*wave_scale,0.0,direction.y*cos(phase)*amplitude*wave_scale));
+ }
  world_position = (MODEL_MATRIX * vec4(VERTEX,1.0)).xyz;
  world_normal = normalize(MODEL_NORMAL_MATRIX * NORMAL);
 }
@@ -37,5 +50,6 @@ void fragment() {
  ALBEDO = mix(base,foam_color.rgb,foam);
  ROUGHNESS = mix(roughness,0.85,foam); METALLIC = metallic; SPECULAR = specular;
  EMISSION = base * glow; ALPHA = liquid_color.a * opacity;
+ if (terrain_surface) { ALPHA *= smoothstep(0.0,0.08,COLOR.g*20.0); }
  if (has_normal) { NORMAL_MAP = texture(normal_texture,p.xz).rgb; NORMAL_MAP_DEPTH = normal_strength; }
 }

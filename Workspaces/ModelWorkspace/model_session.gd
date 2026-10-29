@@ -7,10 +7,12 @@ var mode := "Object"
 var elements := PackedInt32Array()
 var dirty := false
 var revision := 0
+var history_revision:=0 # explicit history navigation, separate from derived refreshes
 var _undo: Array[Dictionary] = []
 var _redo: Array[Dictionary] = []
 var _gesture: Dictionary = {}
 var last_command := ""
+var pending_source_cancel:=Callable()
 var rig_selection: Dictionary={}
 
 func primary() -> KiwiModelComponent: return document.component(selected.back()) if not selected.is_empty() else null
@@ -18,6 +20,7 @@ func snapshot() -> Dictionary: return {"document":document.snapshot(),"selected"
 func restore(state: Dictionary) -> void:
 	document=state.document.snapshot(); selected.assign(state.selected); mode=state.mode; elements=state.elements.duplicate(); rig_selection=state.get("rig_selection",{}).duplicate(); changed.emit()
 func begin() -> void:
+	if pending_source_cancel.is_valid(): pending_source_cancel.call()
 	if _gesture.is_empty(): _gesture=snapshot()
 func cancel() -> void:
 	if _gesture.is_empty(): return
@@ -40,17 +43,26 @@ func _signature(data: KiwiModelDocument) -> int:
 	for item in data.components:
 		var geometry: Array=[]
 		if item.mesh!=null: geometry=[item.mesh.vertices,item.mesh.faces,item.mesh.uv,item.mesh.materials,item.mesh.smooth]
-		entries.append([item.id,item.title,item.parent_id,item.transform,item.pivot,item.visible,item.locked,item.generator,item.parameters,item.modifiers,item.surface_materials,geometry,item.is_skeleton,item.bones,item.skin,item.skin_mesh,item.skeleton_id,item.binding.signature() if item.binding!=null else 0,item.geometry_source,item.geometry_source_hash])
+		if item.growth!=null and item.growth.appearance!=null: geometry.append(item.growth.appearance.signature())
+		if item.growth!=null and item.growth.growth_style!=null: geometry.append([item.growth.growth_style.asset_id,item.growth.growth_style.title,item.growth.growth_style.values])
+		if item.growth!=null: geometry.append([item.growth.rendering,item.growth.brush_presets,item.growth.individual])
+		if item.growth!=null:
+			for region: Dictionary in item.growth.regions: geometry.append([region.get("id"),region.get("name"),region.get("roots"),region.get("faces"),region.get("enabled",true),region.get("all",false),region.material.signature() if region.get("material") is KiwiGrowthMaterial else 0,[region.style.asset_id,region.style.title,region.style.values] if region.get("style") is KiwiGrowthStyle else {}])
+		entries.append([item.id,item.title,item.parent_id,item.transform,item.pivot,item.visible,item.locked,item.generator,item.parameters,item.modifiers,item.surface_materials,geometry,item.is_skeleton,item.bones,item.skin,item.skin_mesh,item.skeleton_id,item.binding.signature() if item.binding!=null else 0,item.geometry_source,item.geometry_source_hash,item.structural,[item.growth.source_id,item.growth.settings,item.growth.groom,item.growth.groom_layers,item.growth.guides,item.growth.groom_enabled] if item.growth!=null else []])
 	return hash(entries)
 func action(label: String, operation: Callable) -> void: begin(); operation.call(); commit(label)
 func undo() -> void:
-	if not _gesture.is_empty(): cancel(); return
+	if pending_source_cancel.is_valid(): history_revision+=1; pending_source_cancel.call(); return
+	if not _gesture.is_empty(): history_revision+=1; cancel(); return
 	if _undo.is_empty(): return
+	history_revision+=1
 	var entry: Dictionary=_undo.pop_back(); _redo.append(entry); dirty=true; revision+=1
 	if entry.has("custom"): entry.undo.call(); changed.emit()
 	else: restore(entry.before)
 func redo() -> void:
+	if pending_source_cancel.is_valid(): history_revision+=1; pending_source_cancel.call(); return
 	if _redo.is_empty(): return
+	history_revision+=1
 	var entry: Dictionary=_redo.pop_back(); _undo.append(entry); dirty=true; revision+=1
 	if entry.has("custom"): entry.redo.call(); changed.emit()
 	else: restore(entry.after)
@@ -66,8 +78,12 @@ func select(id: String, additive: bool=false) -> void:
 		else: selected.append(id)
 	elements=PackedInt32Array(); changed.emit()
 func add(kind: String, parameters: Dictionary={}, position: Vector3=Vector3.ZERO) -> KiwiModelComponent:
+	if preload("res://Workspaces/EnvironmentWorkspace/architecture/architectural_component.gd").accepts(kind): return preload("res://Workspaces/EnvironmentWorkspace/architecture/architectural_component.gd").add(self,kind,parameters,position)
+	if kind=="Building": return preload("res://Workspaces/EnvironmentWorkspace/architecture/building_session.gd").add(self,position,int(parameters.get("levels",1)))
+	if kind in preload("res://Workspaces/ModelWorkspace/natural_cluster.gd").kinds(): return preload("res://Workspaces/ModelWorkspace/natural_cluster.gd").add(self,kind,parameters,position)
 	var item := KiwiModelComponent.new(); item.id=ActorData.new_id(); item.title=kind; item.generator=kind; item.parameters=KiwiModelPrimitives.defaults(kind); item.parameters.merge(parameters,true)
 	item.mesh=KiwiModelPrimitives.create(kind,item.parameters); item.transform.origin=position
+	if preload("res://Workspaces/ModelWorkspace/natural_generator.gd").accepts(kind): item.surface_materials=preload("res://Workspaces/ModelWorkspace/natural_generator.gd").materials(kind,item.parameters)
 	action("Add "+kind,func(): document.components.append(item); selected.assign([item.id]); elements=PackedInt32Array())
 	return item
 func selected_vertices() -> PackedInt32Array:
@@ -149,8 +165,8 @@ func duplicate_selected(preview: bool=false) -> void:
 			if included:
 				var copy := item.copy_component(true); copy.title+=" copy"; mapping[item.id]=copy.id; copies.append(copy)
 		for copy in copies:
+			preload("res://Workspaces/ModelWorkspace/model_reference_remap.gd").component(copy,mapping)
 			if mapping.has(copy.parent_id): copy.parent_id=mapping[copy.parent_id]
-			if mapping.has(copy.skeleton_id): copy.skeleton_id=mapping[copy.skeleton_id]
 			document.components.append(copy)
 		var roots := selected.duplicate(); selected.clear()
 		for id in roots:
@@ -218,6 +234,7 @@ func delete_selected() -> String:
 		if not elements.is_empty(): return edit_mesh("Delete")
 		return ""
 	for item in document.components:
+		if item.growth!=null and selected.has(item.growth.source_id) and not selected.has(item.id): return "Delete or convert dependent surface growth first, or select it with its source."
 		if selected.has(item.skeleton_id) and not selected.has(item.id): return "Detach this armature's meshes first, or select them together with the armature for deletion."
 	action("Delete components",func():
 		for item in document.components:
@@ -230,7 +247,7 @@ func join_selected() -> void:
 	if target==null or selected.size()<2: return
 	for id in selected:
 		var item := document.component(id)
-		if item.is_skeleton or item.skin_mesh!=null or item.binding!=null: return
+		if item.is_skeleton or item.skin_mesh!=null or item.binding!=null or item.growth!=null: return
 	action("Join meshes",func():
 		var world := document.world_transform(target); var mesh := KiwiModelMesh.new(); var mats: Array[Material]=[]; var worlds := {}
 		for item in document.components: worlds[item.id]=document.world_transform(item)
