@@ -24,7 +24,7 @@ func run() -> void:
 	check(workspace._automation_mode.size.y < 60 and workspace.play_button.size.y < 60, "Transport and automation rows remain compact in the native layout")
 	var samples := PackedVector2Array(); samples.resize(44100)
 	for i in samples.size(): samples[i] = Vector2(sin(TAU * 440.0 * i / 44100.0), sin(TAU * 660.0 * i / 44100.0)) * 0.1
-	var source := KiwiAudioSourceCache.to_wav(samples)
+	var source := KiwiAudioSourceCache.to_wav(samples,44100,true)
 	workspace.open_source(KiwiAudioDocument.from_source(source, "Native audio workflow")); await process_frame
 	var directory := "user://native_audio_" + ActorData.new_id(); DirAccess.make_dir_recursive_absolute(directory)
 	var composition := directory.path_join("composition.tres")

@@ -18,7 +18,7 @@ func run()->void:
 	for index in samples.size():
 		var amplitude:=.08*sin(TAU*440.*index/rate)*minf(1.,float(index)/480.)*minf(1.,float(samples.size()-index)/480.)
 		samples[index]=Vector2(amplitude,amplitude)
-	var player:=AudioStreamPlayer.new();root.add_child(player);player.stream=KiwiAudioSourceCache.to_wav(samples,rate);player.play()
+	var player:=AudioStreamPlayer.new();root.add_child(player);player.stream=KiwiAudioSourceCache.to_wav(samples,rate,true);player.play()
 	await create_timer(3.).timeout;player.stop()
 	var capture:Dictionary=await recorder.stop_to_files()
 	check(str(capture.get("error","")).is_empty(),"Physical capture stops and finalizes without error")

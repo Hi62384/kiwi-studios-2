@@ -2,7 +2,7 @@ extends "res://scripts/actors/tests/surface_growth_test.gd"
 func run() -> void:
 	var session:=KiwiModelSession.new(); session.add("Sphere",{"radius":.6,"segments":12,"rings":8}); KiwiSurfaceGrowth.add(session,0)
 	var data:=session.primary().growth; data.settings.length=.35; data.settings.direction_mode=0
-	var mesh:=KiwiSurfaceGrowth.render(data); var original_roots:=data.roots.duplicate(true); var key:=data.generation_key; var builds:=data.chunk_builds; var material:=data.appearance
+	var mesh:=KiwiSurfaceGrowth.render(data); var original_roots:=data.roots.duplicate(true); var key:=data.generation_key; var builds: int =data.chunk_builds; var material:=data.appearance
 	check(mesh.get_surface_count()>0 and material.material() is ShaderMaterial,"Growth uses a specialized shared shader material")
 	var arrays:=mesh.surface_get_arrays(0); var vertices: PackedVector3Array=arrays[Mesh.ARRAY_VERTEX]; var tangents: PackedFloat32Array=arrays[Mesh.ARRAY_TANGENT]
 	check(tangents.size()==vertices.size()*4 and arrays[Mesh.ARRAY_CUSTOM0]!=null,"Every vertex carries strand tangents and stable root-space pattern attributes")

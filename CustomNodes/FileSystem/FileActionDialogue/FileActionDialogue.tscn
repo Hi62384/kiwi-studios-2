@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://cm431qw86wyvs"]
 
 [ext_resource type="StyleBox" uid="uid://ck4h6q1rp4uqc" path="res://resources/StyleBoxes/Default.tres" id="1_3f31n"]
-[ext_resource type="Script" uid="uid://c0ohimns5kdk7" path="res://CustomNodes/FileSystem/FileActionDialogue/file_action_dialogue.gd" id="2_6g0bl"]
+[ext_resource type="Script" path="res://scripts/Extra/FileActionDialogueControl.cs" id="2_6g0bl"]
 [ext_resource type="PackedScene" uid="uid://tkaurlpinqd" path="res://CustomNodes/FileSystem/FileActionDialogue/FileActionPanel.tscn" id="2_7p7ll"]
 [ext_resource type="Texture2D" uid="uid://8vmiy3qcy1nq" path="res://resources/Images/BasicImages/Plus.png" id="3_6g0bl"]
 [ext_resource type="Texture2D" uid="uid://cd70en77xwt7j" path="res://resources/Images/ToolImages/Folder.png" id="4_160du"]

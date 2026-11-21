@@ -9,22 +9,22 @@ func check(value: bool, message: String) -> void:
 func run() -> void:
 	var directory := "user://media_repair_" + ActorData.new_id(); DirAccess.make_dir_recursive_absolute(directory)
 	var samples := PackedVector2Array(); samples.resize(48000)
-	var stream := KiwiAudioSourceCache.to_wav(samples,48000)
+	var stream := KiwiAudioSourceCache.to_wav(samples,48000,true)
 	var destination := directory.path_join("replacement.wav"); stream.save_to_wav(destination)
 	var missing := directory.path_join("missing.wav")
-	var session := KiwiAudioEditSession.new(); session.document=KiwiAudioDocument.from_source(stream)
-	var document := session.document; var clip := document.clips[0]; var actor := document.actors[0]
+	var session := KiwiAudioEditSession.new(); session.document=KiwiAudioDocument.from_source(stream, "")
+	var document: KiwiAudioDocument = session.document; var clip: ActorClip = document.clips[0]; var actor: ActorData = document.actors[0]
 	clip.duration=.5; clip.source_offset=.1
 	actor.values[&"audio"]=missing; actor.values[&"original_audio"]=missing
-	var second := document.add_track("Sampler","instrument"); var sampler_clip := document.insert_source(stream,second.id,0,"Sampler")
-	var sampler := document.actor_for_clip(sampler_clip.id)
+	var second: Dictionary = document.add_track("Sampler","instrument"); var sampler_clip: ActorClip = document.insert_source(stream,second.id,0,"Sampler")
+	var sampler: ActorData = document.actor_for_clip(sampler_clip.id)
 	sampler.values[&"instrument"]={"kind":"multisample","multisamples":[{"sample":missing,"root_pitch":60,"low":0,"high":127}]}
 	document.tracks[0].instrument={"kind":"sampler","sample":missing,"loop_start":.1,"loop_end":.8}
 	document.master.effects=[{"id":"ir","type":"convolution","parameters":{"impulse_path":missing}}]
 	var scan := Repair.scan(document)
 	check(str(scan.error).is_empty() and scan.entries.size()==1,"One review groups active clip, sampler and impulse references")
 	check(scan.entries[0].count==4 and bool(scan.entries[0].missing),"Provenance is excluded while all four active references are reported")
-	var probe := KiwiAudioEditSession.probe_audio_relink(destination)
+	var probe := KiwiAudioEditSession.probe_audio_relink(destination, null)
 	check(str(probe.get("error","")).is_empty(),"Replacement probe accepts a bounded PCM source")
 	var problem := Repair.apply(session,document,session.revision,missing,probe)
 	check(problem.is_empty(),"Matching references are repaired atomically: " + problem)

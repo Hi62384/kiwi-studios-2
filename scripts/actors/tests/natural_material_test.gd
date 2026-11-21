@@ -41,7 +41,7 @@ func run() -> void:
 		actor.set_value(&"material", reference)
 		var runtime := actor_definition.create_runtime(actor)
 		root.add_child(runtime)
-		runtime.evaluate_clip(ActorClip.create(actor), 0.0)
+		runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip), 0.0)
 		var mesh: MeshInstance3D
 		for candidate in runtime.find_children("*", "MeshInstance3D", true, false):
 			mesh = candidate
@@ -53,7 +53,7 @@ func run() -> void:
 			check(is_equal_approx(float(material.get_shader_parameter("texture_size")), 77.0), "Texture size reaches the spatial renderer independently of actor geometry")
 			check(is_equal_approx(float(material.get_shader_parameter("angle")), deg_to_rad(23.0)), "Texture rotation reaches the spatial renderer")
 			check(is_equal_approx(float(material.get_shader_parameter("relief")), 0.4), "Height-derived relief is configured on the spatial renderer")
-			runtime.evaluate_clip(ActorClip.create(actor), 0.2)
+			runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip), 0.2)
 			check(mesh.material_override == material, "Unchanged frames reuse the material allocation")
 			var updated := original.duplicate(true)
 			updated.parameters.primary = Color("2b4d66")
@@ -61,7 +61,7 @@ func run() -> void:
 			updated.mapping = "triplanar"
 			updated.metallic = 0.6
 			object.set_value(&"material_settings", updated)
-			runtime.evaluate_clip(ActorClip.create(actor), 0.4)
+			runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip), 0.4)
 			check(mesh.material_override == material, "Parameter edits update the reusable GPU material in place")
 			check(runtime.get("_natural_settings") == updated, "Runtime consumes current shared parameters")
 			check(material.get_shader_parameter("primary") == updated.parameters.primary, "Edited color reaches the actual shared shader")
@@ -70,10 +70,10 @@ func run() -> void:
 			check(is_equal_approx(float(material.get_shader_parameter("metallic_override")), 0.6), "Metallic override updates live")
 			object.set_value(&"material_settings", original)
 			actor.set_value(&"material", ActorObjectReference.from_object(registry.get_object_definition(&"material").create_object()))
-			runtime.evaluate_clip(ActorClip.create(actor), 0.6)
+			runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip), 0.6)
 			check(mesh.material_override is StandardMaterial3D, "Switching back preserves standard Material behavior")
 			actor.set_value(&"material", ActorObjectReference.from_object(registry.get_object_definition(&"shader_material").create_object()))
-			runtime.evaluate_clip(ActorClip.create(actor), 0.8)
+			runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip), 0.8)
 			check(mesh.material_override is ShaderMaterial and mesh.material_override != material, "ShaderMaterial remains independently available")
 		runtime.free()
 	for type_id: StringName in [&"camera_3d", &"fog_volume"]:

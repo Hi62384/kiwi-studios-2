@@ -1,0 +1,20 @@
+using Godot;
+using System;
+using System.Collections.Generic;
+using Settings=Godot.Collections.Dictionary;
+using GArray=Godot.Collections.Array;
+public partial class BasicActorOperations
+{
+    private static Variant Constant(string key)=>BasicActorDefaults.Constant(key);
+    private static void ApplyRows(GodotObject target,Settings values,GArray rows){foreach(var item in rows){var row=item.AsGodotArray();target.Set(row[0].AsString(),Get(values,row[1].AsString(),row[2]));}}
+    public void update_shape(Node3D owner,int kind){if(kind==owner.Get("_shape_kind").AsInt32())return;owner.Set("_shape_kind",kind);var instance=(MeshInstance3D)Content(owner)!;PrimitiveMesh mesh=kind switch{1=>new SphereMesh(),2=>new CylinderMesh(),3=>new CapsuleMesh(),4=>new PlaneMesh(),5=>new PrismMesh(),6=>new QuadMesh(),7=>new TorusMesh(),_=>new BoxMesh()};instance.Mesh=mesh;apply_shape_properties(mesh,Actor(owner).Get("values").AsGodotDictionary());}
+    public void apply_shape_properties(PrimitiveMesh mesh,Settings values){var rows=Constant("SHAPE_ROWS").AsGodotDictionary();ApplyRows(mesh,values,rows["PrimitiveMesh"].AsGodotArray());if(rows.TryGetValue(mesh.GetClass(),out var specific))ApplyRows(mesh,values,specific.AsGodotArray());}
+    public void apply_directional_light(Node3D owner,Settings values)=>ApplyRows(Content(owner)!,values,Constant("DIRECTIONAL_LIGHT_ROWS").AsGodotArray());
+    public void apply_light(Node3D owner,Settings values){var light=(Light3D)Content(owner)!;light.LightColor=Get(values,"color",Colors.White).AsColor();light.LightEnergy=Get(values,"energy",1.0).AsSingle();light.ShadowEnabled=Get(values,"shadows",true).AsBool();_lighting.apply_light(light,values);if(light is OmniLight3D omni)omni.OmniRange=Get(values,"range",5.0).AsSingle();else if(light is SpotLight3D spot){spot.SpotRange=Get(values,"range",5.0).AsSingle();spot.SpotAngle=Get(values,"spot_angle",45.0).AsSingle();}}
+    public void apply_reflection_probe(Node3D owner,Settings values){var probe=(ReflectionProbe)Content(owner)!;ApplyRows(probe,values,Constant("PROBE_ROWS").AsGodotArray());probe.CullMask=1;}
+    public void apply_decal(Node3D owner,Settings values){var decal=(Decal)Content(owner)!;ApplyRows(decal,values,Constant("DECAL_ROWS").AsGodotArray());decal.TextureAlbedo=texture_for_value(owner,Get(values,"texture"));decal.CullMask=1;}
+    public void apply_particles(Node3D owner,Settings values)
+    {
+        var particles=(GpuParticles3D)Content(owner)!;bool emitting=Get(values,"emitting",true).AsBool();owner.Set("_particle_emitting",emitting);bool active=owner.Get("active").AsBool();if(particles.Emitting!=(active&&emitting))particles.Emitting=active&&emitting;long signature=GD.Hash(new GArray{Get(values,"amount",64),Get(values,"lifetime",1.0),Get(values,"one_shot",false),Get(values,"explosiveness",0.0),Get(values,"direction",Vector3.Up),Get(values,"spread",45.0),Get(values,"velocity",2.0),Get(values,"gravity",new Vector3(0,-9.8f,0)),Get(values,"color",Colors.White),Get(values,"particle_size",.08)});if(signature==owner.Get("_particle_settings_hash").AsInt64())return;owner.Set("_particle_settings_hash",signature);particles.Amount=Math.Max(1,Get(values,"amount",64).AsInt32());particles.Lifetime=Math.Max(.05,Get(values,"lifetime",1.0).AsDouble());particles.OneShot=Get(values,"one_shot",false).AsBool();particles.Explosiveness=Get(values,"explosiveness",0.0).AsSingle();var material=owner.Get("particle_material").As<ParticleProcessMaterial>();if(material!=null){material.Direction=Get(values,"direction",Vector3.Up).AsVector3();material.Spread=Get(values,"spread",45.0).AsSingle();float velocity=Get(values,"velocity",2.0).AsSingle();material.InitialVelocityMin=velocity;material.InitialVelocityMax=velocity;material.Gravity=Get(values,"gravity",new Vector3(0,-9.8f,0)).AsVector3();material.Color=Get(values,"color",Colors.White).AsColor();}if(particles.DrawPass1 is SphereMesh mesh){float radius=Math.Max(.001f,Get(values,"particle_size",.08).AsSingle());mesh.Radius=radius;mesh.Height=radius*2;}
+    }
+}

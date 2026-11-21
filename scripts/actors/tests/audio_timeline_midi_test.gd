@@ -16,7 +16,7 @@ func source(document: KiwiAudioDocument, start: float, duration: float, offset: 
 	actor.id = ActorData.new_id(); actor.type_id = &"audio"; actor.display_name = "Source"
 	actor.values = {&"track_id": track.id, &"instrument": {"id": "piano"}, &"source_bpm": 120.0, &"pattern_beats": 4.0, &"source_duration": 2.0,
 		&"notes": [{"pitch": 60, "start": 1.0, "duration": 2.0, "velocity": 0.8}]}
-	var clip := ActorClip.create(actor, start, duration); clip.source_offset = offset; clip.playback_speed = speed
+	var clip := (load("res://scripts/actors/core/ActorClip.cs").call("create",actor, start, duration) as ActorClip); clip.source_offset = offset; clip.playback_speed = speed
 	document.actors.append(actor); document.clips.append(clip)
 	return actor
 

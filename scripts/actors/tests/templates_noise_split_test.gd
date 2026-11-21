@@ -54,7 +54,7 @@ func run() -> void:
 	image_actor.set_value(&"material", ActorObjectReference.from_object(shader_object))
 	var runtime := image_def.create_runtime(image_actor)
 	root.add_child(runtime)
-	runtime.evaluate_clip(ActorClip.create(image_actor), 0)
+	runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",image_actor) as ActorClip), 0)
 	var mesh := runtime.get_child(0) as MeshInstance3D
 	check((mesh.material_override as ShaderMaterial).get_shader_parameter(&"mask_texture") is Texture2D,
 		"Shader sampler accepts an embedded Noise Image")

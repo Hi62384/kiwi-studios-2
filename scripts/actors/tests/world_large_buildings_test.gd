@@ -1,9 +1,9 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Settlements=preload("res://Workspaces/EnvironmentWorkspace/world/world_settlement.gd")
-const Buildings=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Buildings=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 func run() -> void:
-	var source:=preload("res://Workspaces/EnvironmentWorkspace/world/world_source.gd").new(); source.dimensions=Vector2(2048,2048); source.configure_regions(); source.max_building_plots=512; source.eager_building_limit=0; source.connect_settlements=false
-	var template: Resource=Buildings.rectangular(8.,8.,1,false)
+	var source:=preload("res://Workspaces/EnvironmentWorkspace/world/WorldSource.cs").new(); source.dimensions=Vector2(2048,2048); source.configure_regions(); source.max_building_plots=512; source.eager_building_limit=0; source.connect_settlements=false
+	var template: Resource=(load("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs").call("rectangular",8.,8.,1,false) as BuildingSource)
 	for index in 8:
 		var x:=float(index%4)*240.-360.; var z:=float(index/4)*240.-120.
 		source.settlements.append({"id":"large-settlement-"+str(index),"name":"District "+str(index),"profile":"Town","center":Vector3(x,0.,z),"radius":72.,"blocks":6,"seed":100+index,"enabled":true,"locked":false,"template":template,"height_min":1,"height_max":2,"setback":2.})

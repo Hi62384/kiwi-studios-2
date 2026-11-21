@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://nk3th1hepl7n"]
 
-[ext_resource type="Script" uid="uid://65nr6lacg13d" path="res://CustomNodes/Freecam/Freecam.gd" id="1_q8las"]
+[ext_resource type="Script" path="res://scripts/Extra/FreecamController.cs" id="1_q8las"]
 
 [node name="Freecam" type="Node3D" unique_id=1750300459]
 script = ExtResource("1_q8las")

@@ -1,0 +1,18 @@
+using Godot;
+using System;
+using System.Linq;
+using System.Collections.Generic;
+using Settings=Godot.Collections.Dictionary;
+using GArray=Godot.Collections.Array;
+public partial class FogMeshOperations:RefCounted
+{
+    private readonly VolumeSamplerOperations _sampler=new();
+    private GDScript Script=>GD.Load<GDScript>("res://scripts/actors/fog/fog_mesh.gd");
+    private Settings State(string name)=>Script.Get(name).AsGodotDictionary();
+    public Settings prepare(string path)
+    {
+        if(path.Length==0||!ResourceLoader.Exists(path))return new Settings{["error"]="Choose a saved closed Mesh resource."};long length=0;using(var file=Godot.FileAccess.Open(path,Godot.FileAccess.ModeFlags.Read)){if(file!=null)length=(long)file.GetLength();}var stamp=new Vector2I(unchecked((int)Godot.FileAccess.GetModifiedTime(path)),unchecked((int)length));var stamps=State("stamps");bool reload=stamps.TryGetValue(path,out var oldStamp)&&oldStamp.AsVector2I()!=stamp;stamps[path]=stamp;var mesh=ResourceLoader.Load(path,"",reload?ResourceLoader.CacheMode.Ignore:ResourceLoader.CacheMode.Reuse) as Mesh;if(mesh==null)return new Settings{["error"]="The boundary must be a Mesh resource."};if(reload)mesh.TakeOverPath(path);long identity=unchecked((long)mesh.GetInstanceId());var revisions=State("revisions");if(!revisions.ContainsKey(identity)){revisions[identity]=0;mesh.Changed+=()=>revisions[identity]=revisions.GetValueOrDefault(identity,0).AsInt64()+1;}string Key()=>GD.Hash(new GArray{path,stamp,identity,revisions[identity]}).ToString(System.Globalization.CultureInfo.InvariantCulture);var cache=State("cache");string key=Key();if(cache.TryGetValue(key,out var cached))return cached.AsGodotDictionary();var surfaces=new GArray();int triangles=0;
+        for(int index=0;index<mesh.GetSurfaceCount();index++){if(mesh is ArrayMesh arrayMesh&&arrayMesh.SurfaceGetPrimitiveType(index)!=Mesh.PrimitiveType.Triangles)return new Settings{["error"]="Boundary surfaces must contain triangles."};var arrays=mesh.SurfaceGetArrays(index);surfaces.Add(arrays);var indices=arrays[(int)Mesh.ArrayType.Index].VariantType==Variant.Type.Nil?System.Array.Empty<int>():arrays[(int)Mesh.ArrayType.Index].AsInt32Array();var vertices=arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();triangles+=(indices.Length>0?indices.Length:vertices.Length)/3;if(triangles>10000)return new Settings{["error"]="Fog boundaries support at most 10,000 triangles. Use a simplified closed mesh."};}
+        var checkedMesh=_sampler.closed_mesh(new Settings{["meshes"]=new GArray{new Settings{["local"]=Transform3D.Identity,["surfaces"]=surfaces}}});if(checkedMesh["error"].AsString().Length>0){cache[key]=checkedMesh;return checkedMesh;}var bounds=checkedMesh["bounds"].AsAabb();if(bounds.Size.X<=.00001f||bounds.Size.Y<=.00001f||bounds.Size.Z<=.00001f)return new Settings{["error"]="The boundary must enclose a three-dimensional interior."};const int size=32;var slices=new Godot.Collections.Array<Image>();ulong started=Time.GetTicksUsec();var triangleMesh=checkedMesh["mesh"].As<TriangleMesh>();for(int z=0;z<size;z++){var bytes=new byte[size*size];for(int y=0;y<size;y++)for(int x=0;x<size;x++){var point=bounds.Position+(new Vector3(x,y,z)+Vector3.One*.5f)/size*bounds.Size;bytes[y*size+x]=_sampler.inside(triangleMesh,point,bounds.Size.Length()*3)?(byte)255:(byte)0;}slices.Add(Image.CreateFromData(size,size,false,Image.Format.R8,bytes));}var texture=new ImageTexture3D();texture.Create(Image.Format.R8,size,size,size,false,slices);var result=new Settings{["error"]="",["texture"]=texture,["source"]=mesh,["slices"]=slices,["milliseconds"]=(Time.GetTicksUsec()-started)/1000.0};if(cache.Count>=4)cache.Remove(cache.Keys.First());cache[Key()]=result;return result;
+    }
+}

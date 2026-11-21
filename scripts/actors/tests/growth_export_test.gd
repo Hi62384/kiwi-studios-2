@@ -1,7 +1,7 @@
 extends "res://scripts/actors/tests/destruction_authoring_workspace_test.gd"
 func run() -> void:
 	root.size=Vector2i(1400,900); root.gui_embed_subwindows=true
-	var folder:=ProjectSettings.globalize_path("user://growth-export-"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.new("Growth validation"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.loaded_project=project
+	var folder:=ProjectSettings.globalize_path("user://growth-export-"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.create("Growth validation"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.set_loaded_project(project)
 	var session:=KiwiModelSession.new(); session.add("Plane",{"size":Vector3(.8,1,.8)}); KiwiSurfaceGrowth.add(session,0); session.primary().title="Baked export hair"; var growth:=session.primary().growth; growth.settings.density=150.; growth.settings.length=.4; growth.rendering.gpu_threshold=1; growth.appearance.emission=Color(.2,.5,.1); session.document.prepare_growth(); var source:=folder.path_join("Hair.tres"); ResourceSaver.save(session.document,source)
 	var main: Node=load("res://scenes/Main.tscn").instantiate(); root.add_child(main); await settle(12); editor=(get_first_node_in_group("actor_scene_tabs") as ActorSceneTabs).timeline; editor.model.create_actor(editor.registry.get_definition(&"basic_mesh"),0,{&"mesh_path":source}); await settle(4)
 	var actor: ActorData

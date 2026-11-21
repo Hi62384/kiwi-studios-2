@@ -17,7 +17,7 @@ func spectral_center(samples:PackedVector2Array,start:int,rate:int,low:float,hig
 func _initialize()->void:
  var rate:=48000;var samples:=PackedVector2Array();samples.resize(rate*3)
  for i in samples.size():samples[i]=Vector2.ONE*sin(TAU*440*i/rate)*0.2
- var source:=KiwiAudioSourceCache.to_wav(samples,rate)
+ var source:=KiwiAudioSourceCache.to_wav(samples,rate,true)
  var dir:=ProjectSettings.globalize_path("user://pitch_automation_test/"+ActorData.new_id());DirAccess.make_dir_recursive_absolute(dir)
  var results:Array=[]
  for type in ["hq_pitch","formant","time_warp","audio_fm","distance"]:
@@ -27,15 +27,15 @@ func _initialize()->void:
    for limit in ["min","max"]:
     var copy:=effect.duplicate(true);copy.parameters[field.id]=field[limit];variants.append(copy)
   for i in variants.size():
-   var doc:=KiwiAudioDocument.from_source(source);doc.master.volume_db=0;doc.actors[0].values[&"effects"]=[variants[i]]
+   var doc:=KiwiAudioDocument.from_source(source, "");doc.master.volume_db=0;doc.actors[0].values[&"effects"]=[variants[i]]
    var result:=KiwiAudioRenderer.render(doc,dir.path_join(type+"_"+str(i)+".wav"),{"sample_rate":rate,"bit_depth":16,"include_tail":false})
    check(result.get("success",false),type+" variant "+str(i)+": "+str(result.get("error","")));results.append(result)
- var doc:=KiwiAudioDocument.from_source(source);doc.master.volume_db=0
+ var doc:=KiwiAudioDocument.from_source(source, "");doc.master.volume_db=0
  doc.actors[0].values[&"automation"]={"pitch":[{"time":0,"value":1,"curve":"hold"},{"time":1.5,"value":2,"curve":"hold"}]}
  var result:=KiwiAudioRenderer.render(doc,dir.path_join("bend.wav"),{"sample_rate":rate,"bit_depth":16,"include_tail":false})
  check(result.get("success",false),"clip pitch automation render")
  if result.get("success",false):
-  var data:PackedVector2Array=KiwiAudioSourceCache.decode(AudioStreamWAV.load_from_file(result.path),rate).samples
+  var data:PackedVector2Array=KiwiAudioSourceCache.decode(AudioStreamWAV.load_from_file(result.path),rate,0.0,-1.0,300.0).samples
   var first:=frequency(data,24000,8192,rate);var second:=frequency(data,108000,8192,rate)
   print("PITCH_BEND ",first," -> ",second)
   check(absf(spectral_center(data,24000,rate,380,500)-440)<3 and absf(spectral_center(data,108000,rate,810,950)-880)<3,"pitch ratio automation changes actual frequency")
@@ -45,7 +45,7 @@ func _initialize()->void:
  result=KiwiAudioRenderer.render(doc,dir.path_join("effect_bend.wav"),{"sample_rate":rate,"bit_depth":16,"include_tail":false})
  check(result.get("success",false),"effect pitch automation render")
  if result.get("success",false):
-  var data:PackedVector2Array=KiwiAudioSourceCache.decode(AudioStreamWAV.load_from_file(result.path),rate).samples
+  var data:PackedVector2Array=KiwiAudioSourceCache.decode(AudioStreamWAV.load_from_file(result.path),rate,0.0,-1.0,300.0).samples
   check(absf(spectral_center(data,108000,rate,810,950)-880)<3,"effect automation command reaches Rubber Band")
  var file:=FileAccess.open("user://pitch_automation_results.json",FileAccess.WRITE);file.store_string(JSON.stringify(results," "));file.close()
  print("PITCH_AUTOMATION directory=",dir," failures=",failures);quit(failures)

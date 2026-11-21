@@ -6,7 +6,7 @@ func run() -> void:
 		if item.mesh!=null: count+=1
 	var renderer:=KiwiEnvironmentRuntime.new(); renderer.progressive=true; renderer.upload_budget_usec=1; root.add_child(renderer); renderer.set_process(false); renderer.configure(session.environment())
 	check(count>64 and renderer.pending_assets.size()==count,"Large building previews queue native component uploads before rendering all meshes")
-	var bridge: Node=load("res://Workspaces/EnvironmentWorkspace/environment_actor.gd").new(); bridge.content=renderer
+	var bridge: Node=load("res://Workspaces/EnvironmentWorkspace/EnvironmentActorRuntime.cs").new(); bridge.content=renderer
 	check(not bridge.physics_geometry_ready(),"Scene physics waits while generated structural collision is still uploading")
 	renderer._process(0.); check(renderer.pending_assets.size()==count-1,"A tiny upload budget installs one real building mesh per scheduling pass")
 	var passes:=0

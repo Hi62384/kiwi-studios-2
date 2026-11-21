@@ -41,7 +41,7 @@ func _run() -> void:
 	model.history.redo()
 	assert(is_equal_approx(clip.duration, 1.5))
 	assert(is_equal_approx(float(actor.get_value(&"pitch")), 1.0))
-	var wave := ActorAudioSystem._decode(ActorAudio.source(path))
+	var wave := ActorAudioSystem._decode((load("res://scripts/actors/core/ActorAudio.cs").call("source",path) as AudioStream))
 	assert(wave.size() == 4096 and wave[100] > 0.1)
 	var system := ActorAudioSystem.new()
 	root.add_child(system)
@@ -90,10 +90,10 @@ func _run() -> void:
 	editor.audio_system._process(0.13)
 	assert(not editor.audio_system.players[displayed.id].playing)
 	for frame in 5: await process_frame
-	var envelope := editor.audio_system.waveform(ActorAudio.source(path))
+	var envelope := editor.audio_system.waveform((load("res://scripts/actors/core/ActorAudio.cs").call("source",path) as AudioStream))
 	while envelope.is_empty():
 		await process_frame
-		envelope = editor.audio_system.waveform(ActorAudio.source(path))
+		envelope = editor.audio_system.waveform((load("res://scripts/actors/core/ActorAudio.cs").call("source",path) as AudioStream))
 	assert(envelope.size() == 4096)
 	editor.free()
 	await process_frame

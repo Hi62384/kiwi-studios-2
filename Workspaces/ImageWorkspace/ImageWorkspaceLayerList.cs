@@ -1,0 +1,24 @@
+using Godot;
+using System;
+using GArray=Godot.Collections.Array;
+public partial class ImageWorkspaceOperations
+{
+    public void selection_changed(Control owner){finish_pending(owner);refresh_layers(owner);owner.Call("_refresh_inspector");owner.Call("_refresh_context");var canvas=Canvas(owner);canvas.QueueRedraw();_canvas.sync_pixel_selection(canvas);if(canvas.Get("tool").AsString()=="pixel_select")owner.Call("_prepare_pixel_selection");}
+    public void refresh_layers(Control owner){if(owner.Get("document").AsGodotObject()==null)return;if(owner.Get("_tree_selection_pending").AsBool())apply_tree_selection(owner);owner.Set("_syncing",true);var tree=owner.Get("layer_tree").As<Tree>();tree.Clear();var root=tree.CreateItem();tree_children(owner,root,"");owner.Set("_syncing",false);}
+    public Texture2D small_layer_icon(Control owner,string key){var icons=owner.Get("_icons").AsGodotDictionary();string cache="small_"+key;if(!icons.ContainsKey(cache)){using var bitmap=icon(owner,key).GetImage();bitmap.Resize(14,14,Image.Interpolation.Lanczos);icons[cache]=ImageTexture.CreateFromImage(bitmap);}return icons[cache].As<Texture2D>();}
+    public void tree_children(Control owner,TreeItem parent,string parentId)
+    {
+        var document=Document(owner);var children=_documents.children(document,parentId);children.Reverse();string filter=owner.Get("_layer_filter").AsString().ToLowerInvariant();var tree=owner.Get("layer_tree").As<Tree>();var selected=Canvas(owner).Get("selected").AsGodotArray();foreach(var value in children){var layer=value.As<Resource>();string kind=layer.Get("kind").AsString(),label=layer.Get("label").AsString();if(filter.Length>0&&!label.ToLowerInvariant().Contains(filter,StringComparison.Ordinal)&&kind!="group")continue;var item=tree.CreateItem(parent);item.SetText(0,label);item.SetMetadata(0,layer.Get("id"));item.SetEditable(0,true);item.SetIcon(0,icon(owner,kind));item.SetIconMaxWidth(0,15);item.AddButton(0,small_layer_icon(owner,layer.Get("visible").AsBool()?"eye":"hidden"),0,false,"Toggle visibility");item.AddButton(0,small_layer_icon(owner,layer.Get("isolated").AsBool()?"isolated":"isolate"),2,false,"Isolate layer · Multiple layers can be isolated");item.AddButton(0,small_layer_icon(owner,layer.Get("locked").AsBool()?"lock":"unlock"),1,false,"Toggle lock");if(layer.Get("mask").AsGodotObject()!=null)item.SetTooltipText(0,"Layer mask attached");if(selected.Contains(layer.Get("id")))item.Select(0);if(_documents.children(document,layer.Get("id").AsString()).Count>0)tree_children(owner,item,layer.Get("id").AsString());}
+    }
+    public void tree_selected(Control owner,TreeItem? item,bool selected){if(owner.Get("_syncing").AsBool())return;if(selected&&item!=null)owner.Set("_tree_main_id",item.GetMetadata(0).AsString());if(!owner.Get("_tree_selection_pending").AsBool()){owner.Set("_tree_selection_pending",true);owner.CallDeferred("_apply_tree_selection");}}
+    public void apply_tree_selection(Control owner)
+    {
+        if(!owner.Get("_tree_selection_pending").AsBool())return;owner.Set("_tree_selection_pending",false);var chosen=new GArray();var tree=owner.Get("layer_tree").As<Tree>();var current=tree.GetNextSelected(null);while(current!=null){chosen.Add(current.GetMetadata(0).AsString());current=tree.GetNextSelected(current);}string main=owner.Get("_tree_main_id").AsString();if(chosen.Contains(main)){chosen.Remove(main);chosen.Add(main);}var canvas=Canvas(owner);_canvas.cancel_gesture(canvas);Assign(canvas.Get("selected").AsGodotArray(),chosen);if(canvas.Get("tool").AsString()=="path")owner.Call("_set_tool","move");owner.Call("_refresh_inspector");owner.Call("_refresh_context");canvas.QueueRedraw();_canvas.sync_pixel_selection(canvas);if(canvas.Get("tool").AsString()=="pixel_select")owner.Call("_prepare_pixel_selection");
+    }
+    public void layer_button(Control owner,TreeItem item,int id){var layer=_documents.layer_for_id(Document(owner),item.GetMetadata(0).AsString());if(layer==null)return;Action(owner,()=>{string key=id==0?"visible":id==2?"isolated":"locked";layer.Set(key,!layer.Get(key).AsBool());});}
+    public void layer_context(Control owner)
+    {
+        var popup=new PopupMenu();owner.AddChild(popup);var entries=new[]{("Duplicate   Ctrl+D","duplicate_layers"),("Copy   Ctrl+C","copy_layers"),("Paste   Ctrl+V","paste_layers"),("Fill parent / canvas","fill_selected_to_parent"),("Restore drawing / erasing","restore_layer_paint"),("Merge into basic layer","merge_selected"),("Parent to last selected   Ctrl+G","parent_selected"),("Unparent","unparent_selected"),("Copy style","copy_style"),("Paste style","paste_style"),("Delete","delete_selected")};foreach(var entry in entries)popup.AddItem(entry.Item1);popup.IdPressed+=index=>owner.Call(entries[(int)index].Item2);popup.PopupHide+=popup.QueueFree;popup.Position=(Vector2I)owner.GetGlobalMousePosition();popup.Popup();
+    }
+
+}

@@ -1,7 +1,7 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Workspace=preload("res://Workspaces/EnvironmentWorkspace/environment_workspace.gd")
 func run() -> void:
-	root.size=Vector2i(1440,900); var folder:=ProjectSettings.globalize_path("user://terrain-cave-workspace"); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.new("Cave workspace"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.loaded_project=project
+	root.size=Vector2i(1440,900); var folder:=ProjectSettings.globalize_path("user://terrain-cave-workspace"); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.create("Cave workspace"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.set_loaded_project(project)
 	var document:=KiwiEnvironmentDocument.new(); var terrain:=KiwiEnvironmentTerrain.new(); terrain.resolution=33; terrain.dimensions=Vector2(16,16); var item:=document.add_terrain(terrain); var workspace:=Workspace.new(); root.add_child(workspace); workspace.open_source(document); workspace.session.select(item.id)
 	for i in 5: await process_frame
 	workspace._add_cave(1); check(workspace._generation_jobs.size()==1 and workspace.session.environment().terrain(item.id).caves.is_empty(),"Adding a tunnel starts worker generation without committing unfinished cave fields")

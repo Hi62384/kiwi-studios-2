@@ -223,360 +223,63 @@ var _copy_revision := 0
 
 
 func _ready() -> void:
-	name = "ShaderDocumentation"
-	size = Vector2i(980, 700)
-	min_size = Vector2i(720, 500)
-	transparent_bg = false
-	borderless = false
-	title = "Shader Documentation, Samples & Templates"
-	add_theme_stylebox_override("panel", _style(SURFACE, BORDER, 1, 12, 0))
-
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 18)
-	margin.add_theme_constant_override("margin_top", 16)
-	margin.add_theme_constant_override("margin_right", 18)
-	margin.add_theme_constant_override("margin_bottom", 18)
-	add_child(margin)
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var root := VBoxContainer.new()
-	_page_root = root
-	root.add_theme_constant_override("separation", 14)
-	margin.add_child(root)
-	root.add_child(_build_header())
-	sections.add_tab("Documentation")
-	sections.add_tab("Shader Samples")
-	sections.add_tab("Shader Templates")
-	sections.tab_changed.connect(_section_changed)
-	root.add_child(sections)
-	documentation_body = _build_body()
-	root.add_child(documentation_body)
-	search.text_changed.connect(_filter_topics)
-	_filter_topics("")
-	if not _filtered_indices.is_empty(): _select_topic(_filtered_indices[0])
-
+	_native_docs().ready(self)
 
 func open() -> void:
-	popup_centered_clamped(Vector2i(1300, 850), 0.94)
-	search.grab_focus()
-
+	_native_docs().open(self)
 
 func open_samples(templates: bool = false) -> void:
-	open()
-	sections.current_tab = 2 if templates else 1
-
+	_native_docs().open_samples(self,templates)
 
 func _section_changed(index: int) -> void:
-	documentation_body.visible = index == 0
-	if index > 0 and sample_browser == null:
-		sample_browser = SampleBrowser.new()
-		sample_browser.templates_only = index == 2
-		sample_browser.open_requested.connect(func(entry: Dictionary): sample_open_requested.emit(entry))
-		_page_root.add_child(sample_browser)
-	if sample_browser != null:
-		sample_browser.visible = index > 0
-		if index > 0: sample_browser.set_templates(index == 2)
-
+	_native_docs().section_changed(self,index)
 
 func _build_header() -> Control:
-	var hero := PanelContainer.new()
-	hero.add_theme_stylebox_override("panel", _style(Color("162a35"), Color("366172"), 1, 12, 16))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
-	hero.add_child(row)
-	var mark := Label.new()
-	mark.text = "◇"
-	mark.add_theme_font_size_override("font_size", 34)
-	mark.add_theme_color_override("font_color", ACCENT)
-	row.add_child(mark)
-	var words := VBoxContainer.new()
-	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	words.add_theme_constant_override("separation", 2)
-	row.add_child(words)
-	var heading := Label.new()
-	heading.text = "SHADER FIELD GUIDE"
-	heading.add_theme_font_size_override("font_size", 20)
-	heading.add_theme_color_override("font_color", TEXT)
-	words.add_child(heading)
-	var subtitle := Label.new()
-	subtitle.text = "Concepts, built-ins, and production-ready patterns—without leaving the editor."
-	subtitle.add_theme_font_size_override("font_size", 12)
-	subtitle.add_theme_color_override("font_color", MUTED)
-	words.add_child(subtitle)
-	var close := Button.new()
-	close.text = "Close  ×"
-	close.custom_minimum_size = Vector2(92, 34)
-	_style_button(close, Color("233441"), Color("36505f"), Color("2d4350"))
-	close.pressed.connect(hide)
-	row.add_child(close)
-	return hero
-
+	return _native_docs().build_header(self)
 
 func _build_body() -> Control:
-	var split := HSplitContainer.new()
-	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	split.split_offset = 245
-	var sidebar := PanelContainer.new()
-	sidebar.custom_minimum_size.x = 225
-	sidebar.add_theme_stylebox_override("panel", _style(Color("131e29"), BORDER, 1, 10, 12))
-	split.add_child(sidebar)
-	var side := VBoxContainer.new()
-	side.add_theme_constant_override("separation", 9)
-	sidebar.add_child(side)
-	search.name = "DocumentationSearch"
-	search.placeholder_text = "Search shader docs…"
-	search.clear_button_enabled = true
-	search.custom_minimum_size.y = 38
-	search.add_theme_color_override("font_color", TEXT)
-	search.add_theme_color_override("font_placeholder_color", MUTED)
-	search.add_theme_stylebox_override("normal", _style(Color("0d151e"), BORDER, 1, 7, 9))
-	search.add_theme_stylebox_override("focus", _style(Color("0d171f"), ACCENT, 1, 7, 9))
-	side.add_child(search)
-	result_count.add_theme_font_size_override("font_size", 10)
-	result_count.add_theme_color_override("font_color", MUTED)
-	side.add_child(result_count)
-	var nav_scroll := ScrollContainer.new()
-	nav_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	nav_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	side.add_child(nav_scroll)
-	topic_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	topic_list.add_theme_constant_override("separation", 4)
-	nav_scroll.add_child(topic_list)
-
-	var content_panel := PanelContainer.new()
-	content_panel.add_theme_stylebox_override("panel", _style(Color("0e161f"), BORDER, 1, 10, 16))
-	split.add_child(content_panel)
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	content_panel.add_child(scroll)
-	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_theme_constant_override("separation", 14)
-	scroll.add_child(content)
-	return split
-
+	return _native_docs().build_body(self)
 
 func _filter_topics(query: String) -> void:
-	_filtered_indices.clear()
-	var needle := query.strip_edges().to_lower()
-	for index in TOPICS.size():
-		var topic := TOPICS[index]
-		var haystack := "%s %s %s %s" % [topic.category, topic.title, topic.summary, topic.body]
-		if needle.is_empty() or haystack.to_lower().contains(needle):
-			_filtered_indices.append(index)
-	result_count.text = "%d TOPICS" % _filtered_indices.size()
-	_rebuild_navigation()
-	if _filtered_indices.is_empty():
-		_show_empty_state(needle)
-	elif not _filtered_indices.has(_selected_index):
-		_select_topic(_filtered_indices[0])
-	else:
-		_update_navigation_selection()
-
+	_native_docs().filter_topics(self,query)
 
 func _rebuild_navigation() -> void:
-	for child in topic_list.get_children():
-		child.queue_free()
-	var previous_category := ""
-	for topic_index in _filtered_indices:
-		var topic := TOPICS[topic_index]
-		if topic.category != previous_category:
-			var category := Label.new()
-			category.text = str(topic.category)
-			category.add_theme_font_size_override("font_size", 9)
-			category.add_theme_color_override("font_color", Color("668395"))
-			category.add_theme_constant_override("outline_size", 1)
-			topic_list.add_child(category)
-			previous_category = topic.category
-		var button := Button.new()
-		button.name = "DocumentationTopic_%d" % topic_index
-		button.text = str(topic.title)
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.custom_minimum_size.y = 36
-		button.toggle_mode = true
-		button.button_pressed = topic_index == _selected_index
-		_style_topic_button(button, button.button_pressed)
-		button.pressed.connect(_select_topic.bind(topic_index))
-		topic_list.add_child(button)
-
+	_native_docs().rebuild_navigation(self)
 
 func _update_navigation_selection() -> void:
-	for node in topic_list.get_children():
-		if node is Button and node.name.begins_with("DocumentationTopic_"):
-			var index := int(node.name.trim_prefix("DocumentationTopic_"))
-			node.set_pressed_no_signal(index == _selected_index)
-			_style_topic_button(node, index == _selected_index)
-
+	_native_docs().update_navigation_selection(self)
 
 func _select_topic(index: int) -> void:
-	if index < 0 or index >= TOPICS.size():
-		return
-	_selected_index = index
-	_update_navigation_selection()
-	for child in content.get_children():
-		child.queue_free()
-	var topic := TOPICS[index]
-	var crumb := Label.new()
-	crumb.text = "%s   /   %s" % [topic.category, topic.tag]
-	crumb.add_theme_font_size_override("font_size", 10)
-	crumb.add_theme_color_override("font_color", ACCENT)
-	content.add_child(crumb)
-	var heading := Label.new()
-	heading.text = str(topic.title)
-	heading.add_theme_font_size_override("font_size", 28)
-	heading.add_theme_color_override("font_color", TEXT)
-	content.add_child(heading)
-	var summary := Label.new()
-	summary.text = str(topic.summary)
-	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	summary.add_theme_font_size_override("font_size", 15)
-	summary.add_theme_color_override("font_color", Color("b9cad5"))
-	content.add_child(summary)
-	var divider := HSeparator.new()
-	divider.add_theme_constant_override("separation", 10)
-	content.add_child(divider)
-	var body := Label.new()
-	body.text = str(topic.body)
-	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_theme_font_size_override("font_size", 13)
-	body.add_theme_color_override("font_color", MUTED)
-	body.custom_minimum_size.y = 52
-	content.add_child(body)
-	content.add_child(_build_code_card(str(topic.code), str(topic.title)))
-	var tip := PanelContainer.new()
-	tip.add_theme_stylebox_override("panel", _style(Color("152529"), Color("29484b"), 1, 8, 10))
-	var tip_label := Label.new()
-	tip_label.text = "TIP  •  Copy the sample, then adjust its uniforms in the Properties panel."
-	tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tip_label.add_theme_font_size_override("font_size", 11)
-	tip_label.add_theme_color_override("font_color", Color("86cbbb"))
-	tip.add_child(tip_label)
-	content.add_child(tip)
+	if not _native_docs().select_topic(self,index): return
 	await get_tree().process_frame
-	if is_instance_valid(scroll):
-		scroll.scroll_vertical = 0
-
+	_native_docs().reset_scroll(self)
 
 func _build_code_card(source: String, topic_title: String) -> Control:
-	var card := PanelContainer.new()
-	card.name = "DocumentationCodeCard"
-	card.add_theme_stylebox_override("panel", _style(Color("0a1119"), Color("2b4555"), 1, 9, 0))
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 0)
-	card.add_child(box)
-	var bar := PanelContainer.new()
-	bar.add_theme_stylebox_override("panel", _style(Color("172633"), Color.TRANSPARENT, 0, 9, 10))
-	box.add_child(bar)
-	var row := HBoxContainer.new()
-	bar.add_child(row)
-	var language := Label.new()
-	language.text = "GODOT SHADER"
-	language.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	language.add_theme_font_size_override("font_size", 9)
-	language.add_theme_color_override("font_color", Color("7896aa"))
-	row.add_child(language)
-	var copy := Button.new()
-	copy.name = "CopyShaderSample"
-	copy.text = "Copy code"
-	copy.tooltip_text = "Copy this sample to the clipboard"
-	copy.custom_minimum_size = Vector2(100, 30)
-	_style_button(copy, ACCENT_SOFT, Color("39716c"), Color("2b5a57"))
-	copy.add_theme_color_override("font_color", ACCENT)
-	copy.pressed.connect(_copy_code.bind(source, copy, topic_title))
-	row.add_child(copy)
-	var sample := CodeEdit.new()
-	sample.name = "DocumentationCodeSample"
-	sample.text = source
-	sample.editable = false
-	sample.gutters_draw_line_numbers = true
-	sample.highlight_current_line = false
-	sample.scroll_fit_content_height = true
-	sample.custom_minimum_size.y = clampf((source.count("\n") + 1) * 22.0 + 18.0, 130.0, 390.0)
-	sample.add_theme_font_size_override("font_size", 13)
-	sample.add_theme_color_override("font_color", Color("d9e6ee"))
-	sample.add_theme_color_override("background_color", Color("0a1119"))
-	sample.syntax_highlighter = _make_highlighter()
-	box.add_child(sample)
-	return card
-
+	return _native_docs().build_code_card(self,source,topic_title)
 
 func _copy_code(source: String, button: Button, _topic_title: String) -> void:
-	DisplayServer.clipboard_set(source)
-	_copy_revision += 1
-	var revision := _copy_revision
-	button.text = "Copied  ✓"
-	button.add_theme_color_override("font_color", Color("b7ffe9"))
+	var revision: int=_native_docs().copy_code(self,source,button)
 	await get_tree().create_timer(1.4).timeout
-	if revision == _copy_revision and is_instance_valid(button):
-		button.text = "Copy code"
-		button.add_theme_color_override("font_color", ACCENT)
-
+	_native_docs().finish_copy(self,revision,button)
 
 func _show_empty_state(query: String) -> void:
-	for child in content.get_children():
-		child.queue_free()
-	var spacer := Control.new()
-	spacer.custom_minimum_size.y = 100
-	content.add_child(spacer)
-	var icon := Label.new()
-	icon.text = "⌕"
-	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	icon.add_theme_font_size_override("font_size", 40)
-	icon.add_theme_color_override("font_color", Color("4b6879"))
-	content.add_child(icon)
-	var heading := Label.new()
-	heading.text = "No shader topics found"
-	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	heading.add_theme_font_size_override("font_size", 20)
-	heading.add_theme_color_override("font_color", TEXT)
-	content.add_child(heading)
-	var help := Label.new()
-	help.text = "Try a broader search than %s." % query
-	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	help.add_theme_color_override("font_color", MUTED)
-	content.add_child(help)
-
+	_native_docs().show_empty_state(self,query)
 
 func _style(bg: Color, border: Color, width: int, radius: int, padding: int) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = bg
-	style.border_color = border
-	style.set_border_width_all(width)
-	style.set_corner_radius_all(radius)
-	style.content_margin_left = padding
-	style.content_margin_top = padding
-	style.content_margin_right = padding
-	style.content_margin_bottom = padding
-	return style
-
+	return _native_docs().style(bg,border,width,radius,padding)
 
 func _style_button(button: Button, normal: Color, border: Color, hover: Color) -> void:
-	button.add_theme_stylebox_override("normal", _style(normal, border, 1, 7, 7))
-	button.add_theme_stylebox_override("hover", _style(hover, ACCENT, 1, 7, 7))
-	button.add_theme_stylebox_override("pressed", _style(Color("173d3b"), ACCENT, 1, 7, 7))
-	button.add_theme_stylebox_override("focus", _style(normal, ACCENT, 1, 7, 7))
-
+	_native_docs().style_button(button,normal,border,hover)
 
 func _style_topic_button(button: Button, selected: bool) -> void:
-	var normal := ACCENT_SOFT if selected else Color.TRANSPARENT
-	var border := Color("3e746e") if selected else Color.TRANSPARENT
-	button.add_theme_stylebox_override("normal", _style(normal, border, 1 if selected else 0, 6, 8))
-	button.add_theme_stylebox_override("pressed", _style(ACCENT_SOFT, Color("3e746e"), 1, 6, 8))
-	button.add_theme_stylebox_override("hover", _style(Color("1b2d39"), Color("314a59"), 1, 6, 8))
-	button.add_theme_stylebox_override("focus", _style(normal, ACCENT, 1, 6, 8))
-	button.add_theme_color_override("font_color", ACCENT if selected else Color("b3c3cd"))
-	button.add_theme_color_override("font_pressed_color", ACCENT)
-	button.add_theme_color_override("font_hover_color", TEXT)
-
+	_native_docs().style_topic_button(button,selected)
 
 func _make_highlighter() -> CodeHighlighter:
-	var highlighter := CodeHighlighter.new()
-	highlighter.number_color = Color("b5cea8")
-	highlighter.symbol_color = Color("d4d4d4")
-	highlighter.function_color = Color("dcdcaa")
-	highlighter.member_variable_color = Color("9cdcfe")
-	for keyword in ["shader_type", "render_mode", "uniform", "varying", "const", "void", "if", "else", "for", "while", "return", "discard"]:
-		highlighter.add_keyword_color(keyword, Color("c792ea"))
-	for type_name in ["float", "int", "uint", "bool", "vec2", "vec3", "vec4", "mat2", "mat3", "mat4", "sampler2D", "samplerCube"]:
-		highlighter.add_keyword_color(type_name, Color("62d6ca"))
-	highlighter.add_color_region("//", "", Color("6a9955"), true)
-	return highlighter
+	return _native_docs().make_highlighter()
+
+
+func _sample_open_requested(entry: Dictionary) -> void:
+	sample_open_requested.emit(entry)
+
+static func _native_docs() -> Object:
+	return Engine.get_singleton("KiwiNativeServices").service("shader_documentation")

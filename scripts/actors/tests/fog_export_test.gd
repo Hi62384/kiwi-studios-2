@@ -2,7 +2,7 @@ extends "res://scripts/actors/tests/destruction_authoring_workspace_test.gd"
 const Appearance=preload("res://scripts/actors/fog/fog_appearance.gd")
 func run() -> void:
 	root.size=Vector2i(1400,900); root.gui_embed_subwindows=true
-	var folder:=ProjectSettings.globalize_path("user://fog-export-"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.new("Fog export validation"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.loaded_project=project
+	var folder:=ProjectSettings.globalize_path("user://fog-export-"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.create("Fog export validation"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.set_loaded_project(project)
 	var main: Node=load("res://scenes/Main.tscn").instantiate(); root.add_child(main); await settle(12); editor=(get_first_node_in_group("actor_scene_tabs") as ActorSceneTabs).timeline
 	var appearance:=Appearance.definition().create_object(); appearance.values[&"emission"]=Color.RED; appearance.values[&"color"]=Color.RED
 	var clip:=editor.model.create_actor(editor.registry.get_definition(&"global_fog"),0,{&"appearance":ActorObjectReference.from_object(appearance),&"density":.5}); var actor:=editor.model.actor_for_id(clip.actor_id)

@@ -1,9 +1,9 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
-const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 const Builder=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_geometry.gd")
 const Buildings=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_session.gd")
 func run() -> void:
-	var source: Resource=Source.rectangular(6,8,1); source.baseboard_height=.12; source.crown_height=.09
+	var source: Resource=(load("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs").call("rectangular",6,8,1) as BuildingSource); source.baseboard_height=.12; source.crown_height=.09
 	var result:=Builder.generate(source); var wall_id: String=source.source_id+":floor0:wall:wall0"; var base: KiwiModelComponent=result.document.component(wall_id+":baseboard"); var crown: KiwiModelComponent=result.document.component(wall_id+":crown")
 	check(result.errors.is_empty() and base!=null and crown!=null,"Optional interior finishes generate actual native profile geometry")
 	var clear:=true; var interior:=true

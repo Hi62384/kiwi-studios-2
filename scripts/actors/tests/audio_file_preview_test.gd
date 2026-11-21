@@ -46,10 +46,10 @@ func run() -> void:
 	path = directory.path_join("float.wav"); wav(path, 32, 3, floats)
 	samples = read(path, 0, 2)
 	check(samples.size() == 2 and samples[0] == Vector2(0.25, 0.25) and samples[1] == Vector2.ZERO, "Float PCM sanitizes nonfinite samples")
-	var envelope := KiwiAudioSourceCache.build_file_envelope(path, KiwiAudioPCMFile.inspect(path))
+	var envelope := KiwiAudioSourceCache.build_file_envelope(path, KiwiAudioPCMFile.inspect(path),null)
 	check(not envelope.levels.is_empty() and envelope.bytes < 1024, "File-backed waveform envelopes use bounded chunk PCM")
 	var actor := ActorData.new(); actor.id = ActorData.new_id(); actor.type_id = &"audio"; actor.values = {&"audio": path}
-	check(is_equal_approx(ActorAudio.file_duration(path), 2.0 / 8000.0), "Shared duration service can inspect PCM without resource decode")
+	check(is_equal_approx(float(load("res://scripts/actors/core/ActorAudio.cs").call("file_duration",path)), 2.0 / 8000.0), "Shared duration service can inspect PCM without resource decode")
 	var header := PackedByteArray(); header.resize(42)
 	for i in 4: header[i] = "fLaC".unicode_at(i)
 	header[4] = 128; header[7] = 34
@@ -60,7 +60,7 @@ func run() -> void:
 	path = directory.path_join("metadata.flac")
 	var file := FileAccess.open(path, FileAccess.WRITE); file.store_buffer(header); file.close()
 	check(ActorAudio._flac_pcm_bytes(path) == frames * 4, "FLAC PCM guard reads STREAMINFO fields rather than MD5 bytes")
-	check(is_equal_approx(ActorAudio.file_duration(path), 2.0), "FLAC duration is metadata-only; fake payload is never decoded")
+	check(is_equal_approx(float(load("res://scripts/actors/core/ActorAudio.cs").call("file_duration",path)), 2.0), "FLAC duration is metadata-only; fake payload is never decoded")
 	for name in DirAccess.open(directory).get_files(): DirAccess.remove_absolute(directory.path_join(name))
 	DirAccess.remove_absolute(directory)
 	print("AUDIO_FILE_PREVIEW checks=%d failures=%d" % [checks, failures])

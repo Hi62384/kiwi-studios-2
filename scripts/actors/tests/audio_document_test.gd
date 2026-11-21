@@ -8,10 +8,10 @@ func check(ok:bool,label:String)->void:
 func _initialize()->void:
  var samples:=PackedVector2Array();samples.resize(4800)
  for i in samples.size():samples[i]=Vector2(0.1*sin(TAU*400*i/48000.0),0.05*cos(TAU*900*i/48000.0))
- var source:=KiwiAudioSourceCache.to_wav(samples,48000)
+ var source:=KiwiAudioSourceCache.to_wav(samples,48000,true)
  var original:=KiwiAudioDocument.from_source(source,"Document regression")
  check(original.validate().is_empty(),"valid source document")
- var bad:=original.snapshot();bad.clips[0]=null
+ var bad: KiwiAudioDocument =original.snapshot();bad.clips[0]=null
  check(not bad.validate().is_empty(),"null clip rejected without dereference")
  bad=original.snapshot();bad.actors[0]=null
  check(not bad.validate().is_empty(),"null actor rejected without dereference")
@@ -48,7 +48,7 @@ func _initialize()->void:
  check(deep.validate().is_empty(),"2000-track routing validation is iterative")
  deep.tracks[-1].output=deep.tracks[0].id
  check(not deep.validate().is_empty(),"deep routing feedback rejected")
- var copy:=original.snapshot();copy.actors[0].values[&"notes"]=[{"pitch":60}];copy.tracks[0].volume_db=-20
+ var copy: KiwiAudioDocument =original.snapshot();copy.actors[0].values[&"notes"]=[{"pitch":60}];copy.tracks[0].volume_db=-20
  check(original.actors[0].values[&"notes"].is_empty() and original.tracks[0].volume_db==0,"snapshot metadata independently editable")
  check(copy.actors[0].values[&"audio"]==source,"snapshot shares immutable source identity")
  var session:=KiwiAudioEditSession.new();session.open(original)
@@ -65,8 +65,8 @@ func _initialize()->void:
  var fitted:=KiwiAudioSourceCache.fit_pattern(source,0.25)
  check(fitted.data.size()==12000*4,"pattern fitting is sample exact")
  check(KiwiAudioSourceCache.fit_pattern(source,INF)==null,"infinite pattern length rejected")
- var token:=KiwiAudioJobs.Work.new();token.cancel()
+ var token:=AudioWorkToken.new();token.cancel()
  check(KiwiAudioSourceCache.build_envelope(source,token).get("cancelled",false),"waveform job cancellation")
- check(KiwiAudioInstruments.render_notes([{"pitch":60,"start":0,"duration":100}],{"id":"poly"},120,44100,token)==null,"instrument job cancellation")
+ check(KiwiAudioInstruments.render_notes([{"pitch":60,"start":0,"duration":100}],{"id":"poly"},120,44100,token, [], 1.0)==null,"instrument job cancellation")
  print("AUDIO_DOCUMENT checks=",checks," failures=",failures)
  quit(failures)

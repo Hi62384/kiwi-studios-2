@@ -15,7 +15,7 @@ func run()->void:
 	check(recorder.timeline_effect==null and recorder._timeline_writer!=null,"Native recording has no whole-take AudioEffectRecord buffer")
 	var data:=PackedVector2Array();data.resize(96000)
 	for i in data.size():data[i]=Vector2(.2*sin(TAU*440*i/48000.),.1*sin(TAU*660*i/48000.))
-	var player:=AudioStreamPlayer.new();root.add_child(player);player.bus=recorder.timeline_bus_name;player.stream=KiwiAudioSourceCache.to_wav(data,48000);player.play()
+	var player:=AudioStreamPlayer.new();root.add_child(player);player.bus=recorder.timeline_bus_name;player.stream=KiwiAudioSourceCache.to_wav(data,48000,true);player.play()
 	await create_timer(1.25).timeout;player.stop()
 	var captured:Dictionary=await recorder.stop_to_files()
 	check(str(captured.get("error","")).is_empty() and captured.get("paths",[]).size()==1,"Native Stop produces a recoverable disk WAV")

@@ -1,10 +1,10 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
-const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 const Layout=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_layout.gd")
 const Builder=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_geometry.gd")
 const Collision=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_collision.gd")
 func run() -> void:
-	var memory:=OS.get_static_memory_usage(); var source: Resource=Source.rectangular(24,32,8); var layout:=Layout.generate(source,12,2.); check(layout.errors.is_empty(),"Eight-level constrained plan generates 96 separate rooms with hallways")
+	var memory:=OS.get_static_memory_usage(); var source: Resource=(load("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs").call("rectangular",24,32,8) as BuildingSource); var layout:=Layout.generate(source,12,2.); check(layout.errors.is_empty(),"Eight-level constrained plan generates 96 separate rooms with hallways")
 	var start:=Time.get_ticks_usec(); var output:=Builder.generate(layout.source); var generation_ms:=float(Time.get_ticks_usec()-start)/1000.; var document:=output.document as KiwiModelDocument
 	check(document!=null and output.errors.is_empty() and document.components.size()>500,"Large building produces complete valid native component geometry")
 	if document==null: quit(1); return

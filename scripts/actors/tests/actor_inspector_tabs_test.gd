@@ -19,8 +19,8 @@ func run() -> void:
 	root.size = Vector2i(1440, 1000); root.gui_embed_subwindows = true
 	var folder := ProjectSettings.globalize_path("user://inspector_tabs_" + ActorData.new_id())
 	DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash"))
-	var project := Project.new("Inspector tab verification")
-	ResourceSaver.save(project, folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.loaded_project = project
+	var project := Project.create("Inspector tab verification")
+	ResourceSaver.save(project, folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.set_loaded_project(project)
 	var main: Node = load("res://scenes/Main.tscn").instantiate(); root.add_child(main); await settle(10)
 	var tabs := get_first_node_in_group("actor_scene_tabs") as ActorSceneTabs
 	var editor := tabs.timeline; var model := editor.model; var inspector := editor.inspector
@@ -90,9 +90,9 @@ func run() -> void:
 	var custom := ActorDefinition.new(); custom.type_id = &"inspector_fixture_2d"; custom.display_name = "Inspector fixture"; custom.runtime_scene = shape.runtime_scene; custom.icon = shape.icon
 	custom.properties.assign(shape.properties)
 	for index in 28:
-		var property := ActorProperty.create(StringName("extra_" + str(index)), "Extra value", 1.0, true)
+		var property := (load("res://scripts/actors/core/ActorProperty.cs").call("create",StringName("extra_" + str(index)), "Extra value", 1.0, true) as ActorProperty)
 		property.options.group = "Extra " + str(index); custom.properties.append(property)
-	var repeated := ActorProperty.create(&"repeated_appearance", "Repeated group", 2.0, true); repeated.options.group = "Appearance"; custom.properties.append(repeated)
+	var repeated := (load("res://scripts/actors/core/ActorProperty.cs").call("create",&"repeated_appearance", "Repeated group", 2.0, true) as ActorProperty); repeated.options.group = "Appearance"; custom.properties.append(repeated)
 	check(editor.registry.register(custom), "Register a many-section inspector fixture")
 	var custom_clip := model.create_actor(custom, 12); await settle()
 	check(inspector._sections.size() == 33 and inspector._sections["Properties/Appearance"].content.find_child("repeated_appearance", true, false) != null, "Repeated groups merge into one section without losing any fields")
@@ -120,5 +120,5 @@ func run() -> void:
 	check(inspector.main_tabs.visible and not inspector._inspecting_file and inspector._actor.id == custom_clip.actor_id, "Selecting an actor restores the tabbed inspector after a file preview")
 	model.select(""); await settle()
 	check(not inspector.main_tabs.visible and not inspector.section_scroll.visible, "Clearing the actor selection clears its navigation")
-	main.queue_free(); await settle(); StaticData.loaded_project = null
+	main.queue_free(); await settle(); StaticData.set_loaded_project(null)
 	print("ACTOR_INSPECTOR_TABS checks=%d failures=%d" % [checks, failures]); quit(failures)

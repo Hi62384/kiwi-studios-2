@@ -1,5 +1,5 @@
 extends RefCounted
-const Library=preload("res://Workspaces/ImageWorkspace/texture_material_library.gd")
+const Library=preload("res://scripts/materials/NaturalMaterialCatalog.cs")
 const Source=preload("res://scripts/materials/natural_material_shader_source.gd")
 static var shader_cache: Dictionary={}
 static var noise_cache: Dictionary={}
@@ -75,67 +75,15 @@ void fragment(){float paint_coverage=coverage_opacity*(masked ? texture(coverage
  c.a*=paint_coverage; COLOR=vec4(clamp(c.rgb,vec3(0.),vec3(1.)),c.a);
 }
 """
+static func _native() -> Object:
+ return Engine.get_singleton("KiwiNativeServices").service("image_texture_material_renderer")
+
 static func material(value: KiwiTextureMaterial,extent: Vector2,frame: Transform2D=Transform2D.IDENTITY,straight_output: bool=false) -> ShaderMaterial:
-	var mixed:=value.secondary!=null and value.mix_amount>0
-	var cache_key:=value.material_id+"/"+str(straight_output)+("/"+value.secondary.material_id if mixed else "")
-	if not shader_cache.has(cache_key):
-		var code:=CODE.substr(0,CODE.find("// Single structural evaluator"))+Source.pattern_source(value.material_id)+"\n"+CODE.substr(CODE.find("void fragment()"))
-		code=Source.constants(code,value.material_id)
-		if mixed:
-			var duplicate:=Source.pattern_source(value.secondary.material_id)
-			for key in ["seamless","family","variant","density","thickness","roughness","distortion","detail","knots","contrast","brightness","seed","noise_map","primary","secondary","h","n","cell","line","pattern","raw_pattern","natural_color","natural_surface","nm_fbm","nm_threads","nm_wood","nm_metal","nm_fabric","nm_stone","nm_ground","nm_organic","nm_weather","nm_illustration","nm_geometry","nm_noise"]:
-				var regex:=RegEx.new();regex.compile("\\b"+key+"\\b");duplicate=regex.sub(duplicate,"secondary_"+key,true)
-			code=code.replace("void fragment()",duplicate+"\nvoid fragment()")
-			code=Source.constants(code,value.secondary.material_id,"secondary_")
-		else:
-			var start:=code.find("if(mixer_enabled)");var end:=Source.block_end(code,code.find("{",start))
-			code=code.substr(0,start)+code.substr(end+1)
-		if straight_output: code=code.replace("render_mode unshaded;","render_mode unshaded, blend_disabled;")
-		var compiled:=Shader.new();compiled.code=code
-		if shader_cache.size()>=32: shader_cache.erase(shader_cache.keys()[0])
-		shader_cache[cache_key]=compiled
-	var result:=ShaderMaterial.new();result.shader=shader_cache[cache_key]
-	var family:=Library.CATEGORIES.keys().find(Library.category(value.material_id))
-	result.set_shader_parameter("family",maxi(0,family)); result.set_shader_parameter("variant",Library.variant(value.material_id))
-	var defaults:=Library.create(value.material_id).parameters
-	for key in ["primary","secondary","density","thickness","roughness","distortion","detail","knots","contrast","brightness","seed"]:
-		result.set_shader_parameter(key,value.parameters.get(key,defaults.get(key)))
-	var noise_key:=hash([family,Library.variant(value.material_id),value.parameters.get("seed",0),value.parameters.get("frequency",.035),value.parameters.get("octaves",4),value.parameters.get("gain",.5),value.parameters.get("lacunarity",2)])
-	if not noise_cache.has(noise_key):
-		if noise_cache.size()>=64: noise_cache.erase(noise_cache.keys()[0])
-		var noise:=FastNoiseLite.new(); noise.seed=value.parameters.get("seed",0); noise.frequency=value.parameters.get("frequency",.035); noise.fractal_octaves=value.parameters.get("octaves",4); noise.fractal_gain=value.parameters.get("gain",.5); noise.fractal_lacunarity=value.parameters.get("lacunarity",2)
-		if family==9:
-			noise.noise_type=FastNoiseLite.TYPE_PERLIN if Library.variant(value.material_id)==3 else (FastNoiseLite.TYPE_VALUE if Library.variant(value.material_id) in [1,2] else FastNoiseLite.TYPE_SIMPLEX_SMOOTH)
-		noise_cache[noise_key]=ImageTexture.create_from_image(noise.get_seamless_image(128,128))
-	result.set_shader_parameter("noise_map",noise_cache[noise_key]); result.set_shader_parameter("extent",extent)
-	result.set_shader_parameter("seamless",value.parameters.get("tileable",true)); result.set_shader_parameter("metallic_override",value.metallic)
-	result.set_shader_parameter("texture_size",value.texture_size); result.set_shader_parameter("angle",deg_to_rad(value.rotation))
-	result.set_shader_parameter("origin",frame.origin if value.alignment=="canvas" else (-value.mapping_origin if value.alignment=="stroke" else Vector2.ZERO))
-	result.set_shader_parameter("axis_x",frame.x if value.alignment=="canvas" else Vector2.RIGHT); result.set_shader_parameter("axis_y",frame.y if value.alignment=="canvas" else Vector2.DOWN)
-	result.set_shader_parameter("coverage_map",value.coverage); result.set_shader_parameter("masked",value.coverage!=null)
-	result.set_shader_parameter("base_map",value.source); result.set_shader_parameter("image_map",value.image); result.set_shader_parameter("imported",value.image!=null)
-	if value.image!=null: result.set_shader_parameter("image_aspect",value.image.get_size()/float(maxi(1,mini(value.image.get_width(),value.image.get_height()))))
-	result.set_shader_parameter("tint_strength",value.tint_strength); result.set_shader_parameter("tiling",["repeat","mirror","clamp"].find(value.tiling))
-	result.set_shader_parameter("blend_mode",["replace","overlay","colorize","detail"].find(value.blending))
-	result.set_shader_parameter("relief",value.relief); result.set_shader_parameter("light_angle",deg_to_rad(value.light_direction)); result.set_shader_parameter("highlight",value.highlight); result.set_shader_parameter("shadow",value.shadow)
-	result.set_shader_parameter("relief_softness",value.relief_softness)
-	result.set_shader_parameter("mixer_enabled",value.secondary!=null and value.mix_amount>0)
-	if value.secondary!=null:
-		var second:=value.secondary.copy_material(); second.secondary=null
-		var other:=material(second,extent)
-		for key in ["seamless","family","variant","primary","secondary","density","thickness","roughness","distortion","detail","knots","contrast","brightness","seed","noise_map","image_map","image_aspect","imported","texture_size"]:
-			result.set_shader_parameter("secondary_"+key,other.get_shader_parameter(key))
-		result.set_shader_parameter("secondary_angle",deg_to_rad(second.rotation)); result.set_shader_parameter("mix_amount",value.mix_amount)
-		result.set_shader_parameter("mix_distribution",["uniform","noise","patches","selection"].find(value.mix_distribution)); result.set_shader_parameter("mix_mask",value.mix_mask)
-	return result
+ return _native().material(value,extent,frame,straight_output)
 
 static func preview(host: Node,value: KiwiTextureMaterial,size: Vector2i=Vector2i(256,256),extent: Vector2=Vector2.ZERO,frame: Transform2D=Transform2D.IDENTITY,coordinates: Texture2D=null,coordinate_rect: Rect2=Rect2(0,0,1,1)) -> Image:
-	var viewport:=SubViewport.new(); viewport.disable_3d=true; viewport.transparent_bg=true; viewport.size=size; viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS; host.add_child(viewport)
-	var rect:=ColorRect.new(); rect.size=Vector2(size); rect.material=material(value,extent if extent!=Vector2.ZERO else Vector2(size),frame,true); viewport.add_child(rect)
-	rect.material.set_shader_parameter("has_coordinate_map",coordinates!=null)
-	rect.material.set_shader_parameter("coordinate_map",coordinates)
-	rect.material.set_shader_parameter("coordinate_rect",Vector4(coordinate_rect.position.x,coordinate_rect.position.y,coordinate_rect.size.x,coordinate_rect.size.y))
-	for i in 3:
-		await RenderingServer.frame_post_draw
-		if not is_instance_valid(viewport): return null
-	var image:=viewport.get_texture().get_image(); viewport.queue_free(); return image
+ var viewport: SubViewport=_native().prepare_preview(host,value,size,extent,frame,coordinates,coordinate_rect)
+ for i in 3:
+  await RenderingServer.frame_post_draw
+  if not is_instance_valid(viewport): return null
+ return _native().complete_preview(viewport)

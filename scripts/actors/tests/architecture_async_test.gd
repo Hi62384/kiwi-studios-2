@@ -1,7 +1,7 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Edit=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_edit.gd")
 const Buildings=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_session.gd")
-const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 func send(session: KiwiModelSession,id: String,source: Resource,label: String="Async building") -> void:
 	await Edit.request(session,id,source,label)
 func run() -> void:
@@ -24,7 +24,7 @@ func run() -> void:
 	check(workspace.session!=session and workspace.session.document.components.is_empty() and Buildings.source(session.document.component(id)).roof_pitch==55.,"Switching documents keeps pending generation attached to its original session")
 	next=Source.copy(Edit.source(session,id)); next.roof_pitch=57.; send(session,id,next); session.action("Rename",func(): session.document.component(id).title="Changed while generating"); await Edit.flush(session)
 	check(session.document.component(id).title=="Changed while generating" and Buildings.source(session.document.component(id)).roof_pitch==55.,"A newer history edit cancels an unfinished source result")
-	var job:=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_job.gd").new(); job.cancel(); job.start(Source.copy(Edit.source(session,id)))
+	var job:=preload("res://Workspaces/EnvironmentWorkspace/BuildingGenerationJob.cs").new(); job.cancel(); job.start(Source.copy(Edit.source(session,id)))
 	while not job.complete(): await process_frame
 	check(job.collect().get("cancelled",false),"Cancelled background generation returns no partial document")
 	workspace.queue_free(); await process_frame; print("ARCHITECTURE ASYNC: %d checks, %d failures"%[checks,failures]); quit(failures)

@@ -40,8 +40,8 @@ func run() -> void:
 	check(not editor.model.history.has_undo(), "Scrubbing does not create edit history")
 	editor.canvas.time_selected.emit(2.0)
 	editor.actor_picker.choose(0)
-	var clip := editor.model.clips[0]
-	var actor := editor.model.actors[0]
+	var clip: ActorClip = editor.model.clips[0]
+	var actor: ActorData = editor.model.actors[0]
 	check(clip.start_time == 2.0 and clip.actor_id == actor.id, "Create at cursor via menu")
 	check(not editor.undo_button.disabled, "Toolbar updates after create")
 	# Exercise the same hit testing and drag preview used by the mouse.
@@ -99,22 +99,22 @@ func run() -> void:
 	await process_frame
 	check(editor.model.clips.size() == 1, "Undo shortcut")
 	var other_focus := FocusableKeyInput.new()
-	FocusableKeyInput.current_focused_instance = other_focus
+	FocusableKeyInput.set_focused_instance(other_focus)
 	key = InputEventKey.new()
 	key.pressed = true
 	key.keycode = KEY_DELETE
 	editor._unhandled_key_input(key)
 	check(editor.model.clips.size() == 1, "Other panels cannot trigger timeline deletion")
-	FocusableKeyInput.current_focused_instance = null
+	FocusableKeyInput.set_focused_instance(null)
 	other_focus.free()
 	# Shift-click accumulates a selection, and the last actor clicked becomes the
 	# primary actor used by the inspector and single-actor toolbar actions.
 	var multi_model := ActorTimeline.new()
-	var definition := editor.registry.get_definitions()[0]
+	var definition: ActorDefinition = editor.registry.get_definitions()[0]
 	multi_model.selected_layer = 0
-	var first := multi_model.create_actor(definition, 0.0)
+	var first: ActorClip = multi_model.create_actor(definition, 0.0)
 	multi_model.selected_layer = 1
-	var second := multi_model.create_actor(definition, 0.0)
+	var second: ActorClip = multi_model.create_actor(definition, 0.0)
 	var multi_canvas := ActorTimelineCanvas.new()
 	multi_canvas.model = multi_model
 	multi_canvas.registry = editor.registry
@@ -196,7 +196,7 @@ func run() -> void:
 	multi_canvas.free()
 	# Ctrl+A is scoped to timeline focus and retains the current primary actor.
 	editor.model.selected_layer = 1
-	var select_all_clip := editor.model.create_actor(definition, 10.0)
+	var select_all_clip: ActorClip = editor.model.create_actor(definition, 10.0)
 	editor.canvas.grab_focus()
 	key = InputEventKey.new()
 	key.pressed = true
@@ -239,7 +239,7 @@ func run() -> void:
 	for selected_actor in editor.model.selected_actors():
 		original_parent_ids.append(selected_actor.id)
 	editor.copy_selected()
-	var count_before_paste := editor.model.clips.size()
+	var count_before_paste: int = editor.model.clips.size()
 	editor.paste_copied(true, 20.0, 0)
 	check(editor.model.clips.size() == count_before_paste + original_parent_ids.size() * 2,
 		"Actor-menu paste creates one clipboard copy for every selected parent")

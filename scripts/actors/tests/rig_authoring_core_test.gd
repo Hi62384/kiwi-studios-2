@@ -20,7 +20,7 @@ func run() -> void:
 		check(component.binding!=null and component.binding.validate(rig).is_empty(),method+" weights are finite, nonnegative, normalized and use valid indices")
 		check(component.skin_mesh.get_surface_count()==component.binding.source_mesh.get_surface_count(),method+" preserves mesh surfaces")
 	var binding := component.binding; var source := binding.source_mesh; var original := source.surface_get_arrays(0)
-	var rendered := binding.render_mesh().surface_get_arrays(0)
+	var rendered: Array = binding.render_mesh().surface_get_arrays(0)
 	check(rendered[Mesh.ARRAY_TEX_UV]==original[Mesh.ARRAY_TEX_UV],"Binding preserves UVs")
 	check((rendered[Mesh.ARRAY_BONES] as PackedInt32Array).size()==(rendered[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()*4,"Generated mesh has actual four-bone skin arrays")
 	var before := binding.deformed_points(rig,0); editor.selected_bone=2; var rotation: Vector3=rig.bones[2].rotation; rotation.z+=55.; editor.pose("rotation",rotation)
@@ -60,11 +60,14 @@ func run() -> void:
 	check(session._undo.back().has("custom") and not session._undo.back().has("document"),"Weight history stores sparse vertex deltas, not whole mesh snapshots")
 	session.undo(); check(session.document.component(mesh_id).binding.vertex(0,0)==patch_before.v.values,"Sparse weight painting undo restores the exact previous weights")
 	session.redo(); check(session.document.component(mesh_id).binding.vertex(0,0)=={0:1.},"Sparse weight painting redo restores the correction")
+	var owner_to_release: RefCounted=RefCounted.new(); var expired_owner: WeakRef=weakref(owner_to_release); owner_to_release=null
+	KiwiRigEditor.apply_weight_patch(expired_owner,{})
+	check(expired_owner.get_ref()==null,"Weight-paint history safely ignores an owner after its document closes")
 	var path := "user://Authored Rig.tres"; check(ResourceSaver.save(session.document,path)==OK,"Authored weighted model saves")
 	var saved := ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE) as KiwiModelDocument
 	check(saved!=null and saved.validate().is_empty() and saved.component(mesh_id).binding!=null,"Weighted model reload preserves editable binding data")
 	var preset := editor.preset(); var preset_path := "user://Custom Rig.tres"; ResourceSaver.save(preset,preset_path)
-	check(ResourceLoader.load(preset_path,"",ResourceLoader.CACHE_MODE_IGNORE) is KiwiRigPreset,"Armatures save as standalone reusable preset assets")
+	check(KiwiRigPreset.accepts(ResourceLoader.load(preset_path,"",ResourceLoader.CACHE_MODE_IGNORE)),"Armatures save as standalone reusable preset assets")
 	var reuse := KiwiRigEditor.new(session); check(reuse.load_preset(preset),"Saved armature fits another target without replacing the original rig")
 	var original_bones := rig.bones.size(); editor.rig_id=id; editor.selected_bone=2; editor.duplicate_chain(true); rig=session.document.component(id)
 	check(rig.bones.size()>original_bones and KiwiRigMath.validate(rig.bones).is_empty(),"Mirrored chains preserve valid branching and predictable names")
@@ -75,7 +78,15 @@ func run() -> void:
 	check(mechanical.binding!=null and not mechanical.binding.rigid_bone_id.is_empty() and mechanical.skin==null,"Rigid attachment does not require soft skin weights")
 	var normal_mesh := KiwiModelMesh.from_mesh(source); var immutable: PackedVector3Array=source.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
 	check(normal_mesh.validate().is_empty() and source.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]==immutable,"Binding leaves its immutable source geometry untouched")
-	var job := KiwiRigWeightJob.new(); job.cancel(); check(job.run().is_empty(),"Canceled auto-weight jobs produce no partial bindings")
+	var completed_job: RefCounted=preload("res://Workspaces/ModelWorkspace/rig/RigWeightJob.cs").new()
+	completed_job.tasks.append({"id":mesh_id,"source":source,"bones":rig.bones.duplicate(true),"transform":Transform3D.IDENTITY})
+	var native_worker:=Thread.new(); var worker_start:=native_worker.start(completed_job.run)
+	var native_bindings: Dictionary={}
+	if worker_start==OK:
+		while native_worker.is_alive(): await process_frame
+		native_bindings=native_worker.wait_to_finish()
+	check(worker_start==OK and native_bindings.has(mesh_id) and native_bindings[mesh_id] is KiwiRigBinding,"Native weighting job completes on a worker and returns its owned binding")
+	var job: RefCounted=preload("res://Workspaces/ModelWorkspace/rig/RigWeightJob.cs").new(); job.cancel(); check(job.run().is_empty(),"Canceled auto-weight jobs produce no partial bindings")
 	# Independent islands should not inherit weights from an adjacent part's bone.
 	var pair := KiwiModelMesh.new(); var cube := KiwiModelPrimitives.create("Box",{"size":Vector3(.2,1.,.2)})
 	pair.append_mesh(cube,Transform3D(Basis.IDENTITY,Vector3(-.3,0,0))); pair.append_mesh(cube,Transform3D(Basis.IDENTITY,Vector3(.3,0,0)))
@@ -123,8 +134,8 @@ func run() -> void:
 	var expression := []; expression.resize(Mesh.ARRAY_MAX); expression[Mesh.ARRAY_VERTEX]=PackedVector3Array([Vector3(.1,0,0),Vector3(.1,0,0),Vector3(.1,0,0)]); expression[Mesh.ARRAY_NORMAL]=PackedVector3Array([Vector3.ZERO,Vector3.ZERO,Vector3.ZERO])
 	for surface in 2:
 		attribute_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays,[expression]); attribute_mesh.surface_set_name(surface,"Original surface "+str(surface)); attribute_mesh.surface_set_material(surface,StandardMaterial3D.new())
-	var attribute_skin := KiwiRigWeighting.compute(attribute_mesh,islands.bones,Transform3D(Basis.from_scale(Vector3.ONE*2.),Vector3(3,1,2)),"Distance"); var preserved := attribute_skin.render_mesh()
-	var output := preserved.surface_get_arrays(0); var original_attributes := attribute_mesh.surface_get_arrays(0)
+	var attribute_skin := KiwiRigWeighting.compute(attribute_mesh,islands.bones,Transform3D(Basis.from_scale(Vector3.ONE*2.),Vector3(3,1,2)),"Distance"); var preserved: ArrayMesh = attribute_skin.render_mesh()
+	var output: Array = preserved.surface_get_arrays(0); var original_attributes := attribute_mesh.surface_get_arrays(0)
 	check(preserved.get_surface_count()==2 and preserved.surface_get_material(1)==attribute_mesh.surface_get_material(1) and preserved.surface_get_name(1)==attribute_mesh.surface_get_name(1),"Binding preserves separate surfaces, names and original material objects")
 	check(output[Mesh.ARRAY_COLOR]==original_attributes[Mesh.ARRAY_COLOR] and output[Mesh.ARRAY_TEX_UV2]==original_attributes[Mesh.ARRAY_TEX_UV2],"Binding preserves vertex colors and secondary UVs")
 	check(preserved.get_blend_shape_count()==1 and (preserved.surface_get_blend_shape_arrays(0)[0][Mesh.ARRAY_VERTEX] as PackedVector3Array)[0].distance_to(Vector3(.2,0,0))<.0001,"Relative morph targets preserve names and transform as deltas, not translated positions")

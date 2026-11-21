@@ -1,5 +1,5 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
-const Job=preload("res://Workspaces/EnvironmentWorkspace/environment_generation_job.gd")
+const Job=preload("res://Workspaces/EnvironmentWorkspace/EnvironmentGenerationJob.cs")
 func run() -> void:
 	var source:=KiwiEnvironmentTerrain.new(); source.resolution=33; source.dimensions=Vector2(16,16); source.base_height=-1.; source.hydrology=KiwiTerrainHydrology.new(); source.hydrology.automatic_rivers=false; source.hydrology.automatic_lakes=false; source.hydrology.ocean_enabled=true
 	var job:=Job.new(); job.start(source,{},false)
@@ -18,7 +18,7 @@ func run() -> void:
 		var pixel:=view.get_texture().get_image().get_pixel(120,90); check(pixel.r>pixel.b*1.3 and pixel.r>.1,"A native camera renders the colored water surface with the shared liquid shader")
 	var path:="user://terrain-water.tres"; ResourceSaver.save(document,path); var loaded:=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE) as KiwiEnvironmentDocument; var reopened:=loaded.terrain(item.id)
 	check(reopened.water_valid() and reopened.water_data.mesh.indices==terrain.water_data.mesh.indices,"Saving and reopening retains valid water geometry and editable drainage settings")
-	var actor:=preload("res://Workspaces/EnvironmentWorkspace/environment_actor.gd").new(); root.add_child(actor); actor.source_document=document; actor.content.configure(document); actor.set_active(true); actor.position=Vector3(10,2,0); actor.scale=Vector3.ONE*2.; var world_query:=actor.water_at(Vector3(10,1,0))
+	var actor:=preload("res://Workspaces/EnvironmentWorkspace/EnvironmentActorRuntime.cs").new(); root.add_child(actor); actor.source_document=document; actor.content.configure(document); actor.set_active(true); actor.position=Vector3(10,2,0); actor.scale=Vector3.ONE*2.; var world_query:=actor.water_at(Vector3(10,1,0))
 	check(not world_query.is_empty() and world_query.inside and (world_query.surface as Vector3).is_equal_approx(Vector3(10,2,0)) and is_equal_approx(float(world_query.depth),2.),"Scene actor water surface, bottom and depth respect the full instantiated environment transform")
 	actor.set_timeline_time(2.5); var scene_water:=actor.content.nodes[item.id].get_node("Water") as MeshInstance3D
 	check(is_equal_approx(float((scene_water.material_override as ShaderMaterial).get_shader_parameter("liquid_time")),2.5),"Scene water waves consume manually controlled timeline time")

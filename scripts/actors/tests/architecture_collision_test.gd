@@ -1,10 +1,10 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
-const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 const Builder=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_geometry.gd")
 func runtime_for(document: KiwiModelDocument,id: String,registry: ActorRegistry) -> ActorRuntime:
-	var actor:=registry.get_definition(&"basic_mesh").create_actor(); actor.set_value(&"mesh_path",document); actor.values[&"model_component_id"]=id; var runtime:=registry.get_definition(&"basic_mesh").create_runtime(actor); root.add_child(runtime); runtime.evaluate_clip(ActorClip.create(actor),0.); return runtime
+	var actor:=registry.get_definition(&"basic_mesh").create_actor(); actor.set_value(&"mesh_path",document); actor.values[&"model_component_id"]=id; var runtime:=registry.get_definition(&"basic_mesh").create_runtime(actor); root.add_child(runtime); runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip),0.); return runtime
 func run() -> void:
-	var source: Resource=Source.rectangular(6,8,2); source.floors[1].cuts=[Rect2(-.6,-1.,1.2,2.)]; var result:=Builder.generate(source); var registry:=ActorRegistry.new(); BasicActors.register_all(registry); var wall_id: String=source.source_id+":floor0:wall:wall0"; var runtime:=runtime_for(result.document,wall_id,registry); var geometry:=KiwiPhysicsGeometry.capture(runtime,{}); var settings:=KiwiPhysicsSettings.DEFAULTS.duplicate(true); var collider:=KiwiPhysicsGeometry.collider(geometry,settings)
+	var source: Resource=(load("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs").call("rectangular",6,8,2) as BuildingSource); source.floors[1].cuts=[Rect2(-.6,-1.,1.2,2.)]; var result:=Builder.generate(source); var registry:=ActorRegistry.new(); BasicActors.register_all(registry); var wall_id: String=source.source_id+":floor0:wall:wall0"; var runtime:=runtime_for(result.document,wall_id,registry); var geometry:=KiwiPhysicsGeometry.capture(runtime,{}); var settings:=KiwiPhysicsSettings.DEFAULTS.duplicate(true); var collider:=KiwiPhysicsGeometry.collider(geometry,settings)
 	check(collider.has("compound") and collider.compound.size()>1,"Automatic architectural collision uses existing compound shapes instead of a filled bounding box")
 	var world:=KiwiPhysicsCollisionWorld.new(); world.add_compound("wall",collider.compound,1,1); world.place("wall",Transform3D.IDENTITY)
 	var through:=world.point_motion("probe",Vector3(3,1,-1),Vector3(3,1,1),.12,1,1,[]); var blocked:=world.point_motion("probe",Vector3(1,1,-1),Vector3(1,1,1),.12,1,1,[])

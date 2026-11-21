@@ -18,17 +18,17 @@ func run() -> void:
 	check(BasicActors.register_all(registry), "Register example actor")
 	check(not BasicActors.register_all(registry), "Reject duplicate type")
 	var definition := registry.get_definition(&"point_3d")
-	var actor := definition.create_actor()
+	var actor: ActorData = definition.create_actor()
 	check(not actor.id.is_empty(), "Assign actor ID")
 	check(not definition.set_property_value(actor, &"position", 3), "Reject wrong value type")
 	check(definition.set_property_value(actor, &"position", Vector3(2, 0, 0)), "Set typed value")
 	var material_type := ActorObjectDefinition.new()
 	material_type.type_id = &"material"
-	material_type.properties = [ActorProperty.create(&"color", "Color", Color.WHITE)]
+	material_type.properties = [(load("res://scripts/actors/core/ActorProperty.cs").call("create",&"color", "Color", Color.WHITE) as ActorProperty)]
 	var material := material_type.create_object()
 	actor.set_value(&"material", ActorObjectReference.from_object(material))
 	actor.set_value(&"shared", ActorObjectReference.from_asset("asset-1", &"material"))
-	var copied := actor.copy_actor()
+	var copied: ActorData = actor.copy_actor()
 	check(copied.id != actor.id, "Independent copy gets new ID")
 	var copied_material: ActorObjectData = copied.values[&"material"].resolve()
 	copied_material.set_value(&"color", Color.RED)
@@ -46,12 +46,12 @@ func run() -> void:
 	if loaded != null:
 		check(loaded.values[&"material"].embedded.values[&"color"] == Color.WHITE, "Load embedded data")
 	DirAccess.remove_absolute(save_path)
-	var clip := ActorClip.create(actor, 10.0, 5.0)
+	var clip := (load("res://scripts/actors/core/ActorClip.cs").call("create",actor, 10.0, 5.0) as ActorClip)
 	clip.source_offset = 2.0
 	clip.playback_speed = 2.0
 	check(clip.local_time(11.0) == 4.0, "Map absolute time to source time")
 	check(clip.contains_time(10.0) and not clip.contains_time(15.0), "Half-open clip interval")
-	var runtime := definition.create_runtime(actor)
+	var runtime: ActorRuntime = definition.create_runtime(actor) as ActorRuntime
 	root.add_child(runtime)
 	runtime.evaluate_clip(clip, 11.0, {&"position": Vector3(8, 0, 0)})
 	check(runtime.get_node("Transform").position == Vector3(8, 0, 0), "Apply evaluated override")

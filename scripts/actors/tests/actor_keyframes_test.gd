@@ -29,8 +29,8 @@ func run() -> void:
 	check(track.keys.size() == 2 and track.keys[0].time == 0 and track.keys[1].time == 4,
 		"Keys use clip source-local time")
 	check(track.sample(2).is_equal_approx(Vector3(4, 2, 1)), "Vector tracks interpolate")
-	var first_id := track.keys[0].id
-	model.edit_keyframe(actor, first_id, {"interpolation": ActorKeyframe.Interpolation.EASE, "attenuation": 2.0})
+	var first_id: String = track.keys[0].id
+	model.edit_keyframe(actor, first_id, {"interpolation": ActorKeyframe.interpolation_modes().EASE, "attenuation": 2.0})
 	check(actor.animation_track(path).sample(2).is_equal_approx(Vector3(2, 1, 0.5)), "Attenuation controls easing")
 	model.undo()
 	check(actor.animation_track(path).sample(2).is_equal_approx(Vector3(4, 2, 1)), "Undo restores interpolation")
@@ -52,7 +52,7 @@ func run() -> void:
 	check(actor.animation_track(path).key_at(2).value == Vector3(7, 7, 7), "Existing property editors record a key at cursor")
 	model.undo()
 	check(actor.animation_track(path).key_at(2) == null and actor.animation_previews.is_empty(), "One undo removes recorded preview key")
-	var runtime := definition.create_runtime(actor)
+	var runtime: ActorRuntime = definition.create_runtime(actor)
 	root.add_child(runtime)
 	runtime.evaluate_clip(clip, 12)
 	check(actor.get_value(&"position") == Vector3(2, 1, 0.5), "Runtime samples actor animation when seeking")
@@ -60,7 +60,7 @@ func run() -> void:
 	check(actor.animation_track(path).keys[1].time == 4, "Moving actor keeps keys in clip-local coordinates")
 	model.undo()
 	var material_definition := editor.registry.get_object_definition(&"material")
-	var material := material_definition.create_object()
+	var material: ActorObjectData = material_definition.create_object()
 	var asset_path := "user://keyframe_material_" + ActorData.new_id() + ".tres"
 	check(ResourceSaver.save(material, asset_path) == OK, "Create file-backed object for animation test")
 	actor.values[&"material"] = ActorObjectReference.from_asset(asset_path, &"material")
@@ -72,7 +72,7 @@ func run() -> void:
 	editor.canvas.playhead = 14
 	model.add_keyframe(actor, material_path, "Material / Roughness", 1.0)
 	var values := ActorAnimation.sampled_values(actor, 2)
-	var sampled_material := (values[&"material"] as ActorObjectReference).resolve()
+	var sampled_material: ActorObjectData = (values[&"material"] as ActorObjectReference).resolve()
 	check(is_equal_approx(sampled_material.get_value(&"roughness"), 0.5), "File-backed object property animates privately")
 	var original := ResourceLoader.load(asset_path) as ActorObjectData
 	var original_roughness: Variant = original.get_value(&"roughness")
@@ -145,7 +145,7 @@ func run() -> void:
 	model.add_keyframe(actor, color_path, "Test / Color", Color.WHITE)
 	check(actor.animation_track(color_path).sample(2).is_equal_approx(Color(0.5, 0.5, 0.5)), "Color keys interpolate")
 	var shader_definition := editor.registry.get_object_definition(&"shader_material")
-	var shader_object := shader_definition.create_object()
+	var shader_object: ActorObjectData = shader_definition.create_object()
 	actor.values[&"test_shader"] = ActorObjectReference.from_object(shader_object)
 	var uniform_path := PackedStringArray(["test_shader", "uniforms", "gain"])
 	model.add_keyframe(actor, uniform_path, "Shader / Gain", 0.2)

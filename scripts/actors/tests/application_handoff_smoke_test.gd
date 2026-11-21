@@ -12,9 +12,9 @@ func shot(label:String)->void:
 func run()->void:
 	root.size=Vector2i(1440,1000);root.gui_embed_subwindows=true
 	var project_path:="user://handoff_project_"+ActorData.new_id();DirAccess.make_dir_recursive_absolute(project_path.path_join(".proj/.trash"))
-	var project:=Project.new("Handoff verification");check(ResourceSaver.save(project,project_path.path_join(".proj/Project.tres"))==OK,"Isolated project fixture saves")
+	var project:=Project.create("Handoff verification");check(ResourceSaver.save(project,project_path.path_join(".proj/Project.tres"))==OK,"Isolated project fixture saves")
 	project.take_over_path(ProjectSettings.globalize_path(project_path.path_join(".proj/Project.tres")))
-	StaticData.loaded_project=project
+	StaticData.set_loaded_project(project)
 	var main:Node=load("res://scenes/Main.tscn").instantiate();root.add_child(main)
 	for i in 10:await process_frame
 	var tabs:=get_first_node_in_group("actor_scene_tabs") as ActorSceneTabs
@@ -27,7 +27,7 @@ func run()->void:
 	var audio:KiwiAudioWorkspace=tabs.audio_workspace
 	owned_histories.append(audio.session.history.get_instance_id());owned_histories.append(audio.playback.model.history.get_instance_id())
 	var source:=PackedVector2Array();source.resize(4800);source.fill(Vector2(.1,.1))
-	audio.session.insert_source(KiwiAudioSourceCache.to_wav(source,48000),0,audio.session.selected_track,"Fixture")
+	audio.session.insert_source(KiwiAudioSourceCache.to_wav(source,48000,true),0,audio.session.selected_track,"Fixture")
 	audio.modulation_matrix_dialog();await process_frame
 	for child in audio.get_children():
 		if child is Window:child.queue_free()
@@ -49,6 +49,6 @@ func run()->void:
 	var persisted:Project=ResourceLoader.load(project_path.path_join(".proj/Project.tres"),"",ResourceLoader.CACHE_MODE_IGNORE)
 	check(persisted!=null and persisted.actor_inspector_state.scroll_for("save-on-close-fixture")==42.,"Closing the workspace flushes pending inspector state to its original project")
 	persisted=null
-	StaticData.loaded_project=null;project=null
+	StaticData.set_loaded_project(null);project=null
 	for id in owned_histories:check(not is_instance_id_valid(id),"Workspace releases owned undo history %d"%id)
 	print("APPLICATION_HANDOFF_SMOKE failures=%d renderer=%s"%[failures,DisplayServer.get_name()]);quit(failures)

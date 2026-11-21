@@ -1,6 +1,6 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Workspace=preload("res://Workspaces/EnvironmentWorkspace/environment_workspace.gd")
-const Slice=preload("res://Workspaces/EnvironmentWorkspace/terrain/terrain_slice_view.gd")
+const Slice=preload("res://Workspaces/EnvironmentWorkspace/TerrainSliceView.cs")
 func run() -> void:
 	root.size=Vector2i(1280,800); var document:=KiwiEnvironmentDocument.new(); var terrain:=KiwiEnvironmentTerrain.new(); terrain.resolution=33; terrain.dimensions=Vector2(16,16); var cave:=KiwiTerrainCave.new(); cave.radius_variation=0.; cave.roughness=0.; cave.chambers=PackedVector4Array([Vector4(0,-3,0,2.)]); terrain.caves=[cave]; terrain.prepare_volumes(); var item:=document.add_terrain(terrain); var workspace:=Workspace.new(); root.add_child(workspace); workspace.open_source(document); workspace.session.select(item.id)
 	for i in 8: await process_frame

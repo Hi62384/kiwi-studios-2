@@ -31,7 +31,7 @@ static func drawing(kind: String) -> Image:
 			image.set_pixel(x,y,color)
 	return image
 func pair(a: Image,b: Image) -> KiwiTransformationComponent:
-	renderer.clear_views(); var document := KiwiTransformationImage2D.blank(Vector2i(128,128)); document.duration=1.; var item := document.components[0]
+	renderer.clear_views(); var document := (load("res://Workspaces/TransformationWorkspace/KiwiTransformationImage2D.cs").call("blank",Vector2i(128,128)) as KiwiTransformationImage2D); document.duration=1.; var item := document.components[0]
 	item.states[0].artwork.texture=ImageTexture.create_from_image(a); var target := item.states[0].copy_state(true); target.title="Target"; target.artwork.texture=ImageTexture.create_from_image(b); item.states.append(target)
 	KiwiTransformationExamples.key(item,0,item.states[0],"Auto Morph"); KiwiTransformationExamples.key(item,1,target,"Auto Morph"); session.document=document; return item
 func prepare(at: float=.5) -> void:

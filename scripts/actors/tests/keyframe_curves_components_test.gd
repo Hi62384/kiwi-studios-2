@@ -39,15 +39,15 @@ func run() -> void:
 		check(is_equal_approx(curve.sample(0), 0) and is_equal_approx(curve.sample(1), 1), "Preset %s anchors endpoints" % preset)
 	model.separate_track(actor, path)
 	check(actor.animation_tracks.size() == 3, "Vector3 separates into three tracks")
-	check(ActorAnimation.sampled_value(actor, path, 2).is_equal_approx(Vector3(2, 1, 0.5)), "Separated curves preserve combined sampled values")
+	check(load("res://scripts/actors/core/ActorAnimation.cs").call("sampled_value",actor, path, 2).is_equal_approx(Vector3(2, 1, 0.5)), "Separated curves preserve combined sampled values")
 	var x_track := actor.animation_tracks[0]
 	model.edit_keyframe(actor, x_track.keys[1].id, {"value": 12.0})
 	check(ActorAnimation.sampled_values(actor, 4)[&"position"] == Vector3(12, 4, 2), "Editing X component does not change Y or Z")
 	model.playhead_time = 2
 	editor.canvas.playhead = 2
-	var sampled: Vector3 = ActorAnimation.sampled_value(actor, path, 2)
+	var sampled: Vector3 = load("res://scripts/actors/core/ActorAnimation.cs").call("sampled_value",actor, path, 2)
 	model.preview_property(actor, editor.registry.get_definition(&"point_3d"), &"position", sampled + Vector3(1, 0, 0))
-	check(ActorAnimation.sampled_value(actor, path, 2) == sampled + Vector3(1, 0, 0), "Separated inspector values preview as a composite")
+	check(load("res://scripts/actors/core/ActorAnimation.cs").call("sampled_value",actor, path, 2) == sampled + Vector3(1, 0, 0), "Separated inspector values preview as a composite")
 	model.commit_property_preview(actor, editor.registry.get_definition(&"point_3d"), &"position", sampled, sampled + Vector3(1, 0, 0))
 	check(actor.animation_tracks[0].key_at(2) != null and actor.animation_tracks[1].key_at(2) == null,
 		"Inspector change keys only changed component")
@@ -71,7 +71,7 @@ func run() -> void:
 	check(has_unseparate, "Component key offers Unseparate")
 	model.unseparate_track(actor, path)
 	check(actor.animation_tracks.size() == 1 and actor.animation_track(path).component == -1, "Unseparate restores a combined track")
-	check(ActorAnimation.sampled_value(actor, path, 4) == Vector3(12, 4, 2), "Unseparate retains component key values")
+	check(load("res://scripts/actors/core/ActorAnimation.cs").call("sampled_value",actor, path, 4) == Vector3(12, 4, 2), "Unseparate retains component key values")
 	model.undo()
 	check(actor.animation_tracks.size() == 3, "Unseparate undo restores independent tracks")
 	var color_path := PackedStringArray(["test_color"])
@@ -82,7 +82,7 @@ func run() -> void:
 	var color_tracks := 0
 	for track in actor.animation_tracks:
 		if track.path == color_path: color_tracks += 1
-	check(color_tracks == 4 and ActorAnimation.sampled_value(actor, color_path, 0) == Color(0.1, 0.2, 0.3, 0.4), "Color separates into RGBA tracks")
+	check(color_tracks == 4 and load("res://scripts/actors/core/ActorAnimation.cs").call("sampled_value",actor, color_path, 0) == Color(0.1, 0.2, 0.3, 0.4), "Color separates into RGBA tracks")
 	var save_path := "user://curve_components_" + ActorData.new_id() + ".tres"
 	check(ResourceSaver.save(actor, save_path) == OK, "Save actor with curves and components")
 	var loaded := ResourceLoader.load(save_path, "", ResourceLoader.CACHE_MODE_IGNORE) as ActorData

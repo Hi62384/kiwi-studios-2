@@ -47,26 +47,7 @@ const PATHS={
 	"strength":"<path d='m14 2-10 12h7l-1 8 10-12h-7z'/>",
 	"falloff":"<path d='M3 3v18h18M5 5c10 0 3 13 14 13'/><path d='M5 9h1m2 3h1m2 3h1m2 2h1'/>",
 }
-static func icon(kind: String) -> Texture2D:
-	if icons.has(kind): return icons[kind]
-	var bitmap:=Image.new()
-	bitmap.load_svg_from_string("<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><g fill='none' stroke='#95e4d0' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'>"+str(PATHS.get(kind,PATHS.brush))+"</g></svg>")
-	icons[kind]=ImageTexture.create_from_image(bitmap); return icons[kind]
-
-static func build(workspace: KiwiImageWorkspace,parent: Node,node_name: String,title: String,ids: Array,captions: Array,current: String,changed: Callable) -> MenuButton:
-	var button:=MenuButton.new(); button.name=node_name; button.text=str(captions[maxi(0,ids.find(current))])+"  ▾"; button.icon=icon(current)
-	button.custom_minimum_size.y=28; button.add_theme_constant_override("icon_max_width",19); parent.add_child(button)
-	button.add_theme_font_size_override("font_size",12)
-	button.add_theme_stylebox_override("normal",workspace._box(Color("20343d"),Color("446570"),6,5))
-	button.add_theme_stylebox_override("hover",workspace._box(Color("28554f"),Color("80e3c7"),6,5))
-	button.add_theme_stylebox_override("pressed",workspace._box(Color("23594f"),Color("80e3c7"),6,5))
-	var menu:=button.get_popup(); menu.add_separator(title)
-	menu.add_theme_stylebox_override("panel",workspace._box(Color("152631"),Color("4a756f"),10,10))
-	menu.add_theme_stylebox_override("hover",workspace._box(Color("28594f"),Color.TRANSPARENT,5,5))
-	menu.add_theme_color_override("font_color",Color("dfefed")); menu.add_theme_color_override("font_hover_color",Color.WHITE)
-	menu.add_theme_color_override("font_separator_color",Color("8ba9af"))
-	menu.add_theme_font_size_override("font_size",14); menu.add_theme_constant_override("v_separation",12)
-	menu.add_theme_constant_override("h_separation",12); menu.add_theme_constant_override("icon_max_width",22)
-	for i in ids.size(): menu.add_icon_item(icon(ids[i]),str(captions[i])+("    ✓" if ids[i]==current else ""),i)
-	menu.id_pressed.connect(func(index: int): changed.call(index))
-	return button
+static func _native()->Object:return Engine.get_singleton("KiwiNativeServices").service("image_warp_picker")
+static func icon(kind:String)->Texture2D:return _native().icon(kind,PATHS,icons)
+static func build(workspace:KiwiImageWorkspace,parent:Node,node_name:String,title:String,ids:Array,captions:Array,current:String,changed:Callable)->MenuButton:return _native().build(workspace,parent,node_name,title,ids,captions,current,changed,PATHS,icons)
+static func _choose(callback:Callable,index:int)->void:callback.call(index)

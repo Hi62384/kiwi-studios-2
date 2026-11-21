@@ -1,13 +1,13 @@
 extends "res://scripts/actors/tests/model_scene_integration_test.gd"
 const Buildings=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_session.gd")
-const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 func visual(editor: ActorTimelineEditor,actor: ActorData) -> MeshInstance3D:
 	var runtime:=editor._runtime_for_clip(editor.model.clip_for_actor_id(actor.id).id)
 	for child in runtime.find_children("*","MeshInstance3D",true,false):
 		if child.mesh!=null: return child
 	return null
 func run() -> void:
-	root.size=Vector2i(1440,950); root.gui_embed_subwindows=true; var folder:=ProjectSettings.globalize_path("user://architecture_scene_"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.new("Architecture integration"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.loaded_project=project
+	root.size=Vector2i(1440,950); root.gui_embed_subwindows=true; var folder:=ProjectSettings.globalize_path("user://architecture_scene_"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.create("Architecture integration"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.set_loaded_project(project)
 	var main: Node=load("res://scenes/Main.tscn").instantiate(); root.add_child(main); await settle(); await settle(); var tabs:=get_first_node_in_group("actor_scene_tabs") as ActorSceneTabs; tabs.new_model(); await settle(); var workspace:=tabs.model_workspace; var building:=Buildings.add(workspace.session,Vector3.ZERO,2); var id:=building.id; var path:=folder.path_join("Building.tres"); var saved: Error=await workspace.save_to(path)
 	check(saved==OK,"Complete architecture saves through the native Model Workspace")
 	tabs._model_to_scene(path); await settle(); var scene_index:=tabs._active_index; var editor:=tabs.timeline; var door: ActorData; var wall: ActorData
@@ -33,4 +33,4 @@ func run() -> void:
 	for actor in loaded.actors:
 		if actor.id==door.id: found=actor.animation_track(PackedStringArray(["rotation"])).keys.size()==2 and actor.values[&"mesh_path"]==path
 	check(found,"Scene serialization preserves linked architecture resources and component animation")
-	editor.physics.dispose(); editor.model.history.clear_history(); main.queue_free(); await process_frame; await process_frame; StaticData.loaded_project=null; print("ARCHITECTURE SCENE: %d checks, %d failures"%[checks,failures]); quit(failures)
+	editor.physics.dispose(); editor.model.history.clear_history(); main.queue_free(); await process_frame; await process_frame; StaticData.set_loaded_project(null); print("ARCHITECTURE SCENE: %d checks, %d failures"%[checks,failures]); quit(failures)

@@ -81,7 +81,7 @@ func run() -> void:
 			if joined.has("replace"):
 				check(joined.replace[0].is_equal_approx(joined.replace[-1]),"Corrected loops close with an exact seam")
 				var span:=mini(clampi(ceili(8/maxf(.1,closer.spacing)),1,12),(closer.knots.size()-1)/5)
-				var length:=closer.knots[span].distance_to(closer.knots[closer.knots.size()-1-span])
+				var length: float =closer.knots[span].distance_to(closer.knots[closer.knots.size()-1-span])
 				var count:=clampi(ceili(length/.5),8,128)
 				for point in joined.replace.slice(joined.replace.size()-count):
 					check(closer._raw_bounds.grow(.001).has_point(point),"Gap connector stays within the drawn shape instead of bulging outward")
@@ -106,8 +106,8 @@ func run() -> void:
 	var sparse:=PackedVector2Array(); var dense:=PackedVector2Array()
 	for i in 101: sparse.append(Vector2(i*2,0))
 	for i in 401: dense.append(Vector2(i*.5,0))
-	var sparse_knots:=fit(sparse,1).knots; var dense_knots:=fit(dense,1).knots
-	var equivalent:=sparse_knots.size()==dense_knots.size()
+	var sparse_knots: PackedVector2Array =fit(sparse,1).knots; var dense_knots: PackedVector2Array =fit(dense,1).knots
+	var equivalent: bool =sparse_knots.size()==dense_knots.size()
 	var difference:=0.0
 	if equivalent:
 		for i in sparse_knots.size(): difference=maxf(difference,sparse_knots[i].distance_to(dense_knots[i])); equivalent=equivalent and sparse_knots[i].distance_to(dense_knots[i])<.001

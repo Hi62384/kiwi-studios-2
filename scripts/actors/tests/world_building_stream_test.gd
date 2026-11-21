@@ -1,11 +1,11 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
-const Buildings=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Buildings=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 const Builder=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_geometry.gd")
-const Massing=preload("res://Workspaces/EnvironmentWorkspace/world/world_building_massing.gd")
+const Massing=preload("res://Workspaces/EnvironmentWorkspace/world/WorldBuildingMassingApi.cs")
 const Stream=preload("res://Workspaces/EnvironmentWorkspace/world/world_building_stream.gd")
 func run() -> void:
-	var authored: Resource=Buildings.rectangular(8.,10.,2,false); authored.source_id="streamed-building"; var mesh_key:=Builder.mesh_key(Massing.mesh(authored))
-	var document:=KiwiEnvironmentDocument.new(); var owner:=KiwiModelComponent.new(); owner.id="stream-world"; owner.title="World"; var world_source:=preload("res://Workspaces/EnvironmentWorkspace/world/world_source.gd").new(); world_source.building_detail_distance=80.; world_source.max_active_buildings=4; owner.parameters.world_source=world_source; document.components.append(owner); document.component_settings[owner.id]={"kind":"group"}
+	var authored: Resource=(load("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs").call("rectangular",8.,10.,2,false) as BuildingSource); authored.source_id="streamed-building"; var mesh_key:=Builder.mesh_key(Massing.mesh(authored))
+	var document:=KiwiEnvironmentDocument.new(); var owner:=KiwiModelComponent.new(); owner.id="stream-world"; owner.title="World"; var world_source:=preload("res://Workspaces/EnvironmentWorkspace/world/WorldSource.cs").new(); world_source.building_detail_distance=80.; world_source.max_active_buildings=4; owner.parameters.world_source=world_source; document.components.append(owner); document.component_settings[owner.id]={"kind":"group"}
 	var item:=KiwiModelComponent.new(); item.id=authored.source_id; item.title="Streamed building"; item.parent_id=owner.id; item.transform.origin=Vector3.ZERO; item.mesh=Massing.mesh(authored); item.parameters={"architecture_source":authored,"architecture_type":"building","architecture_owner":item.id,"world_lazy_building":true,"world_owner":owner.id,"_architecture_mesh":mesh_key,"_architecture_materials":[]}; document.components.append(item); document.component_settings[item.id]={"kind":"building","collision":true}
 	check(document.validate().is_empty(),"A saved low-detail building keeps a valid authored building source")
 	var path:="user://lazy_building_"+ActorData.new_id()+".tres"; var saved:=ResourceSaver.save(document,path); var reopened:=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE) as KiwiEnvironmentDocument

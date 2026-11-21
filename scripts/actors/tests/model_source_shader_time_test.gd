@@ -1,7 +1,7 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 func run() -> void:
 	var model:=KiwiModelSession.new(); var item:=model.add("Box"); var material:=ShaderMaterial.new(); var shader:=Shader.new(); shader.code="shader_type spatial; uniform float strength=0.7; void vertex(){VERTEX.y+=sin(TIME)*strength*.1;} void fragment(){ALBEDO=vec3(.4,.7,.2);}"; material.shader=shader; material.set_shader_parameter("strength",.42); item.surface_materials=[material]
-	var registry:=ActorRegistry.new(); BasicActors.register_all(registry); var actor:=registry.get_definition(&"basic_mesh").create_actor(); actor.set_value(&"mesh_path",model.document); var runtime:=registry.get_definition(&"basic_mesh").create_runtime(actor); root.add_child(runtime); runtime.evaluate_clip(ActorClip.create(actor),0.)
+	var registry:=ActorRegistry.new(); BasicActors.register_all(registry); var actor: ActorData = registry.get_definition(&"basic_mesh").create_actor(); actor.set_value(&"mesh_path",model.document); var runtime: ActorRuntime = registry.get_definition(&"basic_mesh").create_runtime(actor) as ActorRuntime; root.add_child(runtime); runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip),0.)
 	var controlled: ShaderMaterial
 	for visual in runtime.find_children("*","MeshInstance3D",true,false):
 		if visual.mesh!=null and visual.mesh.get_surface_count()>0: controlled=visual.get_active_material(0)

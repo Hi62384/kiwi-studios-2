@@ -1,0 +1,26 @@
+using Godot;
+using System;
+using System.Buffers.Binary;
+using Settings=Godot.Collections.Dictionary;
+public partial class WindowsSystemAudioOperations:RefCounted
+{
+    private static string Text(Node owner,string key)=>owner.Get(key).AsString();private static int Pid(Node owner)=>owner.Get("pid").AsInt32();
+    public Settings prepare_start(Node owner,string destination)
+    {
+        if(OS.GetName()!="Windows")return new Settings{["error"]="System audio recording currently requires Windows."};string directory=ProjectSettings.GlobalizePath("user://audio_capture_"+new ActorDataOperations().new_id());owner.Set("directory",directory);string output=destination.Length>0?destination:directory.PathJoin("capture.wav");owner.Set("output_path",output);if(Godot.FileAccess.FileExists(output))return new Settings{["error"]="System capture destination already exists."};DirAccess.MakeDirRecursiveAbsolute(directory);foreach(string name in new[]{"windows_loopback.ps1","windows_loopback.cs"}){string source=Godot.FileAccess.GetFileAsString("res://scripts/actors/audio/"+name);using var target=Godot.FileAccess.Open(directory.PathJoin(name),Godot.FileAccess.ModeFlags.Write);if(target==null)return new Settings{["error"]="Cannot prepare the system audio recorder."};target.StoreString(source);}int pid=OS.CreateProcess("powershell.exe",new[]{"-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",directory.PathJoin("windows_loopback.ps1"),"-Source",directory.PathJoin("windows_loopback.cs"),"-Output",output,"-Stop",directory.PathJoin("stop"),"-Ready",directory.PathJoin("ready")},false);owner.Set("pid",pid);return new Settings{["error"]="",["deadline"]=Time.GetTicksMsec()+15000};
+    }
+    public bool startup_pending(Node owner,ulong deadline)=>Pid(owner)>0&&OS.IsProcessRunning(Pid(owner))&&!Godot.FileAccess.FileExists(Text(owner,"directory").PathJoin("ready"))&&Time.GetTicksMsec()<deadline;
+    public string complete_start(Node owner){string path=Text(owner,"directory").PathJoin("ready");string ready=Godot.FileAccess.FileExists(path)?Godot.FileAccess.GetFileAsString(path):"";if(!ready.StartsWith("READY:",StringComparison.Ordinal)){cleanup(owner);return "System audio capture could not start. "+ready;}owner.Set("rate",int.TryParse(ready.Substring(6),out int rate)?rate:0);owner.Set("_cursor",44);return "";}
+    public Vector2[] samples(Node owner){using var file=Godot.FileAccess.Open(Text(owner,"output_path"),Godot.FileAccess.ModeFlags.Read);if(file==null)return Array.Empty<Vector2>();long cursor=owner.Get("_cursor").AsInt64();file.Seek((ulong)cursor);var bytes=file.GetBuffer(Math.Min(262144,Math.Max(0,(long)file.GetLength()-cursor)));var result=new Vector2[bytes.Length/4];for(int i=0;i<result.Length;i++)result[i]=new Vector2(BinaryPrimitives.ReadInt16LittleEndian(bytes.AsSpan(i*4,2)),BinaryPrimitives.ReadInt16LittleEndian(bytes.AsSpan(i*4+2,2)))/32768;owner.Set("_cursor",cursor+result.Length*4);return result;}
+    public ulong prepare_stop(Node owner){request_stop(owner);return Time.GetTicksMsec()+4000;}
+    public bool stop_pending(Node owner,ulong deadline)=>Pid(owner)>0&&OS.IsProcessRunning(Pid(owner))&&Time.GetTicksMsec()<deadline;
+    public AudioStreamWav? complete_stop(Node owner){string path=Text(owner,"output_path");var stream=Godot.FileAccess.FileExists(path)?AudioStreamWav.LoadFromFile(path):null;cleanup(owner);return stream;}
+    public Settings complete_stop_file(Node owner,string destination)
+    {
+        if(Pid(owner)>0&&OS.IsProcessRunning(Pid(owner))){owner.Set("preserve_capture",true);return new Settings{["error"]="System capture did not finalize in time. Its private capture folder was retained: "+Text(owner,"directory"),["path"]=""};}string original=Text(owner,"output_path");if(original==destination){cleanup(owner);return new Settings{["error"]="",["path"]=destination};}if(Godot.FileAccess.FileExists(destination)){owner.Set("preserve_capture",true);return new Settings{["error"]="The system take destination already exists. Capture preserved: "+original,["path"]=""};}var error=DirAccess.CopyAbsolute(original,destination);if(error!=Error.Ok){owner.Set("preserve_capture",true);return new Settings{["error"]="Could not preserve system capture: "+ErrorText(error)+". Original retained: "+original,["path"]=""};}cleanup(owner);return new Settings{["error"]="",["path"]=destination};
+    }
+    private static string ErrorText(Error error){using var expression=new Expression();expression.Parse("error_string(code)",new[]{"code"});return expression.Execute(new Godot.Collections.Array{(int)error}).AsString();}
+    public void request_stop(Node owner){string directory=Text(owner,"directory");if(directory.Length==0)return;using var file=Godot.FileAccess.Open(directory.PathJoin("stop"),Godot.FileAccess.ModeFlags.Write);}
+    public void cleanup(Node owner){int pid=Pid(owner);if(pid>0&&OS.IsProcessRunning(pid))OS.Kill(pid);owner.Set("pid",-1);string directory=Text(owner,"directory");if(directory.Length>0&&!owner.Get("preserve_capture").AsBool()){foreach(string name in new[]{"windows_loopback.ps1","windows_loopback.cs","ready","stop","capture.wav"})DirAccess.RemoveAbsolute(directory.PathJoin(name));DirAccess.RemoveAbsolute(directory);}owner.Set("directory","");}
+    public void exit_tree(Node owner){request_stop(owner);cleanup(owner);}
+}

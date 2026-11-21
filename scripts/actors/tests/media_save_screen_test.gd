@@ -6,12 +6,7 @@ func check(condition: bool, message: String) -> void:
 		push_error(message)
 func _initialize() -> void: run.call_deferred()
 
-class FakeAudio:
-	extends ActorAudioRecorder
-	var output: AudioStreamWAV
-	func stop() -> AudioStreamWAV:
-		recording = false
-		return output
+const FakeAudio = preload("res://scripts/actors/tests/fixtures/MediaTestAudioRecorder.cs")
 
 func run() -> void:
 	var editor := ActorTimelineEditor.new()
@@ -22,7 +17,7 @@ func run() -> void:
 	check(popup.find_child("CaptureTarget", true, false) != null, "Screen capture options expose targets")
 	check(popup.find_child("RecordMicrophone", true, false) != null and popup.find_child("RecordSystemAudio", true, false) != null, "Screen recorder exposes independent audio source checkboxes")
 	check(popup.find_child("RecordTimelineAudio", true, false) != null, "Screen recorder can include timeline audio")
-	var property := editor.registry.get_definition(&"audio").find_property(&"audio")
+	var property: ActorProperty = editor.registry.get_definition(&"audio").find_property(&"audio")
 	var stream := AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS
 	stream.mix_rate = 48000
@@ -35,11 +30,11 @@ func run() -> void:
 	for format in ["wav", "mp3", "ogg", "flac"]:
 		var path: String = "user://media_export_" + unique + "." + format
 		check(ActorMediaExport.write(stream, path, property), "Audio export encodes " + format)
-		check(ActorAudio.source(path) != null, "Exported audio can be loaded again: " + format)
+		check((load("res://scripts/actors/core/ActorAudio.cs").call("source",path) as AudioStream) != null, "Exported audio can be loaded again: " + format)
 		paths.append(path)
 	var image := Image.create(8, 4, false, Image.FORMAT_RGBA8)
 	image.fill(Color.CORNFLOWER_BLUE)
-	var image_property := ActorProperty.create(&"image", "Image", "")
+	var image_property := (load("res://scripts/actors/core/ActorProperty.cs").call("create",&"image", "Image", "") as ActorProperty)
 	image_property.options.extensions = ["png", "jpg", "webp"]
 	for format in ["png", "jpg", "webp", "tres"]:
 		var path: String = "user://media_image_" + unique + "." + format
@@ -65,7 +60,7 @@ func run() -> void:
 	row.free()
 	var screen := ActorScreenRecorder.new()
 	root.add_child(screen)
-	var target_args := ActorScreenRecorder.capture_arguments({"input": "desktop", "position": Vector2i(-1920, 0), "size": Vector2i(1920, 1080)}, 30, true)
+	var target_args := ActorScreenRecorder.capture_arguments({"input": "desktop", "position": Vector2i(-1920, 0), "size": Vector2i(1920, 1080)}, 30, true, 0)
 	check(target_args.has("-1920") and target_args.has("1920x1080"), "Display capture preserves monitor offsets")
 	# Exercise real FFmpeg finalization using synthetic input, never desktop/mic capture.
 	screen.directory = ProjectSettings.globalize_path("user://screen_test_" + unique)
@@ -82,11 +77,11 @@ func run() -> void:
 	screen.recording = true
 	var path: String = await screen.stop()
 	check(not path.is_empty() and ActorVideo.info(path).get("audio", false), "Screen finalization produces MP4 with selected audio")
-	var video_property := editor.registry.get_definition(&"video").find_property(&"video")
+	var video_property: ActorProperty = editor.registry.get_definition(&"video").find_property(&"video")
 	var export_path := "user://screen_export_" + unique + ".webm"
 	check(ActorMediaExport.write(path, export_path, video_property), "Video Save As transcodes containers/codecs")
 	paths.append(export_path)
-	var recording_directory := screen.directory
+	var recording_directory: String = screen.directory
 	screen.free()
 	for name in ["capture.mp4", "recording.mp4"]: DirAccess.remove_absolute(recording_directory.path_join(name))
 	DirAccess.remove_absolute(recording_directory)

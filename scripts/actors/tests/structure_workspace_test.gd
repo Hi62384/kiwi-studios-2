@@ -1,7 +1,7 @@
 extends "res://scripts/actors/tests/powder_material_workspace_test.gd"
 func run() -> void:
 	root.size=Vector2i(1600,1000); root.gui_embed_subwindows=true
-	var folder:=ProjectSettings.globalize_path("user://structure_ui_"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.new("Structure verification"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.loaded_project=project
+	var folder:=ProjectSettings.globalize_path("user://structure_ui_"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.create("Structure verification"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.set_loaded_project(project)
 	var main: Node=load("res://scenes/Main.tscn").instantiate(); root.add_child(main); await settle(12); editor=(get_first_node_in_group("actor_scene_tabs") as ActorSceneTabs).timeline
 	var clip:=editor.model.create_actor(editor.registry.get_definition(&"basic_shape"),0,{&"position":Vector3(-1,1,0),&"structure_enabled":true,&"structure_role":1}); clip.start_time=0; clip.duration=3; var support:=editor.model.selected_actor()
 	clip=editor.model.create_actor(editor.registry.get_definition(&"basic_shape"),0,{&"position":Vector3(1,1,0)}); clip.start_time=0; clip.duration=3; clip.layer=1; var beam:=editor.model.selected_actor()

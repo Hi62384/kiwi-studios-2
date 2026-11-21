@@ -14,7 +14,7 @@ func frame(at: float) -> Image:
 	return workspace.animation_renderer.texture().get_image()
 func run() -> void:
 	root.size=Vector2i(1440,960); root.gui_embed_subwindows=true; workspace=KiwiTransformationWorkspace.new(); root.add_child(workspace); await settle()
-	var document := KiwiTransformationImage2D.blank(Vector2i(128,128)); var item := document.components[0]; var image := Image.create(128,128,false,Image.FORMAT_RGBA8)
+	var document := (load("res://Workspaces/TransformationWorkspace/KiwiTransformationImage2D.cs").call("blank",Vector2i(128,128)) as KiwiTransformationImage2D); var item := document.components[0]; var image := Image.create(128,128,false,Image.FORMAT_RGBA8)
 	image.fill(Color(0,0,0,0)); image.fill_rect(Rect2i(20,25,80,70),Color(.8,.2,.4,.7)); item.states[0].artwork.texture=ImageTexture.create_from_image(image); item.states[0].artwork.opacity=.7
 	workspace.open_source(document); var session := workspace.session; var source_id := session.primary().id; var original := session.active_state().artwork.texture.get_image().get_data(); var before := await frame(.4)
 	var mask := Image.create(128,128,false,Image.FORMAT_RGBA8); mask.fill(Color(0,0,0,0)); mask.fill_rect(Rect2i(60,0,68,128),Color(1,1,1,.5)); session.playhead=.5

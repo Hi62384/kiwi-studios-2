@@ -16,7 +16,7 @@ func run() -> void:
 	check(is_equal_approx(KiwiAudioInstruments.midi_frequency(69), 440.0), "A4 is 440 Hz")
 	var note := {"id": "test", "pitch": 69, "start": 0.25, "duration": 0.5, "velocity": 1.0, "pan": 0.0}
 	var patch := {"id": "additive", "harmonics": [1.0], "attack": 0.005, "decay": 0.01, "sustain": 1.0, "release": 0.03, "filter": 6000.0}
-	var wave := KiwiAudioInstruments.render_notes([note], patch, 120.0, 16000)
+	var wave := KiwiAudioInstruments.render_notes([note], patch, 120.0, 16000, null, [], 1.0)
 	check(wave != null and energy(wave) > 0.001, "Notes render native stereo PCM")
 	var data := wave.data
 	var first := 0
@@ -28,34 +28,34 @@ func run() -> void:
 	check(absf(crossings * 16000.0 / 3000.0 - 440.0) < 8.0, "Rendered pitch is A4")
 	var quiet := note.duplicate(true)
 	quiet.velocity = 0.2
-	check(energy(wave) > energy(KiwiAudioInstruments.render_notes([quiet], patch, 120.0, 16000)) * 10.0, "Velocity affects audio energy")
+	check(energy(wave) > energy(KiwiAudioInstruments.render_notes([quiet], patch, 120.0, 16000, null, [], 1.0)) * 10.0, "Velocity affects audio energy")
 	var lowpass := patch.duplicate(true)
 	lowpass.filter = 100.0
-	check(energy(KiwiAudioInstruments.render_notes([note], lowpass, 120.0, 16000)) < energy(wave) * 0.1, "Instrument low-pass attenuates above-cutoff energy")
-	var fm_a := KiwiAudioInstruments.render_notes([note], {"id": "fm", "modulation": 0.0}, 120.0, 16000)
-	var fm_b := KiwiAudioInstruments.render_notes([note], {"id": "fm", "modulation": 4.0}, 120.0, 16000)
+	check(energy(KiwiAudioInstruments.render_notes([note], lowpass, 120.0, 16000, null, [], 1.0)) < energy(wave) * 0.1, "Instrument low-pass attenuates above-cutoff energy")
+	var fm_a := KiwiAudioInstruments.render_notes([note], {"id": "fm", "modulation": 0.0}, 120.0, 16000, null, [], 1.0)
+	var fm_b := KiwiAudioInstruments.render_notes([note], {"id": "fm", "modulation": 4.0}, 120.0, 16000, null, [], 1.0)
 	check(fm_a.data != fm_b.data, "FM modulation changes timbre")
-	check(fm_a.data == KiwiAudioInstruments.render_notes([note], {"id": "fm", "modulation": 0.0}, 120.0, 16000).data, "Instrument rendering is deterministic")
-	var fast := KiwiAudioInstruments.render_notes([note], patch, 240.0, 16000)
+	check(fm_a.data == KiwiAudioInstruments.render_notes([note], {"id": "fm", "modulation": 0.0}, 120.0, 16000, null, [], 1.0).data, "Instrument rendering is deterministic")
+	var fast := KiwiAudioInstruments.render_notes([note], patch, 240.0, 16000, null, [], 1.0)
 	check(fast.get_length() < wave.get_length(), "Tempo changes note timing")
 	check(KiwiAudioInstruments.envelope(0.05, 1.0, 0.1, 0.2, 0.5, 0.2) < KiwiAudioInstruments.envelope(0.1, 1.0, 0.1, 0.2, 0.5, 0.2), "ADSR attack rises")
 	check(KiwiAudioInstruments.envelope(1.25, 1.0, 0.1, 0.2, 0.5, 0.2) == 0.0, "ADSR release reaches zero")
 	var disabled := note.duplicate(true)
 	disabled.probability = 0.0
-	check(energy(KiwiAudioInstruments.render_notes([disabled], patch, 120.0, 16000)) == 0.0, "Step probability zero omits sound")
+	check(energy(KiwiAudioInstruments.render_notes([disabled], patch, 120.0, 16000, null, [], 1.0)) == 0.0, "Step probability zero omits sound")
 	var source := KiwiAudioSynthesis.generate("ui_confirm", {"duration": 0.2}, 1, 16000)
 	for instrument: Dictionary in KiwiAudioInstruments.presets():
 		if instrument.kind == "sampler": instrument.sample = source
 		if instrument.kind == "multisample": instrument.multisamples = [{"sample": source, "low": 0, "high": 127, "root_pitch": 69}]
 		instrument.release = 0.05
 		instrument.attack = 0.005
-		var rendered := KiwiAudioInstruments.render_notes([note], instrument, 180.0, 16000)
+		var rendered := KiwiAudioInstruments.render_notes([note], instrument, 180.0, 16000, null, [], 1.0)
 		check(rendered != null and energy(rendered) > 0.0000001, str(instrument.id) + " produces audio")
 	var stereo_frames := PackedVector2Array()
 	stereo_frames.resize(1600)
 	for frame in stereo_frames.size(): stereo_frames[frame] = Vector2(sin(TAU * 440.0 * frame / 16000.0) * 0.3, 0.0)
 	var stereo_source := KiwiAudioSourceCache.to_wav(stereo_frames, 16000, true)
-	var sampled := KiwiAudioInstruments.render_notes([{"pitch": 60, "start": 0.0, "duration": 0.4, "velocity": 1.0}], {"id": "sampler", "sample": stereo_source}, 120.0, 16000)
+	var sampled := KiwiAudioInstruments.render_notes([{"pitch": 60, "start": 0.0, "duration": 0.4, "velocity": 1.0}], {"id": "sampler", "sample": stereo_source}, 120.0, 16000, null, [], 1.0)
 	var sampled_bytes := sampled.data
 	var right_peak := 0
 	var left_peak := 0
@@ -66,10 +66,10 @@ func run() -> void:
 	var sustain_note := {"pitch": 69, "start": 0.0, "duration": 0.25, "velocity": 1.0}
 	var release_patch := patch.duplicate(true)
 	release_patch.release = 0.2
-	var released := KiwiAudioInstruments.render_notes([sustain_note], release_patch, 120.0, 16000)
+	var released := KiwiAudioInstruments.render_notes([sustain_note], release_patch, 120.0, 16000, null, [], 1.0)
 	check(released.get_length() >= 0.325 - 0.0001, "Instrument output includes release tail")
 	check(released.data.decode_s16(released.data.size() - 4) == 0, "Release tail ends at zero")
-	check(KiwiAudioInstruments.render_notes([note], {"id": "sampler", "sample": "missing"}, 120.0, 16000) == null, "Missing sample is reported instead of faked")
+	check(KiwiAudioInstruments.render_notes([note], {"id": "sampler", "sample": "missing"}, 120.0, 16000, null, [], 1.0) == null, "Missing sample is reported instead of faked")
 	var settings := {"style": "Electronic", "key": "D", "scale": "minor", "bars": 8, "tempo": 120.0, "seed": 77}
 	var music := KiwiAudioComposer.generate(settings)
 	check(music == KiwiAudioComposer.generate(settings), "Composition is deterministic including generated IDs")

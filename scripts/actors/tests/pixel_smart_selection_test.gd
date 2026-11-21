@@ -113,7 +113,7 @@ func run() -> void:
 	var dense_path:=PackedVector2Array()
 	for i in 200: dense_path.append(Vector2(800+i,900+sin(i*.02)*20))
 	var paint_started:=Time.get_ticks_usec()
-	KiwiPixelEdgeMagnet.paint_band(large_mask,dense_path,500,Rect2i(0,0,2048,2048),Color.WHITE)
+	KiwiPixelEdgeMagnet.paint_band(large_mask,dense_path,500,Rect2i(0,0,2048,2048),Color.WHITE,true)
 	var paint_usec:=Time.get_ticks_usec()-paint_started
 	check(paint_usec<100000,"A maximum-size brush does not stamp hundreds of redundant circles along a short edge")
 	check(large_mask.get_pixel(800,900).a>.5 and large_mask.get_pixel(999,900).a>.5,"Spaced stamps preserve both ends of the edge stroke")

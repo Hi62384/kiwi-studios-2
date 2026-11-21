@@ -1,7 +1,7 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Workspace=preload("res://Workspaces/EnvironmentWorkspace/environment_workspace.gd")
 func run() -> void:
-	root.size=Vector2i(1440,900); var folder:=ProjectSettings.globalize_path("user://environment-workspace-test"); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.new("Environment workspace test"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.loaded_project=project
+	root.size=Vector2i(1440,900); var folder:=ProjectSettings.globalize_path("user://environment-workspace-test"); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.create("Environment workspace test"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.set_loaded_project(project)
 	var document:=KiwiEnvironmentDocument.new(); var terrain_item:=document.add_terrain(); var workspace:=Workspace.new(); root.add_child(workspace); workspace.open_source(document)
 	for i in 5: await process_frame
 	workspace.canvas.frame(true); await process_frame

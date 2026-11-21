@@ -38,7 +38,7 @@ func run() -> void:
 	var layers: Array = []
 	for part: Dictionary in arrangement.parts:
 		if part.notes.is_empty(): continue
-		var stream := KiwiAudioInstruments.render_notes(part.notes, part.instrument, 120.0, 44100)
+		var stream := KiwiAudioInstruments.render_notes(part.notes, part.instrument, 120.0, 44100, null, [], 1.0)
 		if stream == null:
 			failures += 1
 			continue

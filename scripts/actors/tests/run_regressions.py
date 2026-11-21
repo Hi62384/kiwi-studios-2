@@ -79,11 +79,35 @@ def main() -> int:
     root = Path(__file__).resolve().parents[3]
     artifacts = root / ".godot" / "verification"
     artifacts.mkdir(parents=True, exist_ok=True)
-    cases = [root / "scripts" / "actors" / "tests" / (name if name.endswith(".gd") else name + ".gd")
-             for name in args.tests] or sorted((root / "scripts" / "actors" / "tests").glob("*_test.gd"))
-    missing = [case.name for case in cases if not case.is_file()]
+    test_folder = root / "scripts" / "actors" / "tests"
+    available = sorted(test_folder.glob("*_test.gd")) + sorted(test_folder.glob("*Test.cs"))
+    names = {}
+    for case in available:
+        names[case.name] = case
+        names[case.stem] = case
+        # Keep existing snake-case commands usable as tests move to C#.
+        snake = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", case.stem)
+        snake = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", snake).lower()
+        names.setdefault(snake, case)
+    missing = [name for name in args.tests if name not in names]
     if missing:
         parser.error("Unknown regression script(s): " + ", ".join(missing))
+    cases = [names[name] for name in args.tests] if args.tests else available
+    native_scenes = {}
+    for case in cases:
+        if case.suffix != ".cs":
+            continue
+        # Godot launches C# Node tests through a scene rather than --script.
+        source = case.read_text(encoding="utf-8-sig")
+        entry = re.search(r"public\s+partial\s+class\s+(\w+)\s*:\s*(Node3D|Node|Control)\b", source)
+        if entry is None:
+            parser.error(f"Native test must declare a Node, Node3D or Control entry: {case.name}")
+        scene = artifacts / f"run_{case.stem}.tscn"
+        scene.write_text('[gd_scene load_steps=2 format=3]\n'
+                         f'[ext_resource type="Script" path="res://{case.relative_to(root).as_posix()}" id="1"]\n'
+                         f'[node name="{entry[1]}" type="{entry[2]}"]\nscript = ExtResource("1")\n',
+                         encoding="utf-8")
+        native_scenes[case] = scene
     environment = os.environ.copy()
     # Avoid modifying the editor user's preferences, favorites and recent lists.
     # Concurrent suites must never share favorites, presets or test projects.
@@ -92,7 +116,8 @@ def main() -> int:
     environment["APPDATA"] = str(profile)
     results = []
     for case in cases:
-        command = [args.godot, "--path", str(root), "--script", str(case)]
+        command = [args.godot, "--path", str(root)]
+        command += [str(native_scenes[case])] if case in native_scenes else ["--script", str(case)]
         if args.renderer == "headless":
             command.append("--headless")
         else:
@@ -140,9 +165,14 @@ def main() -> int:
         checked_text = re.sub(r"EXPECTED_SHADER_COMPILER_ERROR_BEGIN.*?EXPECTED_SHADER_COMPILER_ERROR_END",
                               "", text, flags=re.S)
         shader_error = "SHADER ERROR:" in checked_text
-        passed = code == 0 and not timed_out and not script_errors and not shader_error
+        # The local certificate-store warning is environmental. Other engine
+        # errors still fail a test even when its script mistakenly exits zero.
+        runtime_error = any("ERROR:" in line and "Failed to read the root certificate store." not in line
+                            for line in checked_text.splitlines())
+        passed = code == 0 and not timed_out and not script_errors and not shader_error and not runtime_error
         result = {"test": case.stem, "passed": passed, "exit_code": code,
                   "timeout": timed_out, "compile_error": compile_failed,
+                  "runtime_error": runtime_error, "language": "C#" if case in native_scenes else "GDScript",
                   "seconds": round(time.monotonic() - started, 3),
                   "renderer": args.renderer, "log": str(log_path.relative_to(root))}
         results.append(result)

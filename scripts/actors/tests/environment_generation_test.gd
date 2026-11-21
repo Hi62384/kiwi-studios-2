@@ -1,6 +1,6 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Workspace=preload("res://Workspaces/EnvironmentWorkspace/environment_workspace.gd")
-const Job=preload("res://Workspaces/EnvironmentWorkspace/environment_generation_job.gd")
+const Job=preload("res://Workspaces/EnvironmentWorkspace/EnvironmentGenerationJob.cs")
 func run() -> void:
 	var workspace:=Workspace.new(); root.add_child(workspace)
 	var document:=KiwiEnvironmentDocument.new(); var item:=document.add_terrain(); workspace.open_source(document)

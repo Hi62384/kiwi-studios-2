@@ -1,7 +1,7 @@
 extends SceneTree
 ## Real-renderer benchmark: script synchronization, submitted-frame wall time,
 ## and Godot's measured viewport CPU/GPU times are reported separately.
-const Library = preload("res://Workspaces/ImageWorkspace/texture_material_library.gd")
+const Library = preload("res://scripts/materials/NaturalMaterialCatalog.cs")
 var results: Array[Dictionary] = []
 
 func _initialize() -> void: run.call_deferred()

@@ -29,7 +29,7 @@ func run() -> void:
 	empty_shader_actor.set_value(&"material", ActorObjectReference.from_object(shader_definition.create_object()))
 	var empty_shader_runtime := image_definition.create_runtime(empty_shader_actor)
 	root.add_child(empty_shader_runtime)
-	empty_shader_runtime.evaluate_clip(ActorClip.create(empty_shader_actor), 0.0)
+	empty_shader_runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",empty_shader_actor) as ActorClip), 0.0)
 	var empty_shader_mesh := empty_shader_runtime.get_child(0) as MeshInstance3D
 	check(empty_shader_mesh.material_override is ShaderMaterial and (empty_shader_mesh.material_override as ShaderMaterial).shader == null, "A new ShaderMaterial safely renders before a Shader is assigned")
 	empty_shader_runtime.free()
@@ -42,7 +42,7 @@ func run() -> void:
 	actor.set_value(&"material", reference)
 	var runtime := image_definition.create_runtime(actor)
 	root.add_child(runtime)
-	runtime.evaluate_clip(ActorClip.create(actor), 0.0)
+	runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip), 0.0)
 	var mesh := runtime.get_child(0) as MeshInstance3D
 	check(mesh.material_override is ShaderMaterial, "Image actor uses ShaderMaterial in the viewport")
 	var live_material := mesh.material_override as ShaderMaterial
@@ -138,7 +138,7 @@ func run() -> void:
 	recovery_file.store_string("shader_type spatial;\nvoid fragment() { ALBEDO = vec3(0.2); }\n")
 	recovery_file.close()
 	shader_object.set_value(&"shader_path", recovery_path)
-	runtime.evaluate_clip(ActorClip.create(actor), 0.0)
+	runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip), 0.0)
 	editor.open_shader(recovery_path)
 	print("EXPECTED_SHADER_COMPILER_ERROR_BEGIN")
 	editor.code.text = "shader_type spatial;\nvoid fragment() { BROKEN_SHADER }\n"
@@ -153,15 +153,15 @@ func run() -> void:
 		"Corrected filesystem shader is flushed, closed, and refreshed immediately")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(recovery_path))
 	shader_object.set_value(&"shader_path", "res://scripts/actors/tests/fixtures/uniforms_test.gdshader")
-	runtime.evaluate_clip(ActorClip.create(actor), 0.0)
+	runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip), 0.0)
 	editor.open_shader("res://scripts/actors/tests/fixtures/uniforms_test.gdshader")
 	var other_focus := FocusableKeyInput.new()
-	FocusableKeyInput.current_focused_instance = other_focus
+	FocusableKeyInput.set_focused_instance(other_focus)
 	var click := InputEventMouseButton.new()
 	click.pressed = true
 	click.button_index = MOUSE_BUTTON_LEFT
 	editor._code_input(click)
-	check(FocusableKeyInput.current_focused_instance == null, "Clicking the shader editor releases filesystem keyboard focus")
+	check(FocusableKeyInput.focused_instance() == null, "Clicking the shader editor releases filesystem keyboard focus")
 	other_focus.free()
 	# Shader save notifications rebuild the inspector asynchronously; the docs UI
 	# test above yields frames, so reacquire the current resource menu.
@@ -170,7 +170,7 @@ func run() -> void:
 	shader_menu.id_pressed.emit(0)
 	var newly_created_shader := shader_object.get_value(&"shader_path") as Shader
 	check(newly_created_shader != null and editor.current_shader == newly_created_shader and editor.current_path.is_empty(), "New Shader creates and opens an embedded Shader without a save dialog")
-	runtime.evaluate_clip(ActorClip.create(actor), 0.0)
+	runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip), 0.0)
 	var material_before_live_edit := mesh.material_override as ShaderMaterial
 	editor.code.text = "shader_type spatial;\nuniform float live_amount = 0.75;\nvoid fragment() { ALBEDO = vec3(live_amount); }\n"
 	editor.save()

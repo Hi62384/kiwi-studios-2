@@ -1,7 +1,7 @@
 extends SceneTree
 ## Real GPU cache verification: unchanged layers must stop drawing while template,
 ## group, clipping, mutable texture and TIME dependencies continue to update.
-const Library = preload("res://Workspaces/ImageWorkspace/texture_material_library.gd")
+const Library = preload("res://scripts/materials/NaturalMaterialCatalog.cs")
 var checks := 0
 var failures := 0
 

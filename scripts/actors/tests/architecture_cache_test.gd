@@ -1,9 +1,9 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
-const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 const Builder=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_geometry.gd")
 const Cache=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_mesh_cache.gd")
 func run() -> void:
-	Cache.clear(); var source: Resource=Source.rectangular(8,10,3); var first:=Builder.generate(source); var initial:=Cache.statistics(); var repeat:=Builder.generate(source); var warm:=Cache.statistics()
+	Cache.clear(); var source: Resource=(load("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs").call("rectangular",8,10,3) as BuildingSource); var first:=Builder.generate(source); var initial:=Cache.statistics(); var repeat:=Builder.generate(source); var warm:=Cache.statistics()
 	check(first.errors.is_empty() and repeat.errors.is_empty() and warm.hits>initial.hits and warm.misses==initial.misses,"Repeated generation reuses bounded derived geometry")
 	var id: String=source.source_id+":floor0:wall:wall0"; var original: KiwiModelMesh=repeat.document.component(id).mesh; first.document.component(id).mesh.vertices[0]+=Vector3.ONE
 	check(original.vertices!=first.document.component(id).mesh.vertices,"Editable generated meshes do not alias each other or cached topology")

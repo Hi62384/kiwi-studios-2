@@ -1,11 +1,6 @@
 extends RefCounted
-## Ordinary Kiwi objects: nested editing, keyframes, shared files and clipboard
-## use the same paths as other materials. No separate animation system.
 const PRESETS := ["Morning Mist","Dense Fog","Ground Haze","Dusty Atmosphere","Colored Fantasy Fog","Dark Cave Mist"]
-
-static func definition() -> ActorObjectDefinition:
-	var d:=ActorObjectDefinition.new(); d.type_id=&"fog_appearance"; d.display_name="Fog Appearance"
-	var rows:=[
+const FIELD_ROWS := [
 		["cloud_lod","Distance detail reduction",false,"Cloud rendering",{"tooltip":"Smoothly blends the authored cloud source toward a cached 16³ rendering field. Simulated concentration retains its physical grid."}],
 		["cloud_detail_distance","Full detail distance (m)",50.,"Cloud rendering",{"min":1.,"max":10000.}],
 		["projected_shadow","Project cloud shadow",false,"Ground shadow",{"tooltip":"Local decal approximation from integrated density and the real sun. Receives on geometry within the chosen ground elevation/depth; requires Forward+."}],
@@ -54,31 +49,12 @@ static func definition() -> ActorObjectDefinition:
 		["texture_strength","Texture strength",1.,"Mapping",{"min":0.,"max":1.}]
 		,["texture_contrast","Texture contrast",1.,"Mapping",{"min":.01,"max":16.}]
 		,["texture_tiling","Tile textures",true,"Mapping",{}]
-	]
-	for row in rows:
-		var p:=ActorProperty.create(StringName(row[0]),row[1],row[2],true); p.options.merge(row[4]); p.options.group=row[3]; d.properties.append(p)
-	for key in ["color_texture","density_texture","mask_texture","detail_texture"]:
-		var p:=ActorProperty.create(StringName(key),key.capitalize(),null); p.object_type=&"image"; p.options.merge({"group":"Textures","accepted_object_types":["image","noise_image"]}); d.properties.append(p)
-	for key in ["density_volume","color_volume"]:
-		var p:=ActorProperty.create(StringName(key),key.capitalize(),""); p.options.merge({"group":"Textures","file_picker":true,"extensions":["tres","res"],"native_resource_types":["Texture3D"],"file_resource_mode":"uneditable"}); d.properties.append(p)
-	for index in 4:
-		var p:=ActorProperty.create(StringName("layer_%d"%index),"Appearance influence %d"%(index+1),null); p.object_type=&"fog_field"; p.options.group="Layers"; d.properties.append(p)
-	return d
-
+]
+static func definition() -> ActorObjectDefinition:
+	return _native().definition()
 static func preset(index: int) -> ActorObjectData:
-	var data:=definition().create_object(); index=clampi(index,0,PRESETS.size()-1)
-	data.values[&"title"]=PRESETS[index]
-	data.values[&"color"]=[Color("edf3ff"),Color("bbc3c9"),Color("c5d8e9"),Color("ad8d6d"),Color("768bff"),Color("3d4b58")][index]
-	data.values[&"density_multiplier"]=[.12,2.,.2,.45,.65,.8][index]
-	if index==4: data.values[&"gradient"]=1; data.values[&"secondary"]=Color("bc64e8")
-	var field:=preload("res://scripts/actors/fog/fog_field.gd").definition().create_object(); field.values[&"mode"]=4; field.values[&"strength"]=[.15,.45,.2,.6,.3,.7][index]
-	data.values[&"layer_0"]=ActorObjectReference.from_object(field)
-	if index==2:
-		var height:=preload("res://scripts/actors/fog/fog_field.gd").definition().create_object(); height.values[&"mode"]=1; height.values[&"invert"]=true; data.values[&"layer_1"]=ActorObjectReference.from_object(height)
-	return data
-
+	return _native().preset(index)
 static func optical_density(field: float,values: Dictionary) -> float:
-	var d:=maxf(0.,field+float(values.get(&"offset",0.))-float(values.get(&"threshold",0.)))
-	d=pow(d,clampf(float(values.get(&"contrast",1.)),.01,16.))*maxf(0.,float(values.get(&"density_multiplier",1.)))
-	d*=clampf(float(values.get(&"opacity",1.)),0.,1.)*(1.+maxf(0.,float(values.get(&"absorption",0.))))
-	return clampf(d,0.,float(values.get(&"maximum",64.))) if is_finite(d) else 0.
+	return _native().optical_density(field,values)
+static func _native() -> Object:
+	return Engine.get_singleton("KiwiNativeServices").service("fog_appearance")

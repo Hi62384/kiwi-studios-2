@@ -1,0 +1,32 @@
+using Godot;
+using System;
+using System.Collections.Generic;
+using Settings=Godot.Collections.Dictionary;
+public partial class FogRenderSettingsOperations:RefCounted
+{
+    private static Resource? Project()=>StaticData.get_loaded_project();private static Settings Values(Resource project)=>project.Get("fog_rendering").AsGodotDictionary();
+    public void apply(Settings values){RenderingServer.EnvironmentSetVolumetricFogVolumeSize(Math.Clamp(values.GetValueOrDefault("size",ProjectSettings.GetSetting("rendering/environment/volumetric_fog/volume_size",64)).AsInt32(),32,256),Math.Clamp(values.GetValueOrDefault("depth",ProjectSettings.GetSetting("rendering/environment/volumetric_fog/volume_depth",64)).AsInt32(),16,128));RenderingServer.EnvironmentSetVolumetricFogFilterActive(values.GetValueOrDefault("filter",true).AsBool());}
+    public void attach(Node tabs){var button=tabs.GetNodeOrNull<Button>("../HBoxContainer/EditorButton");if(button==null)return;var project=Project();apply(project!=null?Values(project):new Settings());button.Pressed+=()=>show_menu(button,tabs);}
+    public void assign(Resource project,Settings values){project.Set("fog_rendering",values.Duplicate());apply(values);if(Engine.GetMainLoop() is SceneTree tree)foreach(var tabs in tree.GetNodesInGroup("actor_scene_tabs"))apply_scene_shadow(tabs);if(project.ResourcePath.Length>0)ResourceSaver.Save(project,project.ResourcePath);}
+    public void apply_scene_shadow(Node tabs)
+    {
+        var timeline=tabs.Get("timeline").AsGodotObject();if(timeline==null)return;var runtime=timeline.Get("runtime_holder").As<Node>();if(!GodotObject.IsInstanceValid(runtime))return;var viewport=runtime!.GetViewport();if(!viewport.HasMeta("kiwi_original_shadow_atlas"))viewport.SetMeta("kiwi_original_shadow_atlas",viewport.Get("positional_shadow_atlas_size"));var project=Project();if(project!=null)viewport.Set("positional_shadow_atlas_size",Values(project).GetValueOrDefault("shadow_atlas",viewport.GetMeta("kiwi_original_shadow_atlas")));
+    }
+    public void edit(Node tabs,Settings values)
+    {
+        var project=Project();var timeline=tabs.Get("timeline").AsGodotObject();if(project==null||timeline==null)return;var model=timeline.Get("model").As<RefCounted>();var action=new FogRenderSettingsHistoryAction(project,Values(project).Duplicate(),values.Duplicate());var history=model.Get("history").As<UndoRedo>();history.CreateAction("Project volumetric rendering quality");history.AddDoMethod(new Callable(action,"restore_after"));history.AddUndoMethod(new Callable(action,"restore_before"));history.AddDoReference(action);history.CommitAction();
+    }
+    public void show_menu(Button button,Node tabs)
+    {
+        var project=Project();if(project==null)return;var popup=new PopupPanel{Name="FogRenderingSettings"};button.AddChild(popup);popup.PopupHide+=popup.QueueFree;var column=new VBoxContainer();column.AddThemeConstantOverride("separation",8);popup.AddChild(column);column.AddChild(new Label{Text="Volumetric rendering · Project"});var caption=new Label{Text="Sampling applies to every viewport. Light and environment\nproperties remain in their actor inspectors."};caption.AddThemeFontSizeOverride("font_size",12);column.AddChild(caption);var row=new HBoxContainer();column.AddChild(row);var sizes=new[]{new Vector2I(64,32),new Vector2I(128,64),new Vector2I(192,96),new Vector2I(256,128)};var names=new[]{"Fast","Balanced","Detailed","Final render"};for(int i=0;i<names.Length;i++){int index=i;var preset=new Button{Text=names[i]};row.AddChild(preset);preset.Pressed+=()=>{var v=Values(project).Duplicate();v.Merge(new Settings{["size"]=sizes[index].X,["depth"]=sizes[index].Y,["filter"]=true},true);edit(tabs,v);popup.Hide();};}
+        foreach(string key in new[]{"size","depth"}){var line=new HBoxContainer();column.AddChild(line);line.AddChild(new Label{Text=key=="size"?"Fog resolution":"Depth resolution",TooltipText="Higher sampling detail improves light shafts and uses more GPU time and memory. Applies renderer-wide.",SizeFlagsHorizontal=Control.SizeFlags.ExpandFill});var input=new DragNumber();input.MinValue=key=="size"?32:16;input.MaxValue=key=="size"?256:128;input.Step=1;input.Value=Values(project).GetValueOrDefault(key,ProjectSettings.GetSetting("rendering/environment/volumetric_fog/volume_"+key,64)).AsDouble();line.AddChild(input);void Preview(double value){var v=Values(project).Duplicate();v[key]=(int)value;apply(v);}void Commit(double value){var v=Values(project).Duplicate();v[key]=(int)value;edit(tabs,v);}input.ValueChanged+=Commit;input.Connect("preview_changed",Callable.From<double>(Preview));input.Connect("drag_committed",Callable.From<double>(Commit));input.Connect("drag_cancelled",Callable.From(()=>apply(Values(project))));}
+        var filter=new CheckButton{Text="Filter volumetric samples",ButtonPressed=Values(project).GetValueOrDefault("filter",true).AsBool()};column.AddChild(filter);filter.Toggled+=enabled=>{var v=Values(project).Duplicate();v["filter"]=enabled;edit(tabs,v);};var shadowRow=new HBoxContainer();column.AddChild(shadowRow);shadowRow.AddChild(new Label{Text="Scene shadow maps",SizeFlagsHorizontal=Control.SizeFlags.ExpandFill});var atlas=new OptionButton{TooltipText="Omni/spot shadow atlas for the scene viewport and camera previews. Higher resolution uses more GPU memory."};shadowRow.AddChild(atlas);var atlasSizes=new[]{1024,2048,4096,8192};foreach(int size in atlasSizes)atlas.AddItem(size.ToString());int current=Values(project).GetValueOrDefault("shadow_atlas",2048).AsInt32();atlas.Select(Math.Max(0,Array.IndexOf(atlasSizes,current)));atlas.ItemSelected+=index=>{var v=Values(project).Duplicate();v["shadow_atlas"]=atlasSizes[index];edit(tabs,v);};popup.Position=(Vector2I)(button.GetScreenPosition()+new Vector2(0,button.Size.Y));popup.Popup();
+    }
+}
+public partial class FogRenderSettingsHistoryAction:RefCounted
+{
+    private readonly Resource? _project;private readonly Settings? _before,_after;private readonly FogRenderSettingsOperations _operations=new();
+    public FogRenderSettingsHistoryAction(){}
+    public FogRenderSettingsHistoryAction(Resource project,Settings before,Settings after){_project=project;_before=before;_after=after;}
+    public void restore_before(){if(_project!=null&&_before!=null)_operations.assign(_project,_before);}public void restore_after(){if(_project!=null&&_after!=null)_operations.assign(_project,_after);}
+}

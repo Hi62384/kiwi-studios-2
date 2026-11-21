@@ -1,8 +1,8 @@
 extends "res://scripts/actors/tests/destruction_timeline_test.gd"
-const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 const Builder=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_geometry.gd")
 func run() -> void:
-	var source: Resource=Source.rectangular(6,8,1); source.physics_enabled=true; var generated:=Builder.generate(source); var path:="user://destructible_architecture.res"; ResourceSaver.save(generated.document,path)
+	var source: Resource=(load("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs").call("rectangular",6,8,1) as BuildingSource); source.physics_enabled=true; var generated:=Builder.generate(source); var path:="user://destructible_architecture.res"; ResourceSaver.save(generated.document,path)
 	editor=ActorTimelineEditor.new(); root.add_child(editor); var view:=SubViewport.new(); view.size=Vector2i(400,300); root.add_child(view); editor.runtime_holder=Node3D.new(); view.add_child(editor.runtime_holder); editor.model.instantiate_model(generated.document,path,0.)
 	var wall: ActorData; var door: ActorData
 	for actor: ActorData in editor.model.actors:

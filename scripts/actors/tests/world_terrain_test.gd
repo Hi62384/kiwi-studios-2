@@ -1,7 +1,7 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Worlds=preload("res://Workspaces/EnvironmentWorkspace/world/world_session.gd")
 const Terrain=preload("res://Workspaces/EnvironmentWorkspace/world/world_terrain.gd")
-const Source=preload("res://Workspaces/EnvironmentWorkspace/world/world_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/world/WorldSource.cs")
 func run() -> void:
 	var session:=KiwiEnvironmentSession.new(); var ground:=session.add_terrain(); var terrain:=session.environment().terrain(ground.id); terrain.dimensions=Vector2(100,100); terrain.resolution=65; terrain.amplitude=0.; terrain.prepare(); var owner:=Worlds.add(session); var id:=owner.id; var source: Resource=Worlds.source(owner).copy(); source.terrain_id=ground.id; source.dimensions=Vector2(100,100); source.configure_regions(); source=Worlds.add_road(source,Vector3(-30,4,0),Vector3(30,4,0))
 	var fitted:=Terrain.fit(session,id,source,0); check(fitted.error.is_empty() and fitted.source.roads[0].points.size()>2,"Terrain fitting samples the whole curved road rather than just its endpoints")

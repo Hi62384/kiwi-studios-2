@@ -1,7 +1,7 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Modules=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_modules.gd")
 const Buildings=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_session.gd")
-const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 func run() -> void:
 	var source:=KiwiModelDocument.new(); var base:=KiwiModelComponent.new(); base.id="base"; base.mesh=KiwiModelPrimitives.box(Vector3.ONE); source.components.append(base); var child:=KiwiModelComponent.new(); child.id="child"; child.parent_id=base.id; child.mesh=KiwiModelPrimitives.box(Vector3.ONE*.2); child.transform.origin=Vector3(0,1,0); child.structural={&"structure_connections":{"parent":KiwiStructure.connection(base.id)}}; source.components.append(child)
 	var path:="user://furniture_module.res"; ResourceSaver.save(source,path); var session:=KiwiEnvironmentSession.new(); var root:=Buildings.add(session); root.transform=Transform3D(Basis.from_euler(Vector3(.1,.7,0)).scaled(Vector3(1.5,1.,.8)),Vector3(7,2,-3)); var before:=session.document.components.size(); var placed:=Modules.insert(session,root.id,path,Transform3D(Basis(Vector3.UP,.3),Vector3(2,0,1)))

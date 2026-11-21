@@ -1,0 +1,9 @@
+using Godot;
+using GArray=Godot.Collections.Array;
+using Settings=Godot.Collections.Dictionary;
+public partial class FluidDefinitionOperations:RefCounted
+{
+    private readonly ActorPropertyOperations _properties=new();private readonly ActorDefinitionOperations _definitions=new();
+    public void add(Resource definition,string key,string title,Variant value,string group,Settings hints,StringName objectType){var property=_properties.create(new StringName(key),title,value,true);var options=property.Get("options").AsGodotDictionary();options.Merge(hints,true);options["group"]=group;if(objectType.ToString().Length>0){property.Set("object_type",objectType);property.Set("value_type",(int)Variant.Type.Object);options["accepted_object_types"]=objectType==new StringName("material")?new GArray{"material","shader_material","natural_material"}:new GArray{"image","noise_image"};}definition.Get("properties").AsGodotArray().Add(property);}
+    public Resource create(GArray rows){var definition=new ActorDefinition();definition.Set("type_id",new StringName("fluid"));definition.Set("display_name","Fluid");definition.Set("category","Simulation");definition.Set("description","Timeline-controlled 3D liquid volume or source, with a reconstructed surface.");definition.Set("runtime_scene",GD.Load<PackedScene>("res://scripts/actors/physics/fluid/fluid_actor.tscn"));definition.Set("icon",GD.Load<Texture2D>("res://resources/Images/ActorIcons/Fluid.svg"));foreach(var value in rows){var row=value.AsGodotArray();add(definition,row[0].AsString(),row[1].AsString(),row[2],row[3].AsString(),row.Count>4?row[4].AsGodotDictionary():new Settings(),row.Count>5?row[5].AsStringName():new StringName(""));}foreach(string key in new[]{"fluid_preset","fluid_mesh_actor"})_definitions.find_property(definition,new StringName(key))!.Set("animatable",false);return definition;}
+}

@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="ActorDefinition" format=3 uid="uid://bkp7dev8jws4k"]
 
-[ext_resource type="Script" uid="uid://cfphk6n07ph5o" path="res://scripts/actors/core/actor_definition.gd" id="1"]
-[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/actors/core/ActorDefinition.cs" id="1"]
+[ext_resource type="Script" path="res://scripts/actors/core/ActorProperty.cs" id="2"]
 [ext_resource type="PackedScene" path="res://scripts/actors/examples/basic_actor.tscn" id="3"]
 [ext_resource type="Texture2D" uid="uid://d2xecso6leptt" path="res://resources/Images/ActorIcons/Particles3D.svg" id="4"]
 

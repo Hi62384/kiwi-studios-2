@@ -64,7 +64,7 @@ func run() -> void:
 		actor.set_value(&"position", Vector3((index - 1.5) * 2.5, 0.8, 0))
 		var runtime := definition.create_runtime(actor)
 		viewport.add_child(runtime)
-		runtime.evaluate_clip(ActorClip.create(actor), 0)
+		runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip), 0)
 		var title := Label.new()
 		title.text = names[index]
 		title.position = Vector2(20 + index * 300, 365)

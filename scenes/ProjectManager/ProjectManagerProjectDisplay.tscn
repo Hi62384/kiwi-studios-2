@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://b7urpcwnd0d7e"]
 
-[ext_resource type="Script" uid="uid://bjcilpgjrcr" path="res://scenes/ProjectManager/project_manager_project_display.gd" id="1_ccbv7"]
+[ext_resource type="Script" path="res://scenes/ProjectManager/ProjectManagerProjectDisplay.cs" id="1_ccbv7"]
 [ext_resource type="Texture2D" uid="uid://bops5bhht8eq3" path="res://resources/Images/Logos/ProgramIcon.png" id="1_y4eun"]
 [ext_resource type="SystemFont" uid="uid://bwdt8qysdchp6" path="res://resources/fonts/ReemKufi.tres" id="2_ccbv7"]
 [ext_resource type="SystemFont" uid="uid://fue8lb1oipxq" path="res://resources/fonts/MainFont.tres" id="3_0lffj"]

@@ -1,0 +1,43 @@
+using Godot;
+using System;
+using Settings=Godot.Collections.Dictionary;
+
+public partial class ShaderWorkspaceOperations
+{
+    public void apply_materials(Control owner)
+    {string kind=owner.Get("shader_kind").AsString();foreach(var node in Item<Node3D>(owner,"mesh_holder").FindChildren("*","MeshInstance3D",true,false))if(node is MeshInstance3D mesh)mesh.MaterialOverride=kind=="spatial"?Item<ShaderMaterial>(owner,"spatial_material"):null;Item<TextureRect>(owner,"canvas_preview").Material=kind=="canvas_item"?Item<ShaderMaterial>(owner,"canvas_material"):null;Item<FogVolume>(owner,"fog_preview").Material=kind=="fog"?Item<ShaderMaterial>(owner,"fog_preview_material"):null;Item<GpuParticles3D>(owner,"particle_preview").ProcessMaterial=kind=="particles"?Item<ShaderMaterial>(owner,"particle_material"):null;}
+    public void update_preview_mode(Control owner)
+    {
+        string kind=owner.Get("shader_kind").AsString();bool canvas=kind=="canvas_item",fog=kind=="fog";Item<Node3D>(owner,"preview_root").Visible=!canvas;Item<Node3D>(owner,"mesh_holder").Visible=kind=="spatial";var particles=Item<GpuParticles3D>(owner,"particle_preview");particles.Visible=kind=="particles";particles.Emitting=kind=="particles";Item<FogVolume>(owner,"fog_preview").Visible=fog;Item<MeshInstance3D>(owner,"fog_preview_guide").Visible=fog;Item<TextureRect>(owner,"canvas_preview").Visible=canvas;Item<TextureRect>(owner,"canvas_preview_background").Visible=canvas&&Code(owner).Text.Contains("hint_screen_texture",StringComparison.Ordinal);Item<VBoxContainer>(owner,"mesh_group").Visible=kind=="spatial";Item<VBoxContainer>(owner,"environment_group").Visible=!canvas;Item<VBoxContainer>(owner,"canvas_image_group").Visible=canvas;Item<TextureRect>(owner,"viewport_display").TooltipText=canvas?"Canvas shader preview":fog?"Fog volume preview · fly around its bounds":"Right-drag to look · WASD move · Q/E down/up · wheel changes speed";Item<Label>(owner,"status").Text=canvas?"CanvasItem preview · choose any project image above":fog?"Fog volume preview · volumetric fog enabled":viewport_help(owner);if(canvas)update_canvas_texture(owner);else if(kind=="particles")Item<Label>(owner,"status").Text="Particle process shader preview - drag to inspect the simulated particles";sync_preview_visibility(owner);
+    }
+    public void sync_preview_visibility(Control owner)
+    {bool visible=owner.IsVisibleInTree();Item<SubViewport>(owner,"viewport").RenderTargetUpdateMode=visible?SubViewport.UpdateMode.Always:SubViewport.UpdateMode.Disabled;Item<GpuParticles3D>(owner,"particle_preview").SpeedScale=visible?1:0;}
+    public Texture2D? studio_panorama(Control owner)
+    {
+        var cached=owner.Get("_studio_panorama_texture").As<Texture2D>();if(cached!=null)return cached;const string path="res://resources/environments/ShaderStudioPanorama.png";Texture2D? texture=ResourceLoader.Exists(path,"Texture2D")?ResourceLoader.Load(path,"Texture2D",ResourceLoader.CacheMode.Reuse) as Texture2D:null;if(texture==null){using var image=Image.LoadFromFile(ProjectSettings.GlobalizePath(path));if(image!=null&&!image.IsEmpty())texture=ImageTexture.CreateFromImage(image);}owner.Set("_studio_panorama_texture",texture!=null?Variant.From(texture):default);return texture;
+    }
+    public void apply_environment(Control owner)
+    {
+        string path=owner.Get("_environment_path").AsString(),kind=owner.Get("shader_kind").AsString();Godot.Environment? environment=path.Length>0?ResourceLoader.Load(path,"",ResourceLoader.CacheMode.Ignore) as Godot.Environment:null;if(environment==null){environment=new Godot.Environment {BackgroundMode=Godot.Environment.BGMode.Sky,Sky=new Sky {SkyMaterial=new PanoramaSkyMaterial {Panorama=studio_panorama(owner),EnergyMultiplier=.9f}},AmbientLightSource=Godot.Environment.AmbientSource.Sky,ReflectedLightSource=Godot.Environment.ReflectionSource.Sky,AmbientLightEnergy=.7f};}if(kind=="fog"){environment=(Godot.Environment)environment.Duplicate(true);environment.VolumetricFogEnabled=true;environment.VolumetricFogDensity=0;}if(kind=="sky"){environment.Sky=new Sky {SkyMaterial=Item<ShaderMaterial>(owner,"sky_material")};environment.BackgroundMode=Godot.Environment.BGMode.Sky;}Item<WorldEnvironment>(owner,"environment_node").Environment=environment;
+    }
+    public void rebuild_mesh(Control owner)
+    {
+        var holder=Item<Node3D>(owner,"mesh_holder");foreach(var child in holder.GetChildren())child.QueueFree();string path=owner.Get("_mesh_path").AsString();if(owner.Get("_mesh_mode").AsString()=="file"&&path.Length>0){Resource? resource=path.GetExtension().ToLowerInvariant() is "glb" or "gltf" or "fbx" or "obj"?new FileModelImportOperations().load_3d_model(path):ResourceLoader.Load(path,"",ResourceLoader.CacheMode.Ignore);if(resource is PackedScene packed)holder.AddChild(packed.Instantiate());else if(resource is Mesh mesh)holder.AddChild(new MeshInstance3D {Mesh=mesh});Item<Label>(owner,"mesh_label").Text="Project mesh · "+path.GetFile();}else{owner.Set("_mesh_mode","shape");var picker=Item<OptionButton>(owner,"shape_picker");Mesh mesh=picker.Selected switch {1=>new BoxMesh(),2=>new CylinderMesh(),3=>new PlaneMesh(),4=>new CapsuleMesh(),5=>new PrismMesh(),6=>new TorusMesh(),_=>new SphereMesh()};holder.AddChild(new MeshInstance3D {Mesh=mesh});Item<Label>(owner,"mesh_label").Text="Basic shape · "+picker.GetItemText(picker.Selected);}apply_materials(owner);
+    }
+    public string godot_project_path(string path)
+    {if(path.StartsWith("res://",StringComparison.Ordinal)||path.StartsWith("user://",StringComparison.Ordinal))return path;string normalized=path.Replace('\\','/'),root=ProjectSettings.GlobalizePath("res://").Replace('\\','/').TrimEnd('/');return normalized.StartsWith(root+"/",StringComparison.Ordinal)?"res://"+normalized[root.Length..].TrimStart('/'):path;}
+    public void update_canvas_texture(Control owner)
+    {
+        string path=owner.Get("_canvas_image_path").AsString();Texture2D? texture=null;if(path.Length>0){string loadPath=godot_project_path(path);texture=ResourceLoader.Load(loadPath,"",ResourceLoader.CacheMode.Ignore) as Texture2D;if(texture==null){string disk=loadPath.StartsWith("res://",StringComparison.Ordinal)||loadPath.StartsWith("user://",StringComparison.Ordinal)?ProjectSettings.GlobalizePath(loadPath):path;using var image=Image.LoadFromFile(disk);if(image!=null&&!image.IsEmpty())texture=ImageTexture.CreateFromImage(image);}}var preview=Item<TextureRect>(owner,"canvas_preview");preview.Texture=texture??default_canvas_texture(owner);Item<TextureRect>(owner,"canvas_preview_background").Texture=preview.Texture;fit_canvas_preview(owner);Item<Label>(owner,"canvas_image_label").Text=texture!=null?"Project image · "+path.GetFile():"Built-in color test image";
+    }
+    public void fit_canvas_preview(Control owner)
+    {
+        var preview=Item<TextureRect>(owner,"canvas_preview");if(preview.Texture==null)return;Vector2 size=Item<SubViewport>(owner,"viewport").Size;if(Code(owner).Text.Contains("hint_screen_texture",StringComparison.Ordinal)){preview.Size=size;preview.Position=Vector2.Zero;return;}var source=preview.Texture.GetSize();if(source.X<=0||source.Y<=0)return;var available=size-new Vector2(72,72);float fit=Math.Min(available.X/source.X,available.Y/source.Y);var fitted=source*fit;preview.Size=fitted;preview.Position=(size-fitted)*.5f;
+    }
+    public Texture2D default_canvas_texture(Control owner)
+    {
+        var preview=Item<TextureRect>(owner,"canvas_preview");if(preview.HasMeta("default_texture"))return preview.GetMeta("default_texture").As<Texture2D>();using var image=Image.CreateEmpty(640,360,false,Image.Format.Rgba8);for(int y=0;y<image.GetHeight();y++)for(int x=0;x<image.GetWidth();x++){var uv=new Vector2((float)((double)x/639),(float)((double)y/359));double checker=(x/48+y/48)%2==0?.08:0;var color=new Color((float)(.08+uv.X*.62+checker),(float)(.12+(1-uv.Y)*.52+checker),(float)(.3+uv.Y*.48),1);var center=uv-new Vector2(.5f,.5f);if(center.Length()<.22)color=new Color(.94f,(float)(.78+center.Y*.5),(float)(.24+center.X*.6),1);image.SetPixel(x,y,color);}var texture=ImageTexture.CreateFromImage(image);preview.SetMeta("default_texture",texture);return texture;
+    }
+    public void code_changed(Control owner)
+    {if(owner.Get("_loading").AsBool())return;string kind=shader_type(Code(owner).Text);owner.Set("shader_kind",kind);Item<Label>(owner,"shader_type_label").Text=kind.ToUpperInvariant()+" SHADER";owner.Set("preview_shader",new Shader {Code=Code(owner).Text});rebind_preview_materials(owner);update_preview_mode(owner);apply_environment(owner);apply_materials(owner);owner.CallDeferred("_rebuild_parameters");owner.EmitSignal("document_changed");}
+}

@@ -13,7 +13,7 @@ func test()->void:
  var w:=KiwiAudioWorkspace.new();root.add_child(w);await process_frame
  var original_samples:=PackedVector2Array();original_samples.resize(4410)
  for i in original_samples.size():original_samples[i]=Vector2.ONE*.1*sin(TAU*440*i/44100.0)
- var original_stream:=KiwiAudioSourceCache.to_wav(original_samples)
+ var original_stream:=KiwiAudioSourceCache.to_wav(original_samples,44100,true)
  w.open_source(KiwiAudioDocument.from_source(original_stream,"Imported waveform"));await settle(w)
  check(w.session.document.actors[0].values[&"audio"]==original_stream,"empty note metadata never resynthesizes imported audio")
  w.session.change_tempo(60);await settle(w)
@@ -57,7 +57,7 @@ func test()->void:
  check(var_to_str(w.session.primary_actor().values[&"notes"])==before,"locked track blocks all note toolbar and keyboard mutations")
  w.session.document.track_for_clip(clip_id).locked=false;w.piano.delete_selected();await settle(w)
  check(w.session.primary_actor().values[&"notes"].is_empty(),"delete last note regenerates silence")
- var samples:PackedVector2Array=KiwiAudioSourceCache.decode(w.session.primary_actor().values[&"audio"]).get("samples",PackedVector2Array());var peak:=0.0
+ var samples:PackedVector2Array=KiwiAudioSourceCache.decode(w.session.primary_actor().values[&"audio"],44100,0.0,-1.0,300.0).get("samples",PackedVector2Array());var peak:=0.0
  for sample in samples:peak=maxf(peak,maxf(absf(sample.x),absf(sample.y)))
  check(samples.size()>0 and is_zero_approx(peak),"empty pattern audio is actually silent")
  w.session.undo();await settle(w);w.session.redo();await settle(w)

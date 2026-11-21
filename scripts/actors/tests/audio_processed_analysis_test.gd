@@ -8,10 +8,10 @@ func run()->void:
 	if ActorVideo.executable("ffmpeg").is_empty():push_error("FFmpeg is required for this processed-signal test.");quit(2);return
 	var samples:=PackedVector2Array();samples.resize(48000)
 	for i in samples.size():samples[i]=Vector2.ONE*.2*sin(TAU*440*i/48000.)
-	var source:=KiwiAudioSourceCache.to_wav(samples,48000)
-	var document:=KiwiAudioDocument.from_source(source);document.master.volume_db=0.;document.master.effects=[]
+	var source:=KiwiAudioSourceCache.to_wav(samples,48000,true)
+	var document:=KiwiAudioDocument.from_source(source, "");document.master.volume_db=0.;document.master.effects=[]
 	document.tracks[0].volume_db=0.;document.tracks[0].effects=[]
-	var clip:=document.clips[0];var actor:=document.actors[0]
+	var clip: ActorClip =document.clips[0];var actor: ActorData =document.actors[0]
 	clip.source_offset=.2;clip.duration=.4
 	actor.values[&"fade_in"]=0.;actor.values[&"fade_out"]=0.;actor.values[&"volume_db"]=-12.
 	var gain:=KiwiAudioEffects.create("gain");gain.parameters.db=-6.;actor.values[&"effects"]=[gain]

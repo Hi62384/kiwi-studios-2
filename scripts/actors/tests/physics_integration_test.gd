@@ -86,7 +86,7 @@ func run() -> void:
 	check(state(rig).bones.size()==2 and rig_runtime.skeleton.get_bone_pose_rotation(0).is_equal_approx(Quaternion.IDENTITY),"Partial ragdoll affects checked bones while the rest of the rig stays animated")
 	var physical:=rig_runtime.skeleton.get_bone_pose_rotation(1)
 	KiwiPhysicsSettings.edit(editor.model,rig,"influence",0.0); await seek(.8)
-	var animated: Vector3=ActorAnimation.sampled_value(rig,PackedStringArray(["bone_poses","1","rotation"]),.8,Vector3.ZERO)
+	var animated: Vector3=load("res://scripts/actors/core/ActorAnimation.cs").call("sampled_value",rig,PackedStringArray(["bone_poses","1","rotation"]),.8,Vector3.ZERO)
 	check(rig_runtime.skeleton.get_bone_pose_rotation(1).is_equal_approx(Quaternion.from_euler(animated*PI/180.0)),"Zero skeleton influence restores the exact animated pose")
 	check(not physical.is_equal_approx(rig_runtime.skeleton.get_bone_pose_rotation(1)),"Partial ragdoll and animation are visibly distinct states")
 	var generation:=editor.physics.generation; garment.set_value(&"color",Color.RED); editor.model.changed.emit(); await seek(.8)

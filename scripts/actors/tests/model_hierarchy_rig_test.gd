@@ -77,7 +77,7 @@ func run() -> void:
 	editor.runtime_holder=Node3D.new(); viewport.add_child(editor.runtime_holder)
 	var display := TextureRect.new(); display.position=Vector2(20,20); display.size=Vector2(1000,700); display.texture=viewport.get_texture(); display.expand_mode=TextureRect.EXPAND_IGNORE_SIZE; root.add_child(display)
 	gizmo=ActorUIGizmo.new(); gizmo.editor=editor; gizmo.display=display; display.add_child(gizmo)
-	var root_clip := editor.model.create_actor(editor.registry.get_definition(&"basic_mesh"),0,{&"mesh_path":path}); await settle()
+	var root_clip: ActorClip = editor.model.create_actor(editor.registry.get_definition(&"basic_mesh"),0,{&"mesh_path":path}); await settle()
 	check(editor.model.actors.size()==4,"Adding a model creates a parent actor and separate component actors")
 	var aa := actor_named("ParentMesh"); var bb := actor_named("ChildMesh"); var cc := actor_named("Grandchild")
 	check(bb.parent_id==aa.id and cc.parent_id==bb.id and aa.parent_id==root_clip.actor_id,"Scene actors preserve the model's exact parent hierarchy")
@@ -91,7 +91,7 @@ func run() -> void:
 	ResourceSaver.save(session.document,path); call_group("actor_shader_runtimes","refresh_saved_model",path); editor._evaluate_runtimes(); await settle()
 	check(editor.runtime_holder.find_children("*","MeshInstance3D",true,false).size()==3,"Restoring a shared component refreshes its own mesh")
 	check(editor.model.selected_actor().link_timeline_children and not editor.model.selected_actor().show_timeline_children,"Instanced model root links and initially folds its child clips")
-	var saved_ids := editor.model.actors.map(func(actor: ActorData): return actor.id)
+	var saved_ids: Array = editor.model.actors.map(func(actor: ActorData): return actor.id)
 	editor.model.history.undo(); await settle(); check(editor.model.actors.is_empty(),"One undo removes the complete imported model hierarchy")
 	editor.model.history.redo(); await settle(); check(editor.model.actors.map(func(actor: ActorData): return actor.id)==saved_ids,"One redo restores all model nodes with stable IDs")
 	editor.model.unparent(cc.id); await settle(); check(editor._runtime_for_clip(editor.model.clip_for_actor_id(cc.id).id).remote_transform().is_equal_approx(c_world),"Scene unparenting preserves imported shear and world pose")
@@ -101,7 +101,7 @@ func run() -> void:
 	check(actor_named("Grandchild").parent_id==actor_named("ChildMesh").id,"Scene roundtrip preserves individual editable mesh parents")
 	var fixture := rig_fixture(); var imported := KiwiModelImport.load_document(fixture)
 	check(imported.components.size()==4 and imported.components[0].title=="Character" and imported.components[1].title=="ModelGroup","Model import retains non-mesh group nodes instead of flattening them")
-	var rig_data := imported.components[2]; var body_data := imported.components[3]
+	var rig_data: KiwiModelComponent = imported.components[2]; var body_data: KiwiModelComponent = imported.components[3]
 	check(rig_data.is_skeleton and rig_data.bones.size()==2 and rig_data.bones[1].parent==0,"Import recognizes Skeleton3D and preserves its bone names, parents and rest poses")
 	check(body_data.skeleton_id==rig_data.id and body_data.skin!=null and body_data.skin_mesh!=null,"Import preserves skin bindings and weighted source geometry")
 	var gltf_source := fixture.instantiate(); var gltf := GLTFDocument.new(); var state := GLTFState.new(); var glb_path := ProjectSettings.globalize_path("user://Rigged Model.glb")
@@ -126,13 +126,13 @@ func run() -> void:
 	check(editor.inspector.find_child("RigBonePicker",true,false)!=null and editor.inspector.find_child("KeyBonePose",true,false)!=null,"Rig inspector exposes bone selection, numeric transforms and pose keyframes")
 	click(gizmo.spatial.rig.toolbar_rect(0).get_center()); click(gizmo.spatial.rig.toolbar_rect(0).get_center(),false); await settle()
 	check(gizmo.spatial.rig.active(),"Selecting the viewport Bones tool enables bone guides")
-	var joint := gizmo.spatial.project(rig_runtime.skeleton.global_transform*rig_runtime.skeleton.get_bone_global_pose(1).origin)
+	var joint: Vector2 = gizmo.spatial.project(rig_runtime.skeleton.global_transform*rig_runtime.skeleton.get_bone_global_pose(1).origin)
 	click(joint); click(joint,false); await settle(); check(gizmo.spatial.rig.selected()==1,"Clicking a visible bone selects it in the viewport")
 	if DisplayServer.get_name()!="headless":
 		await RenderingServer.frame_post_draw
 	var before_image := viewport.get_texture().get_image()
-	var history_before := editor.model.history.get_version(); gizmo.spatial.mode="move"
-	var handles := gizmo.spatial.geometry(); var handle: Vector2=handles.center.lerp(handles.ends[0],.65)
+	var history_before: int = editor.model.history.get_version(); gizmo.spatial.mode="move"
+	var handles: Dictionary = gizmo.spatial.geometry(); var handle: Vector2=handles.center.lerp(handles.ends[0],.65)
 	click(handle); motion(handle+Vector2(50,0)); await settle(); click(handle+Vector2(50,0),false); await settle()
 	check(rig_runtime.skeleton.get_bone_pose_position(1).x>.1,"Viewport move handles modify the selected bone, not the entire rig")
 	check(rig_actor.get_value(&"position")==Vector3.ZERO and editor.model.history.get_version()==history_before+1,"Bone drag commits one undoable gesture without moving the actor")
@@ -150,13 +150,13 @@ func run() -> void:
 	check(rig_runtime.skeleton.get_bone_pose_scale(1).is_equal_approx(Vector3.ONE*1.5),"Bone scale handles scale the selected bone")
 	editor.model.history.undo(); await settle()
 	key(KEY_W); handles=gizmo.spatial.geometry(); handle=handles.center.lerp(handles.ends[0],.65)
-	var prior := rig_runtime.skeleton.get_bone_pose_position(1); history_before=editor.model.history.get_version()
+	var prior: Vector3 = rig_runtime.skeleton.get_bone_pose_position(1); history_before=editor.model.history.get_version()
 	click(handle); motion(handle+Vector2(25,0)); key(KEY_ESCAPE); click(handle+Vector2(25,0),false); await settle()
 	check(rig_runtime.skeleton.get_bone_pose_position(1).is_equal_approx(prior) and rig_actor.animation_previews.is_empty() and editor.model.history.get_version()==history_before,"Escape cancels a bone transform without an undo entry or stale preview")
 	key(KEY_I); await settle(); check(rig_actor.animation_tracks.size()==3,"I inserts position, rotation and scale keys for the selected bone")
 	var base_pose: Vector3=ActorSkeletonPose.value(rig_actor,1,"position")
 	editor.canvas.playhead=2.; editor._evaluate_runtimes(); await settle()
-	ActorSkeletonPose.commit(editor.model,ActorSkeletonPose.capture(editor.model,rig_actor),1,{"position":base_pose+Vector3.RIGHT,"rotation":Vector3(0,0,90)})
+	ActorSkeletonPose.commit(editor.model,ActorSkeletonPose.capture(editor.model,rig_actor),1,{"position":base_pose+Vector3.RIGHT,"rotation":Vector3(0,0,90)},false)
 	await settle()
 	check(rig_actor.animation_track(ActorSkeletonPose.path(1,"position")).keys.size()==2,"Editing an animated bone inserts a key at the current playhead")
 	editor.model.history.undo(); await settle(); check(rig_actor.animation_track(ActorSkeletonPose.path(1,"position")).keys.size()==1,"Undo removes the complete multi-channel pose edit's keys")
@@ -175,8 +175,8 @@ func run() -> void:
 	var output := ProjectSettings.globalize_path("res://.godot/verification/model_workspace/rig_pose_tools.png"); DirAccess.make_dir_recursive_absolute(output.get_base_dir())
 	if DisplayServer.get_name()!="headless":
 		await RenderingServer.frame_post_draw; check(root.get_texture().get_image().save_png(output)==OK,"Rig viewport screenshot")
-	var original_x := rig_runtime.skeleton.get_bone_pose_position(1).x
-	var original_count := editor.model.actors.size()
+	var original_x: float = rig_runtime.skeleton.get_bone_pose_position(1).x
+	var original_count: int = editor.model.actors.size()
 	var ids: Array[String]=[]
 	for clip in editor.model.clips: ids.append(clip.id)
 	editor.model.set_selection(ids); editor.duplicate_selected(); await settle()
@@ -184,7 +184,7 @@ func run() -> void:
 	var copied_runtime := editor._runtime_for_clip(editor.model.clip_for_actor_id(copied_rig.id).id) as ActorSkeletonRigRuntime
 	var copied_mesh := editor._runtime_for_clip(editor.model.clip_for_actor_id(copied_body.id).id).content.get_child(0) as MeshInstance3D
 	check(copied_body.values[&"model_skeleton_actor"]==copied_rig.id and copied_mesh.get_node(copied_mesh.skeleton)==copied_runtime.skeleton,"Duplicating a hierarchy remaps skin bindings to the copied rig")
-	ActorSkeletonPose.commit(editor.model,ActorSkeletonPose.capture(editor.model,copied_rig),1,{"position":Vector3(3,1,0)}); await settle()
+	ActorSkeletonPose.commit(editor.model,ActorSkeletonPose.capture(editor.model,copied_rig),1,{"position":Vector3(3,1,0)},false); await settle()
 	check(is_equal_approx(rig_runtime.skeleton.get_bone_pose_position(1).x,original_x) and copied_runtime.skeleton.get_bone_pose_position(1).x>2.9,"Copied rig animation is independent of the original")
 	editor.model.history.undo(); editor.model.history.undo(); await settle(); check(editor.model.actors.size()==original_count,"Copied rig poses and the copied model hierarchy undo cleanly")
 	display.queue_free(); editor.inspector.queue_free(); editor.queue_free(); viewport.queue_free(); workspace.queue_free(); await settle()

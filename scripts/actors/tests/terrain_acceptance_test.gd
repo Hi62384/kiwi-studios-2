@@ -1,5 +1,5 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
-const Job=preload("res://Workspaces/EnvironmentWorkspace/environment_generation_job.gd")
+const Job=preload("res://Workspaces/EnvironmentWorkspace/EnvironmentGenerationJob.cs")
 func run() -> void:
 	var source:=KiwiEnvironmentTerrain.new(); source.resolution=65; source.dimensions=Vector2(32,32); source.generation=KiwiTerrainGenerator.preset(2); source.generation.layers=[{"type":"Mountain range","height":8.,"width":8.,"length":16.}]; source.amplitude=8.; source.base_height=3.; source.geology=3; source.biomes=KiwiTerrainBiomes.new(); source.biomes.sea_temperature=5.; source.biomes.altitude_lapse=.5
 	for index in [0,1,7,12,13]:
@@ -11,7 +11,8 @@ func run() -> void:
 	var document:=KiwiEnvironmentDocument.new(); var item:=document.add_terrain(terrain); var paint:=StandardMaterial3D.new(); paint.albedo_color=Color.SADDLE_BROWN; document.component_settings[item.id].paint_material=paint; document.workspace_state={"view":{"target":Vector3(1,2,3),"distance":15.},"selected":[item.id],"property_scrolls":{item.id:120}}; var signature:=terrain.signature(); var path:="user://terrain-acceptance.res"; ResourceSaver.save(document,path,ResourceSaver.FLAG_COMPRESS); var reopened:=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE) as KiwiEnvironmentDocument; var loaded:=reopened.terrain(item.id)
 	check(loaded.signature()==signature and loaded.water_valid() and loaded.biomes_valid() and loaded.volumes_valid() and loaded.cave_biomes_valid() and reopened.workspace_state==document.workspace_state,"A combined environment reopens with all authored sources, valid generated stages, materials and editor state")
 	check(loaded.edits[18+18*65]==2. and loaded.material_mask[18+18*65]==.75 and not loaded.volume_chunks.is_empty() and not loaded.cave_biome_data.is_empty(),"Saved sculpt, paint and underground fields retain their actual independent data")
-	var runtime:=KiwiEnvironmentRuntime.new(); root.add_child(runtime); runtime.configure(reopened); check(runtime.errors.is_empty() and runtime.nodes[item.id].has_node("Water") and runtime.chunks_rebuilt==4,"The combined saved resource renders all native terrain chunks, cave materials and aligned water without warnings")
+	var runtime:=KiwiEnvironmentRuntime.new(); root.add_child(runtime); runtime.configure(reopened); check(runtime.errors.is_empty() and runtime.nodes[item.id].has_node("Water") and runtime.chunks_rebuilt==4,"The combined saved resource renders all native terrain chunks, cave materials and aligned water without geometry errors")
+	if RenderingServer.get_current_rendering_method()=="gl_compatibility": check(not runtime.warnings.is_empty() and "Biome material budget" in " ".join(runtime.warnings),"Compatibility palette limits remain visible as nonfatal material warnings")
 	var heights:=PackedFloat32Array(); heights.resize(33*33)
 	for z in 33:
 		for x in 33: heights[x+z*33]=8.-z*.4+pow(float(x)-16.,2.)*.025

@@ -1,6 +1,6 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Buildings=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_session.gd")
-const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 const Layout=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_layout.gd")
 func run() -> void:
 	var session:=KiwiModelSession.new(); var root:=Buildings.add(session); var id:=root.id; var authored: Resource=Layout.generate(Buildings.source(root),3).source; Buildings.update(session,id,authored)

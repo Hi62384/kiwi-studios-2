@@ -7,9 +7,9 @@ func check(value: bool,message: String) -> void:
 	if not value: failures += 1; push_error(message)
 func run() -> void:
 	var samples := PackedVector2Array(); samples.resize(4800); samples.fill(Vector2(.1,-.2))
-	var source := KiwiAudioSourceCache.to_wav(samples,48000)
-	var session := KiwiAudioEditSession.new(); session.document=KiwiAudioDocument.from_source(source)
-	var actor := session.document.actors[0]; var clip := session.document.clips[0]
+	var source := KiwiAudioSourceCache.to_wav(samples,48000,true)
+	var session := KiwiAudioEditSession.new(); session.document=KiwiAudioDocument.from_source(source, "")
+	var actor: ActorData = session.document.actors[0]; var clip: ActorClip = session.document.clips[0]
 	actor.values[&"fade_in"]=0.; actor.values[&"fade_out"]=0.
 	var original := source.data
 	var result := KiwiAudioRegionEdit.prepare(clip,actor,source,"set_amplitude",Vector2i(100,101),48000,.7,0)

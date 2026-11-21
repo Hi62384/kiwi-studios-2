@@ -27,7 +27,7 @@ func run()->void:
 	root.size=Vector2i(1440,900);await settle()
 	var samples:=PackedVector2Array();samples.resize(48000)
 	for index in samples.size():samples[index]=Vector2.ONE*.2*sin(TAU*220.*index/48000.)
-	var clip:=w.session.insert_source(KiwiAudioSourceCache.to_wav(samples,48000),0,w.session.selected_track,"Voice take")
+	var clip:=w.session.insert_source(KiwiAudioSourceCache.to_wav(samples,48000,true),0,w.session.selected_track,"Voice take")
 	w.session.select(clip.id);await settle()
 	check(not w._layout.empty_state.visible and w._layout.clip_actions.visible,"Selected clips show only their relevant timeline actions")
 	check(w._layout.inspector_view=="clip","Clip selection switches inspector to clip controls")

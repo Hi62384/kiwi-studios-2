@@ -1,8 +1,8 @@
 extends Node
 
-const ExpandableButton = preload("uid://dk22ixmn3cmrb")
+const ExpandableButton = preload("res://scripts/Extra/ExpandableButtonControl.cs")
 const FILE_ACTION_DIALOGUE = preload("uid://cm431qw86wyvs")
-const FileActionDialogue = preload("uid://c0ohimns5kdk7")
+const FileActionDialogue = preload("res://scripts/Extra/FileActionDialogueControl.cs")
 const FileSystem = preload("uid://k2xqavmy8y6v")
 const FileSystemCallableActions = preload("uid://b5gm21p0e2sbv")
 
@@ -26,112 +26,65 @@ var _current_dialouge: FileActionDialogue
 
 
 func _ready() -> void:
-	delete_file_panel_close_button.pressed.connect(func():
-		set_panel_visible(delete_file_panel, false)
-		)
-	delete_file_panel_delete_button.pressed.connect(delete_files)
-	delete_file_panel_to_recycle_bin_button.pressed.connect(recycle_files)
-
-
+	_native_context().ready(self)
 
 func display_operations(expandable_button: ExpandableButton) -> void:
-	_clicked_expandable_button = expandable_button
-	_current_dialouge = FILE_ACTION_DIALOGUE.instantiate()
-	_current_dialouge.position = file_system.get_global_mouse_position()
-	add_child(_current_dialouge)
-	
-	_current_dialouge.copy_path_button.pressed.connect(copy_file_path)
-	_current_dialouge.copy_absolute_path_button.pressed.connect(copy_absolute_file_path)
-	_current_dialouge.show_in_file_manager_button.pressed.connect(_show_in_file_manager)
-	_current_dialouge.open_in_external_program_button.pressed.connect(_open_in_external_program)
-	_current_dialouge.rename_button.pressed.connect(rename_file)
-	_current_dialouge.create_new_folder_button.pressed.connect(create_folder)
-	_current_dialouge.delete_button.pressed.connect(show_delete_options)
-	_current_dialouge.duplicate_button.pressed.connect(duplicate_files)
-	var clipboard:=Button.new(); clipboard.text="Copy to Super Clipboard"; _current_dialouge.duplicate_button.get_parent().add_child(clipboard)
-	clipboard.pressed.connect(func():
-		for path: String in _arr_of_top_selected_file_paths():
-			if FileAccess.file_exists(path): KiwiSuperClipboardService.instance.quick_save(path,path.get_file().get_basename())
-		if is_instance_valid(_current_dialouge): _current_dialouge.queue_free())
-
-
+	_native_context().display_operations(self,expandable_button)
 
 func _arr_of_top_selected_file_paths() -> Array[String]:
-	var top_level_files: Array[ExpandableButton] = file_system.files_selector.get_expandable_buttons_top_selected_files()
-	return file_system.expandable_button_arr_to_path_arr(top_level_files)
-
-
+	return _native_context().selected_paths(self)
 
 func set_panel_visible(panel: Control, visible: bool) -> void:
-	panel.visible = visible
-	screen_cover.visible = visible
-
-
+	_native_context().set_panel_visible(self,panel,visible)
 
 func _get_clicked_expandable_button_path() -> String:
-	return _clicked_expandable_button.get_meta("path")
-
+	return _native_context().clicked_path(self)
 
 func copy_file_path() -> void:
-	DisplayServer.clipboard_set(LocalProjectFilesystem.global_to_local_path(_get_clicked_expandable_button_path()))
-
+	_native_context().copy_file_path(self)
 
 func copy_absolute_file_path() -> void:
-	DisplayServer.clipboard_set(_get_clicked_expandable_button_path())
-
+	_native_context().copy_absolute_file_path(self)
 
 func _show_in_file_manager() -> void:
-	var dir: String = FileOperations.get_lowest_directory(_get_clicked_expandable_button_path())
-	FileOperations.open_file(dir)
-
+	_native_context().show_in_file_manager(self)
 
 func _open_in_external_program() -> void:
-	FileOperations.open_file(_get_clicked_expandable_button_path())
-
+	_native_context().open_in_external_program(self)
 
 func rename_file() -> void:
-	screen_cover.visible = true
-	rename_file_panel_line_edit.text = _get_clicked_expandable_button_path().get_basename().get_file()
-	var result: Dictionary = await rename_file_panel.select_params()
-	screen_cover.visible = false
-	if result.is_empty(): return
-	file_system_callable_actions.rename_file(_get_clicked_expandable_button_path(), result.NewFileName)
-
+	var path: String=_native_context().begin_rename(self)
+	if path.is_empty(): return
+	var result: Dictionary=await rename_file_panel.select_params()
+	_native_context().finish_rename(self,path,result)
 
 func create_folder() -> void:
-	screen_cover.visible = true
-	var result: Dictionary = await create_folder_panel.select_params()
-	screen_cover.visible = false
-	if result.is_empty(): return
-	var base_path: String = FileOperations.get_lowest_directory(_get_clicked_expandable_button_path())
-	var folder_path: String = base_path + "/" + result.FolderName
-	file_system_callable_actions.create_folder(folder_path)
-
-
+	var path: String=_native_context().begin_create_folder(self)
+	if path.is_empty(): return
+	var result: Dictionary=await create_folder_panel.select_params()
+	_native_context().finish_create_folder(self,path,result)
 
 func duplicate_files() -> void:
-	file_system_callable_actions.duplicate_files(_arr_of_top_selected_file_paths())
-
+	_native_context().duplicate_files(self)
 
 func show_delete_options() -> void:
-	set_panel_visible(delete_file_panel, true)
-
-
+	_native_context().show_delete_options(self)
 
 func delete_files() -> void:
-	set_panel_visible(delete_file_panel, false)
-	file_system_callable_actions.delete_files(_arr_of_top_selected_file_paths())
-
-
+	_native_context().delete_files(self)
 
 func recycle_files() -> void:
-	set_panel_visible(delete_file_panel, false)
-	file_system_callable_actions.send_files_to_recycle_bin(_arr_of_top_selected_file_paths())
-
-
+	_native_context().recycle_files(self)
 
 func _for_top_files(fun: Callable) -> void:
-	var top_level_files: Array[ExpandableButton] = file_system.files_selector.get_expandable_buttons_top_selected_files()
-	for expandable_button: ExpandableButton in top_level_files:
-		var expandable_button_path: String = expandable_button.get_meta("path")
-		fun.call(expandable_button, expandable_button_path)
+	_native_context().for_top_files(self,fun)
+
+
+func _close_delete_panel() -> void:
+	_native_context().close_delete_panel(self)
+
+func _invoke_file_callback(callback: Callable,button: Variant,path: String) -> void:
+	if callback.is_valid(): callback.call(button,path)
+
+static func _native_context() -> Object:
+	return Engine.get_singleton("KiwiNativeServices").service("project_file_context")

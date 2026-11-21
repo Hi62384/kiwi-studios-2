@@ -4,10 +4,10 @@ extends RefCounted
 ## No provider, model, subscription, credential or remote operation is enabled by default.
 const TASKS := ["sound_effect","music","speech","transform","extend","variation","restore"]
 func descriptor()->Dictionary:
- return {"id":"","label":"Unconfigured provider","tasks":[],"models":[],"supports_cancel":false,"credential_required":true}
+ return Engine.get_singleton("KiwiNativeServices").service("audio_provider_contract").descriptor()
 func estimate(_request:Dictionary)->Dictionary:
- return {"known":false,"amount":0.0,"currency":"","unit":"request"}
+ return Engine.get_singleton("KiwiNativeServices").service("audio_provider_contract").estimate()
 func generate(_request:Dictionary,_credential:String,_job:RefCounted=null)->Dictionary:
- return {"success":false,"error":"This provider has no generation adapter."}
+ return Engine.get_singleton("KiwiNativeServices").service("audio_provider_contract").generate()
 func cancel(_request_id:String)->void:
  pass

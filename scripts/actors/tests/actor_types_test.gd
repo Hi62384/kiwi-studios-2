@@ -49,7 +49,7 @@ func run() -> void:
 	shape_actor.set_value(&"material", ActorObjectReference.from_object(red_material))
 	var shape_runtime := shape_definition.create_runtime(shape_actor)
 	root.add_child(shape_runtime)
-	var shape_clip := ActorClip.create(shape_actor)
+	var shape_clip := (load("res://scripts/actors/core/ActorClip.cs").call("create",shape_actor) as ActorClip)
 	shape_runtime.evaluate_clip(shape_clip, 0.0)
 	var shape_mesh := shape_runtime.content as MeshInstance3D
 	check(shape_mesh.mesh is BoxMesh and (shape_mesh.material_override as StandardMaterial3D).albedo_color == Color.RED
@@ -79,13 +79,13 @@ func run() -> void:
 	var mesh_actor := mesh_definition.create_actor({&"mesh_path": BoxMesh.new()})
 	var mesh_runtime := mesh_definition.create_runtime(mesh_actor)
 	root.add_child(mesh_runtime)
-	mesh_runtime.evaluate_clip(ActorClip.create(mesh_actor), 0.0)
+	mesh_runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",mesh_actor) as ActorClip), 0.0)
 	check(mesh_runtime.content.find_children("*", "MeshInstance3D", true, false).size() == 1,
 		"Basic Mesh displays an embedded Mesh resource")
 	var saved_mesh_path := "user://basic_mesh_actor_test.tres"
 	ResourceSaver.save(SphereMesh.new(), saved_mesh_path)
 	mesh_actor.set_value(&"mesh_path", ProjectSettings.globalize_path(saved_mesh_path))
-	mesh_runtime.evaluate_clip(ActorClip.create(mesh_actor), 0.0)
+	mesh_runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",mesh_actor) as ActorClip), 0.0)
 	var loaded_meshes: Array[Node] = mesh_runtime.content.find_children("*", "MeshInstance3D", true, false)
 	check(loaded_meshes.size() == 1 and (loaded_meshes[0] as MeshInstance3D).mesh is SphereMesh,
 		"Basic Mesh loads a project filesystem Mesh resource")
@@ -105,7 +105,7 @@ func run() -> void:
 	check(glb_written, "GLB fixture is generated")
 	if glb_written:
 		mesh_actor.set_value(&"mesh_path", ProjectSettings.globalize_path(glb_path))
-		mesh_runtime.evaluate_clip(ActorClip.create(mesh_actor), 0.0)
+		mesh_runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",mesh_actor) as ActorClip), 0.0)
 		check(mesh_runtime.content.find_children("*", "MeshInstance3D", true, false).size() == 1,
 			"Basic Mesh loads an absolute GLB model path")
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(glb_path))
@@ -140,7 +140,7 @@ func run() -> void:
 	light_actor.set_value(&"light_type", 1)
 	var light_runtime := light_definition.create_runtime(light_actor)
 	root.add_child(light_runtime)
-	light_runtime.evaluate_clip(ActorClip.create(light_actor), 0.0)
+	light_runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",light_actor) as ActorClip), 0.0)
 	check(light_runtime.content is OmniLight3D, "3D Light switches between concrete light types")
 	var directional_definition := registry.get_definition(&"directional_light")
 	var directional_actor := directional_definition.create_actor()
@@ -149,7 +149,7 @@ func run() -> void:
 	directional_actor.set_value(&"shadow_max_distance", 250.0)
 	var directional_runtime := directional_definition.create_runtime(directional_actor)
 	root.add_child(directional_runtime)
-	directional_runtime.evaluate_clip(ActorClip.create(directional_actor), 0.0)
+	directional_runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",directional_actor) as ActorClip), 0.0)
 	var directional := directional_runtime.content as DirectionalLight3D
 	check(directional != null and is_equal_approx(directional.light_angular_distance, 1.5)
 		and directional.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
@@ -168,7 +168,7 @@ func run() -> void:
 	camera_actor.set_value(&"material", ActorObjectReference.from_object(camera_material))
 	var camera_runtime := camera_definition.create_runtime(camera_actor)
 	root.add_child(camera_runtime)
-	camera_runtime.evaluate_clip(ActorClip.create(camera_actor), 0.0)
+	camera_runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",camera_actor) as ActorClip), 0.0)
 	check(camera_runtime.camera_shader_material != null
 		and camera_runtime.camera_shader_material.shader.code.contains("hint_screen_texture")
 		and camera_runtime.camera_shader_material.get_shader_parameter(&"tint") == Color.RED
@@ -194,7 +194,7 @@ func run() -> void:
 	fog_actor.set_value(&"material", ActorObjectReference.from_object(fog_object))
 	var fog_runtime := fog_definition.create_runtime(fog_actor)
 	root.add_child(fog_runtime)
-	fog_runtime.evaluate_clip(ActorClip.create(fog_actor), 0.0)
+	fog_runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",fog_actor) as ActorClip), 0.0)
 	check((fog_runtime.content as FogVolume).material is ShaderMaterial
 		and is_equal_approx(float(fog_runtime.fog_shader_material.get_shader_parameter(&"density")), 0.8),
 		"Fog Volume evaluates a fog shader and its uniform values")
@@ -203,7 +203,7 @@ func run() -> void:
 	check(not fog_inspector._property_is_visible(fog_definition.find_property(&"density"), fog_actor),
 		"Fog shader hides built-in fog controls that no longer affect the volume")
 	fog_actor.set_value(&"material", null)
-	fog_runtime.evaluate_clip(ActorClip.create(fog_actor), 0.0)
+	fog_runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",fog_actor) as ActorClip), 0.0)
 	check((fog_runtime.content as FogVolume).material is FogMaterial
 		and fog_inspector._property_is_visible(fog_definition.find_property(&"density"), fog_actor),
 		"Clearing the fog shader restores the built-in FogMaterial")
@@ -217,12 +217,12 @@ func run() -> void:
 	world_actor.set_value(&"environment", ActorObjectReference.from_object(environment_object))
 	var world_runtime := world_definition.create_runtime(world_actor)
 	root.add_child(world_runtime)
-	world_runtime.evaluate_clip(ActorClip.create(world_actor), 0.0)
+	world_runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",world_actor) as ActorClip), 0.0)
 	check(root.world_3d.environment.background_color == Color("345678"),
 		"World Environment controls the viewport Environment")
 	environment_object.set_value(&"background_mode", 2)
 	environment_object.set_value(&"sky_top_color", Color.RED)
-	world_runtime.evaluate_clip(ActorClip.create(world_actor), 0.0)
+	world_runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",world_actor) as ActorClip), 0.0)
 	check(root.world_3d.environment.background_mode == Environment.BG_SKY
 		and root.world_3d.environment.sky.sky_material is ProceduralSkyMaterial
 		and (root.world_3d.environment.sky.sky_material as ProceduralSkyMaterial).sky_top_color == Color.RED,
@@ -254,7 +254,7 @@ func run() -> void:
 	sky_material_object.set_value(&"shader_path", sky_shader)
 	environment_object.set_value(&"background_mode", 3)
 	environment_object.set_value(&"sky_material", ActorObjectReference.from_object(sky_material_object))
-	world_runtime.evaluate_clip(ActorClip.create(world_actor), 0.0)
+	world_runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",world_actor) as ActorClip), 0.0)
 	check(root.world_3d.environment.sky.sky_material is ShaderMaterial
 		and (root.world_3d.environment.sky.sky_material as ShaderMaterial).shader.code == sky_shader.code,
 		"Shader Sky consumes a ShaderMaterial resource instead of a raw Shader property")

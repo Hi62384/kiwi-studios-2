@@ -16,7 +16,7 @@ func test()->void:
  var first:=KiwiAudioDocument.from_source(null,"First composition");workspace.open_source(first)
  var samples:=PackedVector2Array();samples.resize(4410)
  for i in samples.size():samples[i]=Vector2(sin(TAU*440*i/44100.0)*0.1,sin(TAU*660*i/44100.0)*0.08)
- var stream:=KiwiAudioSourceCache.to_wav(samples)
+ var stream:=KiwiAudioSourceCache.to_wav(samples,44100,true)
  var clip:=workspace.session.insert_source(stream,0,workspace.session.selected_track,"Stereo test")
  await process_frame
  var first_state:=workspace.capture_state();var first_session:=workspace.session

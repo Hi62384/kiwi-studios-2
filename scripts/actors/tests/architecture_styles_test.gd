@@ -1,11 +1,11 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
-const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 const Styles=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_styles.gd")
 const Builder=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_geometry.gd")
 const Layout=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_layout.gd")
 const Buildings=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_session.gd")
 func run() -> void:
-	var source: Resource=Layout.generate(Source.rectangular(8,12),5).source; var fingerprints: Dictionary={}
+	var source: Resource=Layout.generate((load("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs").call("rectangular",8,12) as BuildingSource),5).source; var fingerprints: Dictionary={}
 	for name: String in Styles.PRESETS:
 		var styled: Resource=Styles.apply(source,name); var generated:=Builder.generate(styled); var valid: bool=generated.errors.is_empty(); var detail_faces:=0; var shape: Array=[]
 		if valid:

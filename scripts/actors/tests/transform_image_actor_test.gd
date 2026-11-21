@@ -14,15 +14,15 @@ func seek(time: float) -> void:
 	editor._evaluate_runtimes()
 	editor.model.changed.emit()
 func fixture() -> KiwiTransformationImage2D:
-	var document := KiwiTransformationImage2D.blank(Vector2i(160, 120))
-	var item := document.components[0]; item.title = "Face"
-	var first := item.states[0]; first.title = "Rest"
+	var document := (load("res://Workspaces/TransformationWorkspace/KiwiTransformationImage2D.cs").call("blank",Vector2i(160, 120)) as KiwiTransformationImage2D)
+	var item: KiwiTransformationComponent = document.components[0]; item.title = "Face"
+	var first: KiwiTransformationState = item.states[0]; first.title = "Rest"
 	var image := Image.create(48, 48, false, Image.FORMAT_RGBA8); image.fill(Color(0, 0, 0, 0))
 	for y in range(8, 40):
 		for x in range(8, 40): image.set_pixel(x, y, Color("ed624e"))
 	first.artwork.texture = ImageTexture.create_from_image(image)
 	first.artwork.position = Vector2(8, 16); first.artwork.dimensions = Vector2(48, 48)
-	var second := first.copy_state(true); second.title = "Smile"; second.artwork.position = Vector2(96, 24)
+	var second: KiwiTransformationState = first.copy_state(true); second.title = "Smile"; second.artwork.position = Vector2(96, 24)
 	image = image.duplicate(); image.fill(Color(0, 0, 0, 0))
 	for y in 48:
 		for x in 48:
@@ -30,11 +30,11 @@ func fixture() -> KiwiTransformationImage2D:
 	second.artwork.texture = ImageTexture.create_from_image(image); item.states.append(second)
 	KiwiTransformationExamples.key(item, 0, first, "Auto Morph")
 	KiwiTransformationExamples.key(item, 2, second, "Auto Morph")
-	var detail := KiwiTransformationImage2D.make_component(document.canvas_size, "Detail")
+	var detail: KiwiTransformationComponent = (load("res://Workspaces/TransformationWorkspace/KiwiTransformationImage2D.cs").call("make_component",document.canvas_size, "Detail") as KiwiTransformationComponent)
 	var dot := Image.create(8, 8, false, Image.FORMAT_RGBA8); dot.fill(Color("5ce19b"))
 	detail.states[0].artwork.texture = ImageTexture.create_from_image(dot)
 	detail.states[0].artwork.position = Vector2(12, 96); detail.states[0].artwork.dimensions = Vector2(8, 8)
-	var other := detail.states[0].copy_state(true); other.title = "Raised"; other.artwork.position.y = 76; detail.states.append(other)
+	var other: KiwiTransformationState = detail.states[0].copy_state(true); other.title = "Raised"; other.artwork.position.y = 76; detail.states.append(other)
 	document.components.append(detail)
 	return document
 func centroid(image: Image) -> Vector2:
@@ -48,9 +48,9 @@ func run() -> void:
 	root.size = Vector2i(1440, 1000); root.gui_embed_subwindows = true
 	var folder := ProjectSettings.globalize_path("user://transform_actor_" + ActorData.new_id())
 	DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash"))
-	var project := Project.new("Transformation actor verification")
-	ResourceSaver.save(project, folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.loaded_project = project
-	var document := fixture(); var item := document.components[0]; var detail := document.components[1]
+	var project := Project.create("Transformation actor verification")
+	ResourceSaver.save(project, folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.set_loaded_project(project)
+	var document := fixture(); var item: KiwiTransformationComponent = document.components[0]; var detail: KiwiTransformationComponent = document.components[1]
 	check(document.validate().is_empty(), "Actor fixture is a valid multi-component transformation")
 	var source := folder.path_join("Face.tres")
 	check(ResourceSaver.save(document, source) == OK, "Save native transformation fixture")
@@ -92,7 +92,7 @@ func run() -> void:
 	seek(2); selector.item_selected.emit(1); await settle()
 	track = actor.animation_track(path)
 	check(track.keys.size() == 2 and is_equal_approx(track.keys[1].time, 2), "Changing a keyed state inserts a key at the playhead")
-	check(track.keys[0].interpolation == ActorKeyframe.Interpolation.LINEAR, "State keyframes morph rather than defaulting to discrete enum steps")
+	check(track.keys[0].interpolation == ActorKeyframe.interpolation_modes().LINEAR, "State keyframes morph rather than defaulting to discrete enum steps")
 	seek(1); await settle()
 	var sample := ActorTransformationStates.samples(actor, runtime.session.document, 1, ActorAnimation.sampled_values(actor, 1))[item.id] as Dictionary
 	check(sample.a.id == item.states[0].id and sample.b.id == item.states[1].id and is_equal_approx(sample.t, .5), "Keyframes preserve both state endpoints and morph progress")
@@ -118,7 +118,7 @@ func run() -> void:
 	check(is_equal_approx(track.transition_at(1).weight, .5), "Morph curve edits undo")
 	editor.model.redo(); track = actor.animation_track(path)
 	check(is_equal_approx(track.transition_at(1).weight, .1), "Morph curve edits redo")
-	var stepped := track.copy_track(); stepped.keys[0].interpolation = ActorKeyframe.Interpolation.STEP
+	var stepped: ActorAnimationTrack = track.copy_track(); stepped.keys[0].interpolation = ActorKeyframe.interpolation_modes().STEP
 	check(is_zero_approx(stepped.transition_at(1).weight) and stepped.sample(2) == item.states[1].id, "Step keys hold until the exact target key")
 	check(track.transition_at(-1).from == item.states[0].id and track.transition_at(20).from == item.states[1].id, "State sampling clamps safely outside its keyed interval")
 	ActorTransformationStates.choose(editor.model, actor, detail, detail.states[1].id)
@@ -172,13 +172,13 @@ func run() -> void:
 	var base_track := actor.animation_track(path)
 	var combined := ActorTransformationStates.samples(actor, sample_document, 1, ActorAnimation.sampled_values(actor, 1))
 	check(combined[detail.id].a.id == detail.states[1].id and combined[item.id].b.id == item.states[1].id, "Independent components retain their own morph and held state")
-	var alternate := sample_document.snapshot(); var alternate_item := alternate.components[0]
+	var alternate := sample_document.snapshot(); var alternate_item: KiwiTransformationComponent = alternate.components[0]
 	alternate_item.keys[0].mode = "Guided Morph"
 	alternate_item.keys[0].points_a = PackedVector2Array([Vector2(.2, .3)])
 	alternate_item.keys[0].points_b = PackedVector2Array([Vector2(.6, .7)])
 	var guided := ActorTransformationStates.samples(actor, alternate, 1, ActorAnimation.sampled_values(actor, 1))[item.id] as Dictionary
 	check(guided.key.points_a.size() == 1, "Scene state transitions retain matching authored morph guidance")
-	var third := alternate_item.states[1].copy_state(true); third.title = "Alternate"; alternate_item.states.append(third)
+	var third: KiwiTransformationState = alternate_item.states[1].copy_state(true); third.title = "Alternate"; alternate_item.states.append(third)
 	var alternate_actor := actor.copy_actor(); alternate_actor.animation_track(path).keys[1].value = third.id
 	guided = ActorTransformationStates.samples(alternate_actor, alternate, 1, ActorAnimation.sampled_values(alternate_actor, 1))[item.id]
 	check(guided.key.points_a.is_empty() and guided.key.mode == "Auto Morph", "Different state pairs do not reuse incompatible guidance points")
@@ -193,5 +193,5 @@ func run() -> void:
 	editor.model.select(clip.id); seek(1); await settle()
 	await RenderingServer.frame_post_draw
 	root.get_texture().get_image().save_png("res://.godot/verification/transform_image_actor_full_application.png")
-	main.queue_free(); await settle(); StaticData.loaded_project = null
+	main.queue_free(); await settle(); StaticData.set_loaded_project(null)
 	print("TRANSFORM_IMAGE_ACTOR checks=%d failures=%d" % [checks, failures]); quit(failures)

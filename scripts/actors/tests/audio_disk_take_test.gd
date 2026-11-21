@@ -1,5 +1,5 @@
 extends SceneTree
-const Writer = preload("res://scripts/actors/core/audio_take_writer.gd")
+const Writer = preload("res://scripts/actors/core/NativeAudioTakeWriter.cs")
 const Finalize = preload("res://Workspaces/AudioWorkspace/audio_take_finalize.gd")
 var failures := 0
 var checks := 0
@@ -45,9 +45,9 @@ func run() -> void:
 		var mixed_info:=KiwiAudioPCMFile.inspect(mixed.path);var reader:=FileAccess.open(mixed.path,FileAccess.READ)
 		var mixed_frames:=KiwiAudioPCMFile.read_frames(reader,mixed_info,480,1);reader.close()
 		check(mixed_frames.size()==1 and mixed_frames[0].distance_to(Vector2(.125,-.625))<.001,"Disk mix preserves summed amplitude across distinct source rates")
-	var document := KiwiAudioDocument.from_source(result.path)
+	var document := KiwiAudioDocument.from_source(result.path, "")
 	var session := KiwiAudioEditSession.new(); session.document = document
-	var count := document.clips.size()
+	var count: int = document.clips.size()
 	session.action("Insert disk take",func(): session.insert_source(result.path,2,document.tracks[0].id,"Disk take"))
 	check(session.document.clips.size()==count+1, "File-backed takes insert into the existing document")
 	session.undo(); check(session.document.clips.size()==count and FileAccess.file_exists(result.path), "Undo removes metadata without destroying the capture")

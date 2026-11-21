@@ -1,7 +1,7 @@
 extends SceneTree
 class TestStudio extends KiwiImageWorkspace:
 	func _persist_paint_presets(_path: String=PAINT_PRESETS_PATH) -> void: pass
-const Library=preload("res://Workspaces/ImageWorkspace/texture_material_library.gd")
+const Library=preload("res://scripts/materials/NaturalMaterialCatalog.cs")
 var failures:=0
 var checks:=0
 var studio: TestStudio

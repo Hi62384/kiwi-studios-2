@@ -18,7 +18,7 @@ func run() -> void:
 	var repeated:=Mesher.new().build(terrain,Vector2i.ZERO,[cave],.5,100000); check(result.vertices==repeated.vertices and result.indices==repeated.indices,"Cave geometry is deterministic from identical saved field settings")
 	var limited:=Mesher.new().build(terrain,Vector2i.ZERO,[cave],.5,100); check(not str(limited.get("error","")).is_empty(),"Volumetric meshing rejects work above its real voxel budget")
 	check(Mesher.new().build(terrain,Vector2i.ZERO,[cave],.5,100000,func(): return true).get("cancelled",false),"Volumetric generation supports cancellation before committing partial geometry")
-	var network:=KiwiTerrainCave.network(Vector3(0,0,-8),5.,12.,3,73); var other:=KiwiTerrainCave.network(Vector3(0,0,-8),5.,12.,3,73); check(network.paths==other.paths and network.chambers==other.chambers,"Connected procedural cave networks retain deterministic branch and chamber structure")
+	var network:=(load("res://Workspaces/EnvironmentWorkspace/terrain/KiwiTerrainCave.cs").call("network",Vector3(0,0,-8),5.,12.,3,73) as KiwiTerrainCave); var other:=(load("res://Workspaces/EnvironmentWorkspace/terrain/KiwiTerrainCave.cs").call("network",Vector3(0,0,-8),5.,12.,3,73) as KiwiTerrainCave); check(network.paths==other.paths and network.chambers==other.chambers,"Connected procedural cave networks retain deterministic branch and chamber structure")
 	var branches_connected:=true
 	for index in range(1,network.paths.size()): branches_connected=branches_connected and network.paths[0].has(network.paths[index][0])
 	check(branches_connected,"Every generated branch starts on an existing tunnel junction")

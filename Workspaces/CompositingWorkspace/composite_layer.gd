@@ -25,16 +25,9 @@ enum Blend { OVER, UNDER, IN, OUT, ATOP, ADD, SUBTRACT, MULTIPLY, SCREEN, DIFFER
 @export var playback_speed:=1.0
 @export var effects: Array[Dictionary]=[]
 @export var settings: Dictionary={}
-@export var children: Array[KiwiCompositeLayer]=[]
+@export var children: Array[Resource]=[]
 
+# Legacy binary schema and numeric-enum bridge; production validation is C#.
+const LayerNative=preload("res://Workspaces/CompositingWorkspace/CompositeLayer.cs")
 func validate() -> PackedStringArray:
-	var errors:=PackedStringArray()
-	if id.is_empty() or name.strip_edges().is_empty(): errors.append("Every compositing layer needs an ID and name.")
-	if not is_finite(opacity) or opacity<0. or opacity>1. or not is_finite(rotation) or not position.is_finite() or not scale.is_finite() or absf(scale.x)<.000001 or absf(scale.y)<.000001: errors.append("Layer opacity and transform values are invalid.")
-	if not is_finite(start_time) or not is_finite(end_time) or not is_finite(source_time_offset) or not is_finite(playback_speed) or start_time<0. or (end_time>=0. and end_time<start_time) or source_time_offset<0. or playback_speed<=0.: errors.append("Layer timing values must be finite, clip ends cannot precede starts, and playback speed must be positive.")
-	if kind==Kind.IMAGE and source_image==null and source_path.is_empty() and processing_graph_id.is_empty(): errors.append(name+" has no image source.")
-	if kind==Kind.VIDEO and source_path.is_empty(): errors.append(name+" has no video footage source.")
-	if kind==Kind.LINKED_COMPOSITION and source_path.is_empty(): errors.append(name+" has no linked composition resource.")
-	if not processing_graph_id.is_empty() and not [Kind.IMAGE,Kind.SOLID,Kind.VIDEO,Kind.CGI,Kind.VFX,Kind.TEXT,Kind.SHAPE,Kind.MASK,Kind.LINKED_COMPOSITION].has(kind): errors.append(name+" cannot use a source processing graph.")
-	if kind==Kind.SOLID and (not is_finite(color.r) or not is_finite(color.g) or not is_finite(color.b) or not is_finite(color.a)): errors.append(name+" has an invalid solid color.")
-	return errors
+	return LayerNative.new().validate_resource(self)

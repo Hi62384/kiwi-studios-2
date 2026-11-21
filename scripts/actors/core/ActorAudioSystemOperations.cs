@@ -1,0 +1,38 @@
+using Godot;
+using System;
+using System.Linq;
+using System.Collections.Generic;
+using Settings=Godot.Collections.Dictionary;
+using GArray=Godot.Collections.Array;
+public partial class ActorAudioSystemOperations:RefCounted
+{
+    private readonly ActorDataOperations _data=new();private readonly ActorRuntimeOperations _runtime=new();private readonly ActorAudioOperations _audio=new();private readonly AudioEffectsOperations _effects=new();
+    private static Settings Map(Node owner,string name)=>owner.Get(name).AsGodotDictionary();private static Variant Get(Settings values,string key,Variant fallback=default)=>values.TryGetValue(key,out var value)?value:fallback;
+    public void set_output_bus(Node owner,string value){string output=AudioServer.GetBusIndex(value)>=0?value:"Master";owner.Set("output_bus",output);foreach(var item in Map(owner,"players").Values){var player=item.As<AudioStreamPlayer>();int bus=AudioServer.GetBusIndex(player.Bus);if(bus>=0)AudioServer.SetBusSend(bus,output);}}
+    public void scrub(Node owner,RefCounted model,double time){synchronize(owner,model,time,true);var players=Map(owner,"players");var remaining=Map(owner,"_scrub_remaining");foreach(var value in model.Get("clips").AsGodotArray()){var clip=value.As<Resource>();var id=clip.Get("id");if(!players.TryGetValue(id,out var item))continue;var player=item.As<AudioStreamPlayer>();if(!player.Playing)continue;player.Seek((float)_runtime.local_time(clip,time));remaining[id]=Math.Min(.12,clip.Get("start_time").AsDouble()+clip.Get("duration").AsDouble()-time);}}
+    public void process(Node owner,double delta){var remaining=Map(owner,"_scrub_remaining");var players=Map(owner,"players");foreach(var id in remaining.Keys.ToArray()){double time=remaining[id].AsDouble()-delta;remaining[id]=time;if(time<=0){if(players.TryGetValue(id,out var player))player.As<AudioStreamPlayer>().Stop();remaining.Remove(id);}}}
+    public void synchronize(Node owner,RefCounted model,double time,bool playing)
+    {
+        Map(owner,"_scrub_remaining").Clear();var live=new HashSet<string>();var actors=model.Get("actors").AsGodotArray();var clips=model.Get("clips").AsGodotArray();var players=Map(owner,"players");var overrides=Map(owner,"clip_stream_overrides");string output=owner.Get("output_bus").AsString();
+        for(int index=0;index<Math.Min(clips.Count,actors.Count);index++)
+        {
+            var actor=actors[index].As<Resource>();if(actor.Get("type_id").AsString()!="audio")continue;var clip=clips[index].As<Resource>();string id=clip.Get("id").AsString();live.Add(id);var values=actor.Get("values").AsGodotDictionary();var stream=overrides.TryGetValue(id,out var source)?source.As<AudioStream>():GD.Load<CSharpScript>("res://scripts/actors/core/ActorAudio.cs").Call("source",Get(values,"audio","")).As<AudioStream>();if(stream==null){if(players.ContainsKey(id))remove_player(owner,id);continue;}
+            if(!players.ContainsKey(id)){string name="ActorAudio_"+owner.GetInstanceId()+"_"+id;AudioServer.AddBus();int bus=AudioServer.BusCount-1;AudioServer.SetBusName(bus,name);AudioServer.AddBusEffect(bus,new AudioEffectPitchShift());AudioServer.SetBusSend(bus,output);var created=new AudioStreamPlayer{Bus=name};owner.AddChild(created);players[id]=created;}
+            var player=players[id].As<AudioStreamPlayer>();if(player.Stream!=stream){player.Stop();player.Stream=stream;}int busIndex=AudioServer.GetBusIndex(player.Bus);string destination=Get(Map(owner,"clip_output_buses"),id,output).AsString();AudioServer.SetBusSend(busIndex,AudioServer.GetBusIndex(destination)>=0?destination:output);var stack=Get(Map(owner,"clip_effects"),id,new GArray()).AsGodotArray();double pan=Get(Map(owner,"clip_pan"),id,_data.get_value(actor,"pan",0.0)).AsDouble();string signature=GD.VarToStr(stack);var signatures=Map(owner,"_effect_signatures");
+            if(Get(signatures,id,"").AsString()!=signature){var native=new List<AudioEffect>();foreach(var entry in stack){var effect=_effects.native_effect(entry.AsGodotDictionary());if(effect!=null)native.Add(effect);}bool same=AudioServer.GetBusEffectCount(busIndex)==native.Count+2;if(same)for(int i=0;i<native.Count;i++)if(AudioServer.GetBusEffect(busIndex,i+1).GetClass()!=native[i].GetClass()){same=false;break;}if(same){for(int i=0;i<native.Count;i++)_effects.update_native_properties(AudioServer.GetBusEffect(busIndex,i+1),native[i]);}else{while(AudioServer.GetBusEffectCount(busIndex)>1)AudioServer.RemoveBusEffect(busIndex,1);foreach(var effect in native)AudioServer.AddBusEffect(busIndex,effect);AudioServer.AddBusEffect(busIndex,new AudioEffectPanner());}signatures[id]=signature;}
+            if(AudioServer.GetBusEffect(busIndex,AudioServer.GetBusEffectCount(busIndex)-1) is AudioEffectPanner panner)panner.Pan=(float)Math.Clamp(pan,-1,1);double speed=clip.Get("playback_speed").AsDouble();player.PitchScale=(float)speed;player.VolumeDb=(float)(_data.get_value(actor,"volume_db",0.0).AsDouble()+Mathf.LinearToDb(Math.Max(.00001,_audio.fade_gain(actor,clip,time))));if(AudioServer.GetBusEffect(busIndex,0) is AudioEffectPitchShift pitch)pitch.PitchScale=(float)Math.Clamp(_data.get_value(actor,"pitch",1.0).AsDouble()/speed,.01,16);
+            if(!playing||!_runtime.contains_time(clip,time)||_data.get_value(actor,"muted",false).AsBool())player.Stop();else{double sourceTime=_runtime.local_time(clip,time);if(Get(values,"loop",false).AsBool()&&stream.GetLength()>0)sourceTime=Mathf.PosMod(sourceTime,stream.GetLength());if(!player.Playing)player.Play((float)sourceTime);else if(Math.Abs(player.GetPlaybackPosition()-sourceTime)>.15)player.Seek((float)sourceTime);}
+        }
+        foreach(var id in players.Keys.ToArray())if(!live.Contains(id.AsString()))remove_player(owner,id.AsString());
+    }
+    public void remove_player(Node owner,string id){Map(owner,"_scrub_remaining").Remove(id);var players=Map(owner,"players");if(!players.TryGetValue(id,out var value))return;var player=value.As<AudioStreamPlayer>();player.Stop();int bus=AudioServer.GetBusIndex(player.Bus);if(bus>0)AudioServer.RemoveBus(bus);player.QueueFree();players.Remove(id);Map(owner,"_effect_signatures").Remove(id);}
+    public float[] waveform(Node owner,AudioStream? stream)
+    {
+        if(stream==null)return Array.Empty<float>();var envelopes=Map(owner,"envelopes");var jobs=Map(owner,"jobs");var id=Variant.From(stream.GetInstanceId());if(envelopes.TryGetValue(id,out var envelope))return envelope.AsFloat32Array();if(!jobs.ContainsKey(id)){var created=new GodotThread();var error=created.Start(Callable.From(()=>Variant.From(decode(stream))));if(error!=Error.Ok){created.Dispose();return Array.Empty<float>();}jobs[id]=created;}var thread=jobs[id].As<GodotThread>();if(thread.IsAlive())return Array.Empty<float>();var result=thread.WaitToFinish();envelopes[id]=result;jobs.Remove(id);thread.Dispose();return result.AsFloat32Array();
+    }
+    public float[] decode(AudioStream stream)
+    {
+        var result=new float[4096];using var playback=stream.InstantiatePlayback();playback.Start();long total=Math.Max(1,(long)(stream.GetLength()*AudioServer.GetMixRate())),cursor=0;try{while(cursor<total){var samples=playback.MixAudio(1,(int)Math.Min(4096,total-cursor));if(samples.Length==0)break;foreach(var sample in samples){int bin=Math.Min(4095,(int)((double)cursor/total*4096));result[bin]=Math.Max(result[bin],Math.Max(Math.Abs(sample.X),Math.Abs(sample.Y)));cursor++;}}}finally{playback.Stop();}return result;
+    }
+    public void exit_tree(Node owner){foreach(var id in Map(owner,"players").Keys.ToArray())remove_player(owner,id.AsString());var jobs=Map(owner,"jobs");foreach(var value in jobs.Values){var thread=value.As<GodotThread>();thread.WaitToFinish();thread.Dispose();}jobs.Clear();}
+}

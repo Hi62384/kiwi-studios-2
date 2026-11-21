@@ -1,5 +1,5 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
-const Coordinator=preload("res://Workspaces/EnvironmentWorkspace/environment_world_override.gd")
+const Coordinator=preload("res://Workspaces/EnvironmentWorkspace/EnvironmentWorldOverrideApi.cs")
 class Instance extends Node3D:
 	var active:=true
 	var actor:=ActorData.new()
@@ -23,6 +23,6 @@ func run() -> void:
 	instance.shader_time=.75; coordinator._process(0.); check(is_equal_approx(runtime_material.get_shader_parameter(uniform),.75),"Rewinding an environment updates its existing sky shader time")
 	instance.active=true; coordinator._process(0.); var unrelated:=Environment.new(); world.environment=unrelated; instance.active=false; coordinator._process(0.); check(world.environment==unrelated,"Releasing ownership does not overwrite another world assigned in the meantime")
 	world.environment=original; instance.active=true; coordinator._process(0.); instance.queue_free(); await process_frame; coordinator._process(0.); check(world.environment==original,"Deleting an environment instance releases world ownership")
-	var empty: Node=load("res://Workspaces/EnvironmentWorkspace/environment_actor.gd").new(); view.add_child(empty); empty.content.include_lighting=true; empty._load_source("")
+	var empty: Node=load("res://Workspaces/EnvironmentWorkspace/EnvironmentActorRuntime.cs").new(); view.add_child(empty); empty.content.include_lighting=true; empty._load_source("")
 	check(empty.content.sun==null or not empty.content.sun.visible,"A missing environment source does not create an unintended default sun")
 	view.queue_free(); await process_frame; DirAccess.remove_absolute(path); print("ENVIRONMENT WORLD: %d checks, %d failures"%[checks,failures]); quit(failures)

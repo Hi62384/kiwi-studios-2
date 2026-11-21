@@ -14,6 +14,6 @@ func run() -> void:
 	var first:=Recipes.configure(source,"Rural Countryside"); var second:=Recipes.configure(source,"Rural Countryside"); var other: Resource=source.copy(); other.seed+=7; var changed:=Recipes.configure(other,"Rural Countryside")
 	check(first.source.settlements[0].center==second.source.settlements[0].center and first.source.settlements[0].seed==second.source.settlements[0].seed and first.source.settlements[0].center!=changed.source.settlements[0].center,"Recipe layout seeds reproduce structure and changing the seed changes settlement geography")
 	check(Recipes.empty(source) and source.settlements.is_empty() and not Recipes.configure(modern.source,"Modern City").error.is_empty(),"Preset configuration preserves its input and rejects replacing an authored world")
-	var canceled:=preload("res://Workspaces/EnvironmentWorkspace/world/world_recipe_job.gd").new(); canceled.cancel(); canceled.start(modern.source); while not canceled.complete(): await process_frame
+	var canceled:=preload("res://Workspaces/EnvironmentWorkspace/WorldRecipeJob.cs").new(); canceled.cancel(); canceled.start(modern.source); while not canceled.complete(): await process_frame
 	check(canceled.collect().get("cancelled",false),"Recipe layout generation honors cancellation without partial native output")
 	print("WORLD RECIPES: %d checks, %d failures"%[checks,failures]); quit(failures)

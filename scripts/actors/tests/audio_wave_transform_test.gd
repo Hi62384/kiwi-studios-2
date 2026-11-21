@@ -33,7 +33,7 @@ func _initialize()->void:
   check(output.slice(0,12000)==samples.slice(0,12000) and output.slice(120000)==samples.slice(84000),"stretch preserves samples outside selection")
  check(samples==original,"time and pitch edits never mutate original samples")
  check(not str(KiwiAudioAnalysis.transform_selection(samples,"time_stretch",1,10,2,0,rate).get("error","")).is_empty(),"single-channel duration changes rejected explicitly")
- var token:=KiwiAudioJobs.Work.new();token.cancel()
+ var token:=AudioWorkToken.new();token.cancel()
  var cancelled:=KiwiAudioAnalysis.transform_selection(samples,"pitch_shift",0,48000,12,-1,rate,token)
  check(not str(cancelled.get("error","")).is_empty() or not cancelled.get("success",true),"selection processor honors cancellation")
  print("AUDIO_WAVE_TRANSFORM failures=",failures);quit(failures)

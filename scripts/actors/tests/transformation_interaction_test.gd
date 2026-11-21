@@ -21,7 +21,7 @@ func numbers(node: Node) -> Array[DragNumber]:
 	return found
 func run() -> void:
 	root.size=Vector2i(1440,960); root.gui_embed_subwindows=true; workspace=KiwiTransformationWorkspace.new(); root.add_child(workspace); await settle()
-	workspace.open_source(KiwiTransformationImage2D.blank(Vector2i(320,240))); workspace.canvas.fit(); workspace.set_tool("shape"); await settle()
+	workspace.open_source((load("res://Workspaces/TransformationWorkspace/KiwiTransformationImage2D.cs").call("blank",Vector2i(320,240)) as KiwiTransformationImage2D)); workspace.canvas.fit(); workspace.set_tool("shape"); await settle()
 	var canvas := workspace.canvas; var session := workspace.session; var start := canvas.origin()+Vector2(90,70)*canvas.zoom; var end := canvas.origin()+Vector2(220,170)*canvas.zoom
 	canvas.color=Color("e84772"); mouse(canvas,start,true); motion(canvas,end); mouse(canvas,end,false); await settle()
 	check(session.active_state().artwork.texture.get_image().get_pixel(150,100).r>.8,"Native shape drag paints multicolored raster state artwork")

@@ -1,7 +1,7 @@
 extends SceneTree
 ## Adaptive preview must affect only render targets, never source pixels, texture
 ## mapping, Bucket region detection, native export or baked artwork.
-const Library = preload("res://Workspaces/ImageWorkspace/texture_material_library.gd")
+const Library = preload("res://scripts/materials/NaturalMaterialCatalog.cs")
 var checks := 0
 var failures := 0
 

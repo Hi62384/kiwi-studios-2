@@ -1,6 +1,6 @@
 extends SceneTree
 const MaterialEngine=preload("res://scripts/materials/natural_material_engine.gd")
-const Definitions=preload("res://scripts/materials/natural_material_definitions.gd")
+const Definitions=preload("res://scripts/materials/NaturalMaterialCatalog.cs")
 const Renderer=preload("res://Workspaces/ImageWorkspace/texture_material_renderer.gd")
 const Presets=preload("res://scripts/materials/natural_material_presets.gd")
 var failures:=0
@@ -76,7 +76,7 @@ func render_catalog() -> void:
 	print("Catalog renders %d presets, %d distinct pixel fingerprints" % [ids.size(),hashes.size()])
 	check(hashes.size()>130,"Catalog presets retain distinct appearance")
 	viewport.queue_free()
-	for family in Definitions.CATEGORIES:
+	for family in Definitions.categories():
 		var family_ids:=ids.filter(func(id: String): return Definitions.category(id)==family)
 		var sheet:=Image.create(256*4,256*ceili(family_ids.size()/4.),false,Image.FORMAT_RGBA8)
 		for i in family_ids.size():

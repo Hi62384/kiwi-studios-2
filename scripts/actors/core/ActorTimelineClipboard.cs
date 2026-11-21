@@ -1,0 +1,39 @@
+using Godot;
+using System;
+using System.Collections.Generic;
+using GArray=Godot.Collections.Array;
+using Settings=Godot.Collections.Dictionary;
+public partial class ActorTimelineOperations
+{
+    private Settings PromotedChildState(RefCounted owner,Resource child,string parent)=>new Settings{["old_parent"]=child.Get("parent_id"),["old_values"]=transform_values(child),["new_parent"]=parent,["new_values"]=values_for_preserved_world(owner,child,parent)};
+    public void delete_selected(RefCounted owner)
+    {
+        var primary=selected_actor(owner);if(Selected(owner).Count>1||primary!=null&&(primary.Get("type_id").AsString() is "video" or "video_2d")&&actor_for_id(owner,Get(primary.Get("values").AsGodotDictionary(),"linked_audio_actor","").AsString())!=null){delete_selected_group(owner);return;}
+        int index=index_of(owner,owner.Get("selected_id").AsString());if(index<0)return;var actor=Actors(owner)[index].As<Resource>();var clip=Clips(owner)[index].As<Resource>();var states=new Settings();foreach(var value in Actors(owner)){var child=value.As<Resource>();if(child.Get("parent_id").AsString()==actor.Get("id").AsString())states[child.Get("id")]=PromotedChildState(owner,child,actor.Get("parent_id").AsString());}
+        History(owner,"Delete "+actor.Get("display_name").AsString(),"_remove_with_child_states",new GArray{clip.Get("id"),"",states,true},"_insert_with_child_states",new GArray{actor,clip,index,clip.Get("id"),states});Changed(owner);
+    }
+    public void delete_selected_group(RefCounted owner)
+    {
+        var ids=Selected(owner).Duplicate();var previous=Selected(owner).Duplicate();foreach(var id in Selected(owner)){int index=index_of(owner,id.AsString());if(index<0)continue;var actor=Actors(owner)[index].As<Resource>();if(actor.Get("type_id").AsString() is not ("video" or "video_2d"))continue;var audio=clip_for_actor_id(owner,Get(actor.Get("values").AsGodotDictionary(),"linked_audio_actor","").AsString());if(audio!=null&&!ids.Contains(audio.Get("id")))ids.Add(audio.Get("id"));}
+        var removed=new Godot.Collections.Array<Settings>();var removedActors=new HashSet<string>();foreach(var id in ids){int index=index_of(owner,id.AsString());if(index<0)continue;removed.Add(new Settings{["actor"]=Actors(owner)[index],["clip"]=Clips(owner)[index],["index"]=index});removedActors.Add(Actors(owner)[index].As<Resource>().Get("id").AsString());}if(removed.Count==0)return;
+        var states=new Settings();foreach(var value in Actors(owner)){var actor=value.As<Resource>();if(removedActors.Contains(actor.Get("id").AsString())||!removedActors.Contains(actor.Get("parent_id").AsString()))continue;var parent=actor_for_id(owner,actor.Get("parent_id").AsString());var visited=new HashSet<string>();while(parent!=null&&removedActors.Contains(parent.Get("id").AsString())){if(!visited.Add(parent.Get("id").AsString())){parent=null;break;}parent=actor_for_id(owner,parent.Get("parent_id").AsString());}states[actor.Get("id")]=PromotedChildState(owner,actor,parent?.Get("id").AsString()??"");}
+        History(owner,"Delete Actors","_remove_many",new GArray{ids,states},"_insert_many",new GArray{removed,previous,states});Changed(owner);
+    }
+    public string copy_name(string original)=>original+" Copy";
+    public int find_free_paste_layer(RefCounted owner,GArray group,GArray pending,int preferred){int layer=preferred;while(!paste_group_fits(owner,group,pending,layer))layer++;return layer;}
+    public bool paste_group_fits(RefCounted owner,GArray group,GArray pending,int layer)
+    {
+        for(int index=0;index<group.Count;index++){var entry=group[index].AsGodotDictionary();var clip=entry["clip"].As<Resource>();int target=clip.Get("layer").AsInt32()+layer;double start=clip.Get("start_time").AsDouble(),duration=clip.Get("duration").AsDouble();foreach(var value in section_clips(owner)){var other=value.As<Resource>();if(actors_obstruct(owner,entry["actor"].As<Resource>(),actor_for_id(owner,other.Get("actor_id").AsString()))&&other.Get("layer").AsInt32()==target&&Overlaps(start,duration,other.Get("start_time").AsDouble(),other.Get("duration").AsDouble()))return false;}foreach(var value in pending){var other=value.AsGodotDictionary()["clip"].As<Resource>();if(other.Get("layer").AsInt32()==target&&Overlaps(start,duration,other.Get("start_time").AsDouble(),other.Get("duration").AsDouble()))return false;}for(int j=index+1;j<group.Count;j++){var other=group[j].AsGodotDictionary()["clip"].As<Resource>();if(other.Get("layer").AsInt32()+layer==target&&Overlaps(start,duration,other.Get("start_time").AsDouble(),other.Get("duration").AsDouble()))return false;}}return true;
+    }
+    public GArray paste_snapshots(RefCounted owner,GArray snapshots,double time,int preferred,GArray targetParents,string label,bool preserveExternal)
+    {
+        var result=new GArray();if(snapshots.Count==0)return result;var targets=targetParents.Duplicate();if(targets.Count==0){validate_focus(owner);targets.Add(owner.Get("focused_actor_id"));}double first=double.PositiveInfinity;int lowest=int.MaxValue;foreach(var value in snapshots){var snapshot=value.AsGodotDictionary();first=Math.Min(first,snapshot["start"].AsDouble());lowest=Math.Min(lowest,snapshot["layer"].AsInt32());}
+        var entries=new Godot.Collections.Array<Settings>();foreach(var target in targets)
+        {
+            string parentId=target.AsString();if(parentId.Length>0&&actor_for_id(owner,parentId)==null)continue;var map=new Settings();var group=new Godot.Collections.Array<Settings>();foreach(var value in snapshots){var snapshot=value.AsGodotDictionary();var template=snapshot["actor"].As<Resource>();if(template==null)continue;var actor=_data.copy_actor(template);actor.Set("section_id",owner.Get("selected_section_id"));actor.Set("display_name",copy_name(template.Get("display_name").AsString()));map[snapshot["source_id"].AsString()]=actor;var clip=_runtime.create_clip(actor,Math.Max(0,time+snapshot["start"].AsDouble()-first),snapshot["duration"].AsDouble());clip.Set("source_offset",snapshot["offset"]);clip.Set("playback_speed",snapshot["speed"]);clip.Set("layer",snapshot["layer"].AsInt32()-lowest);group.Add(new Settings{["actor"]=actor,["clip"]=clip,["snapshot"]=snapshot});}
+            var remapped=new Settings();foreach(var entry in map)remapped[entry.Key]=entry.Value.As<Resource>().Get("id");foreach(var entry in group){var actor=entry["actor"].As<Resource>();var snapshot=entry["snapshot"].AsGodotDictionary();var values=actor.Get("values").AsGodotDictionary();RemapActorLinks(actor,remapped,false);if(actor.Get("type_id").AsString() is "video" or "video_2d")values[new StringName("linked_audio_actor")]=Get(remapped,Get(values,"linked_audio_actor","").AsString(),"");string sourceParent=snapshot["source_parent"].AsString(),skeleton=Get(values,"model_skeleton_actor","").AsString();if(remapped.ContainsKey(skeleton))values[new StringName("model_skeleton_actor")]=remapped[skeleton];actor.Set("parent_id",remapped.ContainsKey(sourceParent)?remapped[sourceParent]:preserveExternal&&actor_for_id(owner,sourceParent)!=null?Variant.From(sourceParent):Variant.From(parentId));}
+            var parentClip=clip_for_actor_id(owner,parentId);int baseLayer=find_free_paste_layer(owner,Variant.From(group).AsGodotArray(),Variant.From(entries).AsGodotArray(),Math.Max(0,parentClip?.Get("layer").AsInt32()??preferred));foreach(var entry in group){var clip=entry["clip"].As<Resource>();clip.Set("layer",clip.Get("layer").AsInt32()+baseLayer);entries.Add(entry);}
+        }
+        if(entries.Count==0)return result;var ids=new Godot.Collections.Array<string>();foreach(var entry in entries){var clip=entry["clip"].As<Resource>();ids.Add(clip.Get("id").AsString());result.Add(clip);}History(owner,label,"_insert_copies",new GArray{entries,ids},"_remove_copies",new GArray{ids,Selected(owner).Duplicate()});Changed(owner);return result;
+    }
+}

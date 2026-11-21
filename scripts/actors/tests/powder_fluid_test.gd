@@ -10,7 +10,7 @@ func fixture(density: float=1800.0) -> Dictionary:
 	var controller:=KiwiTimelinePhysics.new(); controller._model=ActorTimeline.new()
 	var liquid:=KiwiFluidDefinition.create().create_actor({&"fluid_spacing":.2,&"fluid_quality":1})
 	var powder:=KiwiPowderDefinition.create().create_actor({&"powder_density":density,&"powder_radius":.05})
-	controller._model.actors.assign([liquid,powder]); var lc:=ActorClip.create(liquid); var pc:=ActorClip.create(powder); controller._model.clips.assign([lc,pc])
+	controller._model.actors.assign([liquid,powder]); var lc:=(load("res://scripts/actors/core/ActorClip.cs").call("create",liquid) as ActorClip); var pc:=(load("res://scripts/actors/core/ActorClip.cs").call("create",powder) as ActorClip); controller._model.clips.assign([lc,pc])
 	controller.prototypes[liquid.id]={"actor":liquid,"clip":lc,"geometry":{"meshes":[]}}; controller.prototypes[powder.id]={"actor":powder,"clip":pc,"geometry":{"meshes":[]}}
 	var fluid_state:={"v":Vector3.ZERO,"type":6,"active":true,"initialized":true,"pose":Transform3D.IDENTITY}
 	var points:=PackedVector3Array()

@@ -1,0 +1,18 @@
+using Godot;
+using System;
+public partial class ImageWarpOperations
+{
+    private static ImageWarpKernel Kernel(Resource owner)=>owner.Call("_native").As<ImageWarpKernel>();
+    public bool stroke(Resource owner,Vector2 extent,Vector2 from,Vector2 to,double diameter,double strength,double hardness,string kind,double elapsed)
+    {
+        if(strength<=0)return false;var kernel=Kernel(owner);if(kind is "restore" or "smooth")kernel.rebuild(owner);double radius=Math.Max(.5,diameter*.5),distance=((to-from)*extent).Length();if(kind=="push"&&distance<.0001)return false;int steps=Math.Clamp(Mathf.CeilToInt(distance/Math.Max(1,radius*.3)),1,24);var displacement=owner.Get("displacement").AsVector2Array();var freeze=owner.Get("freeze").AsFloat32Array();var restriction=owner.Get("restriction").AsFloat32Array();var size=owner.Get("grid_size").AsVector2I();for(int step=0;step<steps;step++)Dab(owner,kernel,displacement,freeze,restriction,size,extent,from.Lerp(to,(float)(step+1)/steps),(to-from)/steps,radius,kind=="push"?strength:strength/steps,hardness,kind,elapsed);owner.Set("displacement",displacement);owner.Set("freeze",freeze);kernel.touch(owner);return true;
+    }
+    public void dab(Resource owner,Vector2 extent,Vector2 center,Vector2 movement,double radius,double strength,double hardness,string kind,double elapsed)
+    {
+        var displacement=owner.Get("displacement").AsVector2Array();var freeze=owner.Get("freeze").AsFloat32Array();var restriction=owner.Get("restriction").AsFloat32Array();Dab(owner,Kernel(owner),displacement,freeze,restriction,owner.Get("grid_size").AsVector2I(),extent,center,movement,radius,strength,hardness,kind,elapsed);owner.Set("displacement",displacement);owner.Set("freeze",freeze);
+    }
+    private static void Dab(Resource owner,ImageWarpKernel kernel,Vector2[] displacement,float[] freeze,float[] restriction,Vector2I size,Vector2 extent,Vector2 center,Vector2 movement,double radius,double strength,double hardness,string kind,double elapsed)
+    {
+        var old=(Vector2[])displacement.Clone();var reach=Vector2.One*(float)radius/extent.Max(Vector2.One);var begin=((Vector2I)((center-reach)*(Vector2)(size-Vector2I.One)).Floor()).Max(Vector2I.Zero);var end=((Vector2I)((center+reach)*(Vector2)(size-Vector2I.One)).Ceil()).Min(size-Vector2I.One);for(int y=begin.Y;y<=end.Y;y++)for(int x=begin.X;x<=end.X;x++){int index=y*size.X+x;var uv=new Vector2(x,y)/(Vector2)(size-Vector2I.One);var relative=(uv-center)*extent;double distance=relative.Length()/radius;if(distance>=1)continue;double feather=Math.Max(.08,1-hardness*.92),t=Math.Clamp((1-distance)/feather,0,1),weight=t*t*(3-2*t);if(kind is "freeze" or "thaw"){freeze[index]=Mathf.Lerp(freeze[index],kind=="freeze"?1:0,(float)Math.Clamp(weight*strength*.25*elapsed,0,1));continue;}weight*=1-freeze[index];if(restriction.Length==old.Length)weight*=restriction[index];double amount=Math.Clamp(weight*strength*elapsed,0,1);if(kind=="restore")displacement[index]=old[index]-kernel.inverse_offset(owner,index)*(float)(amount*.2);else if(kind=="smooth"){var sum=kernel.inverse_offset(owner,y*size.X+Math.Max(0,x-1))+kernel.inverse_offset(owner,y*size.X+Math.Min(size.X-1,x+1))+kernel.inverse_offset(owner,Math.Max(0,y-1)*size.X+x)+kernel.inverse_offset(owner,Math.Min(size.Y-1,y+1)*size.X+x);displacement[index]=old[index]+(sum*.25f-kernel.inverse_offset(owner,index))*(float)(amount*.6);}else{var offset=-movement*(float)(weight*strength);if(kind is "pinch" or "bulge")offset=(uv-center)*(float)(amount*(kind=="pinch"?.1:-.1));else if(kind is "twirl_cw" or "twirl_ccw")offset=(relative.Rotated((float)(amount*(kind=="twirl_cw"?-.08:.08)))-relative)/extent;displacement[index]=offset+SampleGrid(old,size,uv+offset);}}
+    }
+}

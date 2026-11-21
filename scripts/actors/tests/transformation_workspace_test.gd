@@ -15,7 +15,7 @@ func motion(point: Vector2) -> void:
 	var event := InputEventMouseMotion.new(); event.button_mask=MOUSE_BUTTON_MASK_LEFT; event.position=workspace.canvas.get_global_transform_with_canvas()*point; event.global_position=event.position; root.push_input(event,true)
 func run() -> void:
 	root.size=Vector2i(1440,960); root.gui_embed_subwindows=true; workspace=KiwiTransformationWorkspace.new(); root.add_child(workspace); await settle()
-	workspace.open_source(KiwiTransformationImage2D.blank(Vector2i(320,240))); workspace.canvas.fit(); await settle()
+	workspace.open_source((load("res://Workspaces/TransformationWorkspace/KiwiTransformationImage2D.cs").call("blank",Vector2i(320,240)) as KiwiTransformationImage2D)); workspace.canvas.fit(); await settle()
 	var session := workspace.session; var canvas := workspace.canvas; var state := session.active_state(); var blank := state.artwork.texture.get_image().get_data(); workspace.set_tool("brush"); canvas.color=Color("ef4269"); canvas.brush_size=12
 	var count := session.undo_stack.size(); var p := canvas.origin()+Vector2(120,100)*canvas.zoom
 	mouse(p,true); motion(p+Vector2(80,15)); mouse(p+Vector2(80,15),false); await settle()
@@ -43,11 +43,11 @@ func run() -> void:
 	workspace.toggle_play(); await settle(); check(workspace.playing and workspace.session.playhead>.36,"Play advances the animation playhead")
 	workspace.toggle_play(); var time := workspace.session.playhead; await settle(); check(is_equal_approx(workspace.session.playhead,time),"Pause freezes the playhead")
 	var file := "user://Transformation Workspace.tres"; check(await workspace.save_to(file)==OK,"Workspace saves a native editable asset")
-	var saved_session := workspace.session; var tab := workspace.capture_state(); workspace.open_source(KiwiTransformationImage2D.blank()); workspace.open_source(file,tab); await settle()
+	var saved_session := workspace.session; var tab := workspace.capture_state(); workspace.open_source((load("res://Workspaces/TransformationWorkspace/KiwiTransformationImage2D.cs").call("blank") as KiwiTransformationImage2D)); workspace.open_source(file,tab); await settle()
 	check(workspace.session==saved_session and workspace.session.document.components[0].states.size()==4,"Tab capture preserves unsaved state data and the edit session")
 	workspace.open_source(file); await settle(); check(workspace.session.document.components[0].states.size()==4 and workspace.session.document.validate().is_empty(),"Closing and reopening native data preserves all drawings and animation")
 	var output := "res://.godot/verification/transformation_workspace.png"; await RenderingServer.frame_post_draw; root.get_texture().get_image().save_png(output)
-	var malformed_view := KiwiTransformationImage2D.blank(Vector2i(80,60)); malformed_view.workspace_state={"selected":[47,"missing"],"states":"broken","zoom":NAN,"pan":"broken","time":INF,"timeline_zoom":0,"timeline_y":-100}
+	var malformed_view := (load("res://Workspaces/TransformationWorkspace/KiwiTransformationImage2D.cs").call("blank",Vector2i(80,60)) as KiwiTransformationImage2D); malformed_view.workspace_state={"selected":[47,"missing"],"states":"broken","zoom":NAN,"pan":"broken","time":INF,"timeline_zoom":0,"timeline_y":-100}
 	check(workspace.open_source(malformed_view),"Invalid optional view metadata does not destroy valid artwork")
 	await settle(); check(workspace.session.primary()!=null and is_finite(workspace.canvas.zoom) and workspace.canvas.zoom>0 and workspace.session.playhead==0 and workspace.timeline.vertical==0,"Corrupt selection, pan, zoom and playhead metadata are safely restored to usable defaults")
 	workspace.queue_free(); await settle(); print("TRANSFORMATION_WORKSPACE checks=%d failures=%d"%[checks,failures]); quit(failures)

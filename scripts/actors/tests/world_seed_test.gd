@@ -1,6 +1,6 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Recipes=preload("res://Workspaces/EnvironmentWorkspace/world/world_recipes.gd")
-const Seed=preload("res://Workspaces/EnvironmentWorkspace/world/world_seed.gd")
+const Seed=preload("res://Workspaces/EnvironmentWorkspace/world/WorldSeed.cs")
 const Worlds=preload("res://Workspaces/EnvironmentWorkspace/world/world_session.gd")
 const Cities=preload("res://Workspaces/EnvironmentWorkspace/world/world_settlement.gd")
 func run() -> void:

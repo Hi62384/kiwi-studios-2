@@ -12,121 +12,69 @@ const DEFAULT_ENVIRONMENT = preload("uid://bngpc7xkudi0e")
 static var _instance: ThumbnailRenderer
 static var _render_busy := false
 
-static func _begin_render() -> void:
-	while _render_busy:
-		await _instance.get_tree().process_frame
-	_render_busy = true
+enum RenderTargets { OBJECT, MATERIAL, WORLD }
 
-
-enum RenderTargets {
-	OBJECT,
-	MATERIAL,
-	WORLD
-}
-
+static func _begin_render() -> bool:
+	while true:
+		var owner: Node3D=_native_thumbnail().render_owner()
+		if owner==null: return false
+		if _native_thumbnail().try_begin(): return true
+		await owner.get_tree().process_frame
+	return false
 
 func _ready() -> void:
-	_instance = self
+	_native_thumbnail().ready(self)
 
 func _exit_tree() -> void:
-	if _instance == self:
-		_instance = null
-		_render_busy = false
-
-
+	_native_thumbnail().exit_tree(self)
 
 static func _delete_objects() -> void:
-	for a in _instance.object_holder.get_children():
-		a.queue_free()
-
-
+	_native_thumbnail().delete_objects()
 
 static func _set_target_visibility(target: RenderTargets) -> void:
-	_delete_objects()
-	_instance.object_holder.mesh = null
-	_instance.sub_viewport.find_world_3d().environment = DEFAULT_ENVIRONMENT
-	
-	_instance.object_holder.visible = target == RenderTargets.OBJECT
-	_instance.sphere_renderer.visible = target == RenderTargets.MATERIAL
-	_instance.sub_viewport.transparent_bg = target != RenderTargets.WORLD
-
-
+	_native_thumbnail().set_target_visibility(target)
 
 static func _center_object_holder() -> void:
-	var aabb: AABB = _instance.object_holder.get_aabb()
-	var center_local = aabb.position + aabb.size * 0.5
-	var center_global = _instance.object_holder.to_global(center_local)
-	var distance = 5.0
-	var target_pos = _instance.camera_3d.global_transform.origin - _instance.camera_3d.global_transform.basis.z * distance
-
-	# Offset needed to bring AABB center to target
-	var offset = target_pos - center_global
-
-	_instance.object_holder.global_position += offset
-
-
+	_native_thumbnail().center_object_holder()
 
 static func _snap_photo() -> Texture2D:
-	_instance.sub_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-	if DisplayServer.get_name() == "headless":
-		await _instance.get_tree().process_frame
-	else:
-		await RenderingServer.frame_post_draw
-	var image := _instance.sub_viewport.get_texture().get_image()
-	_render_busy = false
-	return ImageTexture.create_from_image(image) if image != null and not image.is_empty() else null
-
-
+	var viewport: SubViewport=_native_thumbnail().prepare_snap()
+	if viewport==null: return null
+	if DisplayServer.get_name()=="headless": await viewport.get_tree().process_frame
+	else: await RenderingServer.frame_post_draw
+	return _native_thumbnail().finish_snap(viewport,false)
 
 static func render_material(material: StandardMaterial3D) -> Texture2D:
-	await _begin_render()
-	_set_target_visibility(RenderTargets.MATERIAL)
-	_instance.sphere_renderer.material_override = material
+	if not await _begin_render(): return null
+	_native_thumbnail().prepare_render("material",material)
 	return await _snap_photo()
-
-
 
 static func render_mesh(mesh: Mesh) -> Texture2D:
-	await _begin_render()
-	_set_target_visibility(RenderTargets.OBJECT)
-	_instance.object_holder.mesh = mesh
-	_center_object_holder()
+	if not await _begin_render(): return null
+	_native_thumbnail().prepare_render("mesh",mesh)
 	return await _snap_photo()
-
-
 
 static func render_scene(scene: PackedScene) -> Texture2D:
-	await _begin_render()
-	_set_target_visibility(RenderTargets.OBJECT)
-	_instance.object_holder.add_child(scene.instantiate())
-	_center_object_holder()
+	if not await _begin_render(): return null
+	_native_thumbnail().prepare_render("scene",scene)
 	return await _snap_photo()
-
-
 
 static func render_environment(environment: Environment) -> Texture2D:
-	await _begin_render()
-	_set_target_visibility(RenderTargets.WORLD)
-	_instance.sub_viewport.find_world_3d().environment = environment
+	if not await _begin_render(): return null
+	_native_thumbnail().prepare_render("environment",environment)
 	return await _snap_photo()
 
-
 static func render_actor_environment(object: ActorObjectData) -> Texture2D:
-	var runtime: Node = load("res://scripts/actors/examples/basic_actor.tscn").instantiate()
-	var environment := Environment.new()
-	runtime.call("_configure_environment", environment, object)
-	runtime.free()
+	var environment: Environment=_native_thumbnail().actor_environment(object)
 	return await render_environment(environment)
 
-
 static func render_text_settings(object: ActorObjectData) -> Texture2D:
-	await _begin_render()
-	var viewport:=SubViewport.new(); viewport.size=Vector2i(256,144); viewport.transparent_bg=false
-	viewport.render_target_update_mode=SubViewport.UPDATE_ONCE; _instance.add_child(viewport)
-	var background:=ColorRect.new(); background.color=Color("182532"); background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); viewport.add_child(background)
-	var label:=Label.new(); label.text="Aa  Text"; label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; label.vertical_alignment=VERTICAL_ALIGNMENT_CENTER
-	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); ActorTextSettings.apply_label(label,object.values); viewport.add_child(label)
-	if DisplayServer.get_name()=="headless": await _instance.get_tree().process_frame
+	if not await _begin_render(): return null
+	var viewport: SubViewport=_native_thumbnail().prepare_text(object)
+	if viewport==null: return null
+	if DisplayServer.get_name()=="headless": await viewport.get_tree().process_frame
 	else: await RenderingServer.frame_post_draw
-	var image:=viewport.get_texture().get_image(); viewport.queue_free(); _render_busy=false
-	return ImageTexture.create_from_image(image) if image!=null and not image.is_empty() else null
+	return _native_thumbnail().finish_snap(viewport,true)
+
+static func _native_thumbnail() -> Object:
+	return Engine.get_singleton("KiwiNativeServices").service("thumbnail_renderer")

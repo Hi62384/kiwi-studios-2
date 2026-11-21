@@ -31,7 +31,7 @@ func run() -> void:
 	check(preview != null and preview.image.texture != null, "Image double-click inspection shows an image")
 	inspector.refresh()
 	check(media_preview(inspector) == preview, "File preview survives timeline refresh")
-	var property := ActorProperty.create(&"image", "Image", "")
+	var property := (load("res://scripts/actors/core/ActorProperty.cs").call("create",&"image", "Image", "") as ActorProperty)
 	property.options.extensions = ["png", "webp"]
 	check(await ActorMediaExport.write_async(editor, png, copied, property), "Asynchronous same-format save succeeds")
 	check(FileAccess.get_file_as_bytes(png) == FileAccess.get_file_as_bytes(copied), "Same-format save preserves original bytes")
@@ -63,7 +63,7 @@ func run() -> void:
 	editor.playing = true
 	editor._evaluate_runtimes()
 	var actor := editor.model.actor_for_id(clip.actor_id)
-	var previous := actor.animation_time
+	var previous: float = actor.animation_time
 	check(editor.audio_system.players[clip.id].playing, "Normal playback starts timeline audio")
 	editor.audio_recorder.recording = true
 	editor.canvas.recording_preview = {"start": 0.1, "duration": 0.0, "layer": 1}

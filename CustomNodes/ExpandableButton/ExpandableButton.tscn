@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://basy0qkxblg2m"]
 
-[ext_resource type="Script" uid="uid://dk22ixmn3cmrb" path="res://CustomNodes/ExpandableButton/expandable_button.gd" id="1_vlimd"]
+[ext_resource type="Script" path="res://scripts/Extra/ExpandableButtonControl.cs" id="1_vlimd"]
 [ext_resource type="Texture2D" uid="uid://bdblvy7bf8xgn" path="res://resources/Images/BasicImages/PointerRight.png" id="2_vlimd"]
 [ext_resource type="SystemFont" uid="uid://fue8lb1oipxq" path="res://resources/fonts/MainFont.tres" id="4_xrkke"]
-[ext_resource type="Script" path="res://CustomNodes/FileSystem/project_file_drag_button.gd" id="5_drag"]
+[ext_resource type="Script" path="res://scripts/Globals/ProjectFileDragButton.cs" id="5_drag"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_bb450"]
 font = ExtResource("4_xrkke")

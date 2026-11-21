@@ -1,6 +1,6 @@
 extends SceneTree
 ## Run with a graphics display / Forward+; headless intentionally reports SKIP.
-const Preview = preload("res://Workspaces/ShaderWorkspace/shader_sample_preview.gd")
+const Preview = preload("res://Workspaces/ShaderWorkspace/ShaderSamplePreview.cs")
 var failures := 0
 var evidence := "res://.godot/verification/"
 

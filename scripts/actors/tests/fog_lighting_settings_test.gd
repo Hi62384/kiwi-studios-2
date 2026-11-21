@@ -1,7 +1,7 @@
 extends "res://scripts/actors/tests/destruction_authoring_workspace_test.gd"
 const Settings=preload("res://scripts/actors/fog/fog_render_settings.gd")
 func run() -> void:
-	root.size=Vector2i(1400,900); root.gui_embed_subwindows=true; var folder:=ProjectSettings.globalize_path("user://fog-settings-"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.new("Fog settings"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.loaded_project=project
+	root.size=Vector2i(1400,900); root.gui_embed_subwindows=true; var folder:=ProjectSettings.globalize_path("user://fog-settings-"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.create("Fog settings"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.set_loaded_project(project)
 	var main: Node=load("res://scenes/Main.tscn").instantiate(); root.add_child(main); await settle(12); var tabs:=get_first_node_in_group("actor_scene_tabs") as ActorSceneTabs; editor=tabs.timeline
 	var button:=main.get_node("MainUI/ColorRect/VBoxContainer/HBoxContainer/EditorButton") as Button; button.pressed.emit(); await settle(2)
 	var popup:=button.get_node_or_null("FogRenderingSettings"); check(popup!=null and popup.visible,"Editor opens a compact project-wide volumetric rendering panel")

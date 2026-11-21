@@ -2,7 +2,7 @@ extends SceneTree
 ## Run with a graphics display and Forward+ to compile AND render every catalog entry.
 ## Example: Godot --path . --rendering-method forward_plus --script res://scripts/tests/shader_library_validation.gd
 const Catalog = preload("res://Workspaces/ShaderWorkspace/library/shader_sample_catalog.gd")
-const Preview = preload("res://Workspaces/ShaderWorkspace/shader_sample_preview.gd")
+const Preview = preload("res://Workspaces/ShaderWorkspace/ShaderSamplePreview.cs")
 const OUTPUT := "res://.godot/verification/shader_library"
 var _only_type := ""
 

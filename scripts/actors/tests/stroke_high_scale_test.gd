@@ -27,9 +27,9 @@ func check_profile(amount: float,profile: String) -> void:
 			corrector.update()
 			var previous_turn := 0.0
 			for i in range(5,corrector.knots.size()-5):
-				var a := corrector.knots[i]-corrector.knots[i-1]
-				var b := corrector.knots[i+1]-corrector.knots[i]
-				var turn := a.angle_to(b)
+				var a: Vector2 = corrector.knots[i]-corrector.knots[i-1]
+				var b: Vector2 = corrector.knots[i+1]-corrector.knots[i]
+				var turn: float = a.angle_to(b)
 				if absf(turn)>worst_turn:
 					worst_turn=absf(turn)
 					debug_kink="step %s knot %s/%s corner %s raw %s fitted %s neighbors %s %s" % [step,i,corrector.knots.size(),corrector.corners[i],corrector._raw(i),corrector.knots[i],a,b]

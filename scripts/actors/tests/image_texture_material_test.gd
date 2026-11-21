@@ -1,5 +1,5 @@
 extends SceneTree
-const Library=preload("res://Workspaces/ImageWorkspace/texture_material_library.gd")
+const Library=preload("res://scripts/materials/NaturalMaterialCatalog.cs")
 const Render=preload("res://Workspaces/ImageWorkspace/texture_material_renderer.gd")
 var failures:=0
 func _initialize() -> void: execute.call_deferred()
@@ -17,7 +17,7 @@ func run() -> void:
 	load("res://Workspaces/ImageWorkspace/texture_material_browser.gd").open(studio)
 	var sheet:=Image.create(800,320,false,Image.FORMAT_RGBA8)
 	var fingerprints: Dictionary={}; var index:=0
-	for family in Library.CATEGORIES:
+	for family in Library.categories():
 		var material:=Library.create(Library.ids().filter(func(id: String): return Library.category(id)==family)[0])
 		material.blending="replace"
 		var bitmap: Image=await Render.preview(root,material,Vector2i(160,160))
@@ -29,7 +29,7 @@ func run() -> void:
 	await catalog_sheet()
 	await create_timer(2).timeout
 	root.get_viewport().get_texture().get_image().save_png("res://.godot/material_browser_ui.png")
-	var material:=Library.create("wood/oak"); var copy:=material.copy_material(); copy.parameters.density=3
+	var material:=Library.create("wood/oak"); var copy: KiwiTextureMaterial =material.copy_material(); copy.parameters.density=3
 	check(material.parameters.density!=copy.parameters.density,"Material instances own independent parameters")
 	var saved_path:="res://.godot/material_roundtrip.tres"
 	check(ResourceSaver.save(copy,saved_path)==OK,"Material resource saves")
@@ -50,7 +50,7 @@ func catalog_sheet() -> void:
 	var background:=ColorRect.new(); background.color=Color("13202b"); background.size=Vector2(viewport.size); viewport.add_child(background)
 	var ids:=Library.ids(); check(ids.size()==143,"Catalog contains all 143 requested presets")
 	for i in ids.size():
-		var value:=Library.create(ids[i]); value.blending="replace"
+		var value: KiwiTextureMaterial =Library.create(ids[i]); value.blending="replace"
 		var tile:=ColorRect.new(); tile.position=Vector2((i%13)*100,(i/13)*100); tile.size=Vector2(96,76); tile.material=Render.material(value,tile.size); viewport.add_child(tile)
 		var caption:=Label.new(); caption.text=value.label; caption.position=tile.position+Vector2(0,76); caption.size=Vector2(96,22); caption.clip_text=true; caption.add_theme_font_size_override("font_size",9); viewport.add_child(caption)
 	for i in 4: await RenderingServer.frame_post_draw
@@ -84,7 +84,7 @@ func integration(studio: KiwiImageWorkspace) -> void:
 	await studio.canvas._begin_paint(Vector2(48,48)); await studio.canvas._finish(Vector2(48,48))
 	check(studio.document.layers.size()==1 and studio.document.live_materials.size()==1,"Material brush creates independent editable ownership within the selected layer")
 	var layer:=studio._main_layer(); var region: KiwiLivePaintRegion=layer.live_paint[-1]
-	var template:=studio.document.live_material_for_id(region.template_id); var id:=template.id
+	var template:=studio.document.live_material_for_id(region.template_id); var id: String =template.id
 	check(absf(region.coverage.get_image().get_pixel(48,48).a-.5)<.01,"Material strokes store fractional opacity as coverage")
 	check(region.coverage.get_image().get_pixel(0,0).a==0,"Unpainted material pixels remain transparent")
 	check(layer.live_paint[0].raster.get_image().get_data()==bitmap.get_data(),"Material paint preserves the original raster in its ordered stack")
@@ -92,7 +92,7 @@ func integration(studio: KiwiImageWorkspace) -> void:
 	studio.undo(); check(studio.document.live_materials.is_empty() and studio._main_layer().live_paint.is_empty(),"Undo removes linked coverage and restores the original raster")
 	studio.redo(); layer=studio._main_layer(); region=layer.live_paint[-1]; template=studio.document.live_material_for_id(id)
 	check(region.coverage!=null,"Redo restores material coverage")
-	var value:=template.material.copy_material(); var old_color: Color=value.parameters.primary
+	var value: KiwiTextureMaterial =template.material.copy_material(); var old_color: Color=value.parameters.primary
 	value.parameters.primary=Color.RED; studio._material_changed(value); value.parameters.primary=Color.GREEN; studio._material_changed(value); studio._commit()
 	check(studio._undo.size()==history+2,"Multiple live material previews commit as one edit")
 	studio.undo(); check(studio.document.live_material_for_id(id).material.parameters.primary==old_color,"Undo restores edited material parameters")

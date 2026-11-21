@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="ActorObjectDefinition" format=3 uid="uid://70yblcc2yqh6"]
 
-[ext_resource type="Script" uid="uid://ct1qlalxsv4yb" path="res://scripts/actors/core/actor_object_definition.gd" id="1"]
-[ext_resource type="Script" uid="uid://bdqg0opq1ftpj" path="res://scripts/actors/core/actor_property.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/actors/core/ActorObjectDefinition.cs" id="1"]
+[ext_resource type="Script" path="res://scripts/actors/core/ActorProperty.cs" id="2"]
 
 [sub_resource type="Resource" id="font"]
 script = ExtResource("2")

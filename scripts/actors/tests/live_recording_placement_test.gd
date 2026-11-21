@@ -1,16 +1,7 @@
 extends SceneTree
 var failures := 0
 
-class TestRecorder:
-	extends ActorAudioRecorder
-	var output: AudioStreamWAV
-	func start() -> String:
-		recording = true
-		peaks = PackedFloat32Array([0.2, 0.5, 0.7])
-		return ""
-	func stop() -> AudioStreamWAV:
-		recording = false
-		return output
+const TestRecorder = preload("res://scripts/actors/tests/fixtures/PlacementTestAudioRecorder.cs")
 
 func check(condition: bool, message: String) -> void:
 	if not condition:
@@ -89,7 +80,7 @@ func run() -> void:
 	check(editor.start_input.size.y < 50 and editor.end_input.size.y < 50, "Timing inputs no longer stretch vertically")
 	editor.timing_dialog.hide()
 	var settings_button := Button.new()
-	settings_button.set_script(load("res://scripts/Extra/editor_settings_button.gd"))
+	settings_button.set_script(load("res://scripts/Extra/RecordingOptionsButton.cs"))
 	root.add_child(settings_button)
 	settings_button.call("open_settings")
 	check(settings_button.get("device") is OptionButton and settings_button.get("popup").visible, "Editor opens microphone preferences")

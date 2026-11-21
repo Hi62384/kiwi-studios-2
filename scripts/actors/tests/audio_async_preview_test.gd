@@ -9,7 +9,7 @@ func check(condition: bool, message: String) -> void:
 
 func _initialize() -> void: run.call_deferred()
 
-func await_queue(reader: KiwiAudioFilePreview.Reader, count: int) -> bool:
+func await_queue(reader: AudioFilePreviewReader, count: int) -> bool:
 	var deadline := Time.get_ticks_msec() + 5000
 	while Time.get_ticks_msec() < deadline:
 		var state := reader.status()
@@ -30,32 +30,32 @@ func run() -> void:
 	# reflection of an internal cursor. The fixture remains under 1 MiB.
 	var samples := PackedVector2Array(); samples.resize(44100 * 4)
 	for i in samples.size(): samples[i] = Vector2(0.125, -0.25) if i < 88200 else Vector2(-0.5, 0.75)
-	var source := KiwiAudioSourceCache.to_wav(samples)
+	var source := KiwiAudioSourceCache.to_wav(samples,44100,true)
 	check(source.save_to_wav(path) == OK, "PCM fixture writes")
 	var info := KiwiAudioPCMFile.inspect(path)
-	var reader := KiwiAudioFilePreview.Reader.new(); reader.path = path; reader.info = info
+	var reader := AudioFilePreviewReader.new(); reader.path = path; reader.info = info
 	var generation := reader.seek_to(0, false)
 	var thread := Thread.new()
 	check(thread.start(reader.run) == OK, "Dedicated PCM reader starts")
-	check(await await_queue(reader, KiwiAudioFilePreview.QUEUE_CHUNKS), "Read-ahead fills its bounded queue")
+	check(await await_queue(reader, KiwiAudioFilePreview.queue_chunks()), "Read-ahead fills its bounded queue")
 	await create_timer(0.03).timeout
-	check(int(reader.status().queued) == KiwiAudioFilePreview.QUEUE_CHUNKS, "Read-ahead stops at 32 chunks")
-	var packet := reader.take(KiwiAudioFilePreview.CHUNK_FRAMES)
+	check(int(reader.status().queued) == KiwiAudioFilePreview.queue_chunks(), "Read-ahead stops at 32 chunks")
+	var packet := reader.take(KiwiAudioFilePreview.chunk_frames())
 	var pcm: PackedVector2Array = packet.get("samples", PackedVector2Array())
 	check(int(packet.get("generation", -1)) == generation and not pcm.is_empty() and absf(pcm[0].x - 0.125) < 0.001, "Initial queue contains the original source samples")
 	# A pending read may race this seek; every exposed packet must be new.
 	generation = reader.seek_to(100000, false)
 	check(await await_queue(reader, 1), "Reader prepares a new seek generation")
-	packet = reader.take(KiwiAudioFilePreview.CHUNK_FRAMES); pcm = packet.get("samples", PackedVector2Array())
+	packet = reader.take(KiwiAudioFilePreview.chunk_frames()); pcm = packet.get("samples", PackedVector2Array())
 	check(int(packet.get("generation", -1)) == generation and not pcm.is_empty() and absf(pcm[0].x + 0.5) < 0.001, "Seek discards old PCM and delivers the requested half")
 	generation = reader.seek_to(samples.size() - 7, false)
 	check(await await_queue(reader, 1), "Reader reaches a short tail")
-	packet = reader.take(KiwiAudioFilePreview.CHUNK_FRAMES); pcm = packet.get("samples", PackedVector2Array())
+	packet = reader.take(KiwiAudioFilePreview.chunk_frames()); pcm = packet.get("samples", PackedVector2Array())
 	check(pcm.size() == 7 and bool(packet.get("final", false)), "Final packet stops at the declared frame boundary")
 	generation = reader.seek_to(samples.size() - 7, true)
 	check(await await_queue(reader, 2), "Loop queues the tail and source start")
-	var tail := reader.take(KiwiAudioFilePreview.CHUNK_FRAMES)
-	packet = reader.take(KiwiAudioFilePreview.CHUNK_FRAMES); pcm = packet.get("samples", PackedVector2Array())
+	var tail := reader.take(KiwiAudioFilePreview.chunk_frames())
+	packet = reader.take(KiwiAudioFilePreview.chunk_frames()); pcm = packet.get("samples", PackedVector2Array())
 	check(not bool(tail.get("final", true)) and not pcm.is_empty() and absf(pcm[0].x - 0.125) < 0.001, "Loop crosses the source boundary without stale tail repetition")
 	reader.cancel(); thread.wait_to_finish()
 	check(reader.status().queued == 0, "Cancellation clears queued PCM and joins the owned reader")

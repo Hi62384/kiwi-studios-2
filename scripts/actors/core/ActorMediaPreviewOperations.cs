@@ -1,0 +1,21 @@
+using Godot;
+using System;
+using Settings=Godot.Collections.Dictionary;
+public partial class ActorMediaPreviewOperations:RefCounted
+{
+    private static CSharpScript Video=>GD.Load<CSharpScript>("res://scripts/actors/core/ActorVideo.cs");
+    private static TextureRect ImageView(Node owner)=>owner.Get("image").As<TextureRect>();private static AudioStreamPlayer Player(Node owner)=>owner.Get("player").As<AudioStreamPlayer>();private static HSlider Seek(Node owner)=>owner.Get("seek").As<HSlider>();private static Button Transport(Node owner)=>owner.Get("transport").As<Button>();
+    public void ready(VBoxContainer owner)
+    {
+        var player=Player(owner);owner.AddChild(player);var image=ImageView(owner);image.CustomMinimumSize=new Vector2(180,160);image.ExpandMode=TextureRect.ExpandModeEnum.IgnoreSize;image.StretchMode=TextureRect.StretchModeEnum.KeepAspectCentered;owner.AddChild(image);string path=owner.Get("path").AsString(),extension=path.GetExtension().ToLowerInvariant();if(extension is "png" or "jpg" or "jpeg" or "webp" or "bmp" or "svg" or "tga" or "exr" or "hdr"){using var bitmap=Image.LoadFromFile(path);if(bitmap!=null)image.Texture=ImageTexture.CreateFromImage(bitmap);return;}bool video=extension is "mp4" or "mov" or "mkv" or "webm" or "avi" or "m4v" or "ogv" or "mpeg" or "mpg" or "wmv" or "ts";owner.Set("video",video);
+        if(video){var metadata=Video.Call("info",path).AsGodotDictionary();owner.Set("duration",metadata.TryGetValue("duration",out var duration)?duration:Variant.From(0.0));if(metadata.TryGetValue("audio",out var audio)&&audio.AsBool()){string target=ProjectSettings.GlobalizePath("user://preview_audio_"+new ActorDataOperations().new_id()+".wav");owner.Set("audio_path",target);owner.Set("audio_job",OS.ExecuteWithPipe(Video.Call("executable","ffmpeg").AsString(),new[]{"-nostdin","-v","error","-n","-i",ProjectSettings.GlobalizePath(path),"-vn","-ar","48000","-ac","2","-c:a","pcm_s16le",target},false));}}else{image.Hide();player.Stream=GD.Load<CSharpScript>("res://scripts/actors/core/ActorAudio.cs").Call("source",path).As<AudioStream>();if(player.Stream!=null)owner.Set("duration",player.Stream.GetLength());}
+        var transport=Transport(owner);transport.Text="▶ Preview";owner.AddChild(transport);transport.Pressed+=()=>toggle(owner);var seek=Seek(owner);seek.MaxValue=owner.Get("duration").AsDouble();seek.Step=.01;owner.AddChild(seek);seek.ValueChanged+=time=>seek_to(owner,time);
+    }
+    public void toggle(Node owner){double time=owner.Get("time").AsDouble();if(time>=owner.Get("duration").AsDouble()){time=0;owner.Set("time",time);}bool playing=!owner.Get("playing").AsBool();owner.Set("playing",playing);Transport(owner).Text=playing?"Ⅱ Pause":"▶ Preview";var player=Player(owner);if(playing&&player.Stream!=null)player.Play((float)time);else player.Stop();}
+    public void seek_to(Node owner,double time){owner.Set("time",time);var player=Player(owner);if(owner.Get("playing").AsBool()&&player.Stream!=null)player.Play((float)time);}
+    public void process(Node owner,double delta)
+    {
+        var player=Player(owner);var job=owner.Get("audio_job").AsGodotDictionary();if(job.Count>0){job["stderr"].As<Godot.FileAccess>().GetBuffer(4096);int pid=job["pid"].AsInt32();if(!OS.IsProcessRunning(pid)){if(OS.GetProcessExitCode(pid)==0)player.Stream=AudioStreamWav.LoadFromFile(owner.Get("audio_path").AsString());job.Clear();if(owner.Get("playing").AsBool()&&player.Stream!=null)player.Play((float)owner.Get("time").AsDouble());}}if(owner.Get("playing").AsBool()){double time=Math.Min(owner.Get("duration").AsDouble(),owner.Get("time").AsDouble()+delta);owner.Set("time",time);Seek(owner).SetValueNoSignal(time);if(time>=owner.Get("duration").AsDouble()){owner.Set("playing",false);player.Stop();Transport(owner).Text="▶ Preview";}}if(owner.Get("video").AsBool()){var frame=Video.Call("frame",owner.Get("path"),owner.Get("time"),true).As<Texture2D>();if(frame!=null)ImageView(owner).Texture=frame;}
+    }
+    public void exit_tree(Node owner){Player(owner).Stop();var job=owner.Get("audio_job").AsGodotDictionary();if(job.Count>0&&OS.IsProcessRunning(job["pid"].AsInt32()))OS.Kill(job["pid"].AsInt32());string path=owner.Get("audio_path").AsString();if(path.Length>0)DirAccess.RemoveAbsolute(path);}
+}

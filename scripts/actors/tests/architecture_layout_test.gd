@@ -1,10 +1,10 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Layout=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_layout.gd")
-const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 const Builder=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_geometry.gd")
 const Buildings=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_session.gd")
 func run() -> void:
-	var source: Resource=Source.rectangular(8,12); source.seed=42; var result:=Layout.generate(source,5,1.2); check(result.errors.is_empty(),"Constrained house layout generates valid rooms and real door walls")
+	var source: Resource=(load("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs").call("rectangular",8,12) as BuildingSource); source.seed=42; var result:=Layout.generate(source,5,1.2); check(result.errors.is_empty(),"Constrained house layout generates valid rooms and real door walls")
 	var authored: Resource=result.source; var graph:=Layout.connectivity(authored)
 	check(authored.floors[0].rooms.size()==6 and graph.warnings.is_empty() and graph.reachable.size()==7,"Five rooms and a central hall all connect to the exterior")
 	var total:=0.; var overlap:=false; var rooms: Array=authored.floors[0].rooms
@@ -20,7 +20,7 @@ func run() -> void:
 		if str(wall.id).begins_with("layout:doorwall"): wall.openings=[]; break
 	check(not Layout.connectivity(blocked).warnings.is_empty(),"Removing a connecting door reports inaccessible rooms")
 	var building:=Builder.generate(authored); check(building.errors.is_empty() and building.document.components[0].parameters.architecture_navigation.reachable.size()==7,"Native editable hierarchy carries circulation metadata")
-	var invalid: Resource=Source.rectangular(); invalid.footprint=PackedVector2Array([Vector2.ZERO,Vector2(5,0),Vector2(4,4),Vector2(0,4)])
+	var invalid: Resource=(load("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs").call("rectangular") as BuildingSource); invalid.footprint=PackedVector2Array([Vector2.ZERO,Vector2(5,0),Vector2(4,4),Vector2(0,4)])
 	check(not Layout.generate(invalid).errors.is_empty(),"Unsupported footprints are rejected instead of generating overlapping rooms")
 	var path:="user://connected_building.res"; ResourceSaver.save(building.document,path); var reopened:=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE) as KiwiModelDocument
 	check(reopened!=null and reopened.components[0].parameters.architecture_navigation.connections==building.document.components[0].parameters.architecture_navigation.connections,"Room graph survives native save and reload")

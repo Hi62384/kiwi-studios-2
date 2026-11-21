@@ -1,0 +1,140 @@
+[gd_resource type="Resource" script_class="KiwiCompositingDocument" format=3]
+
+[ext_resource type="Script" path="res://Workspaces/CompositingWorkspace/composite_graph_connection.gd" id="1_88oxa"]
+[ext_resource type="Script" path="res://Workspaces/CompositingWorkspace/composite_graph_node.gd" id="2_0y4ro"]
+[ext_resource type="Script" path="res://Workspaces/CompositingWorkspace/composite_graph.gd" id="3_481ch"]
+[ext_resource type="Script" path="res://Workspaces/CompositingWorkspace/CompositeLayer.cs" id="4_1a1h7"]
+[ext_resource type="Script" path="res://Workspaces/CompositingWorkspace/compositing_document.gd" id="5_p0s74"]
+
+[sub_resource type="Resource" id="Resource_6innb"]
+script = ExtResource("1_88oxa")
+from_node = "source-A"
+from_port = "image"
+to_node = "output-B"
+to_port = "image"
+
+[sub_resource type="Resource" id="Resource_mvp36"]
+script = ExtResource("2_0y4ro")
+id = "legacy-node-A"
+kind = "Color Grade"
+position = Vector2(123, 456)
+settings = {
+"curves": {
+"red": [Vector2(0, 0), Vector2(0.5, 0.25), Vector2(1, 1)]
+},
+"exposure": 2.5,
+"key_color": Color(0.2, 0.4, 0.8, 0.5)
+}
+exposed = true
+
+[sub_resource type="Resource" id="Resource_lg0qx"]
+script = ExtResource("3_481ch")
+id = "5dafda638bd770bc96db7b67622bdc80"
+nodes = Array[Resource]([SubResource("Resource_mvp36")])
+connections = Array[Resource]([SubResource("Resource_6innb")])
+
+[sub_resource type="Image" id="Image_3j5ar"]
+data = {
+"data": PackedByteArray(63, 127, 191, 127, 63, 127, 191, 127),
+"format": "RGBA8",
+"height": 1,
+"mipmaps": false,
+"width": 2
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_p5715"]
+image = SubResource("Image_3j5ar")
+
+[sub_resource type="Resource" id="Resource_ltaga"]
+script = ExtResource("4_1a1h7")
+id = "legacy-image"
+name = "Legacy Image"
+parent_id = "legacy-group"
+locked = true
+opacity = 0.4
+blend_mode = 8
+position = Vector2(23, 45)
+rotation = 0.25
+scale = Vector2(2, 0.5)
+anchor = Vector2(0.2, 0.8)
+source_image = SubResource("ImageTexture_p5715")
+mask_id = "legacy-mask"
+processing_graph_id = "5dafda638bd770bc96db7b67622bdc80"
+start_time = 1.0
+end_time = 4.0
+source_time_offset = 0.5
+playback_speed = 2.0
+effects = Array[Dictionary]([{
+"kind": "blur",
+"radius": 7
+}])
+settings = {
+"custom": "preserve-me",
+"vector": Vector3(1, 2, 3)
+}
+
+[sub_resource type="Resource" id="Resource_417w2"]
+script = ExtResource("4_1a1h7")
+id = "legacy-group"
+name = "Legacy Group"
+kind = 9
+position = Vector2(960, 540)
+children = Array[Resource]([SubResource("Resource_ltaga")])
+
+[sub_resource type="Resource" id="Resource_uaye0"]
+script = ExtResource("4_1a1h7")
+id = "legacy-mask"
+name = "Legacy Mask"
+kind = 7
+visible = false
+position = Vector2(960, 540)
+source_image = SubResource("ImageTexture_p5715")
+
+[resource]
+script = ExtResource("5_p0s74")
+document_id = "851a8f41daa6006485c236b247b2738e"
+title = "Legacy Document State"
+canvas_size = Vector2i(320, 180)
+pixel_aspect_ratio = 1.25
+frame_rate = 30.0
+duration = 6.5
+input_color_settings = {
+"source_space": "sRGB"
+}
+output_color_settings = {
+"exposure": 0.5,
+"transform": "sRGB"
+}
+layers = Array[Resource]([SubResource("Resource_417w2"), SubResource("Resource_ltaga"), SubResource("Resource_uaye0")])
+graphs = Array[Resource]([SubResource("Resource_lg0qx")])
+active_graph_id = "5dafda638bd770bc96db7b67622bdc80"
+solo_layer_id = "legacy-image"
+media_references = Array[String](["res://example-source.png"])
+animation = Array[Dictionary]([{
+"keys": [{
+"time": 1.0,
+"value": 0.4
+}, {
+"time": 4.0,
+"value": 0.8
+}],
+"layer_id": "legacy-image",
+"property": "opacity"
+}])
+processing_settings = {
+"cache": false,
+"precision": "float32",
+"tile_size": 64
+}
+render_settings = {
+"quality": "Final",
+"transparent": true
+}
+cache_references = {
+"example": "cache-marker"
+}
+workspace_state = {
+"mode": 1,
+"scroll": Vector2(20, 40),
+"selected_id": "legacy-image"
+}

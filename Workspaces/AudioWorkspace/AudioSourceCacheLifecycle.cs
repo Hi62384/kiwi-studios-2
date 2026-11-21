@@ -1,0 +1,27 @@
+using Godot;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Settings=Godot.Collections.Dictionary;
+using GArray=Godot.Collections.Array;
+
+public partial class AudioSourceCacheOperations
+{
+    private static Settings Store(Node owner,string key)=>owner.Get(key).AsGodotDictionary();
+    private static Settings Stamp(Variant value)=>GD.Load<CSharpScript>("res://scripts/actors/core/ActorAudio.cs").Call("source_stamp",value).AsGodotDictionary();
+    public Settings request(Node owner,AudioStream? stream)=>stream!=null?request_value(owner,stream,identity(stream)):new Settings();
+    public Settings request_source(Node owner,Variant value){if(value.VariantType==Variant.Type.Object&&value.AsGodotObject() is AudioStream stream)return request(owner,stream);var stamp=Stamp(value);return stamp["missing"].AsBool()?new Settings {["missing"]=true}:request_value(owner,value,stamp["key"].AsString());}
+    public Settings request_value(Node owner,Variant value,string key){if(key.Length==0)return new Settings();var entries=Store(owner,"entries");if(entries.TryGetValue(key,out var found)){var entry=found.AsGodotDictionary();bool missing=entry.TryGetValue("missing",out var problem)&&problem.AsBool();long retry=entry.TryGetValue("retry_after",out var after)?after.AsInt64():0;if(!missing||(long)Time.GetTicksMsec()<retry){entry["used"]=(long)Time.GetTicksMsec();return entry;}entries.Remove(key);}if(!Store(owner,"_jobs").ContainsKey(key))Store(owner,"_pending")[key]=value;return new Settings();}
+    public void invalidate(Node owner,AudioStream? stream){owner.Set("_generation",owner.Get("_generation").AsInt64()+1);var jobs=Store(owner,"_jobs");if(stream==null){Store(owner,"entries").Clear();Store(owner,"_pending").Clear();foreach(var raw in jobs.Values)raw.AsGodotDictionary()["token"].AsGodotObject().Call("cancel");}else{string key=identity(stream);Store(owner,"entries").Remove(key);Store(owner,"_pending").Remove(key);if(jobs.TryGetValue(key,out var raw))raw.AsGodotDictionary()["token"].AsGodotObject().Call("cancel");}}
+    public void process(Node owner)
+    {
+        var jobs=Store(owner,"_jobs");foreach(var key in jobs.Keys.ToArray()){var job=jobs[key].AsGodotDictionary();var thread=job["thread"].As<GodotThread>();if(thread.IsAlive())continue;var result=thread.WaitToFinish().AsGodotDictionary();jobs.Remove(key);thread.Dispose();bool current=true;var source=job["source"];if(source.VariantType!=Variant.Type.Object||source.AsGodotObject() is not AudioStream){var stamp=Stamp(source);current=!stamp["missing"].AsBool()&&stamp["key"].AsString()==key.AsString();}if(job["generation"].AsInt64()==owner.Get("_generation").AsInt64()&&current&&!(result.TryGetValue("cancelled",out var cancelled)&&cancelled.AsBool())){result["used"]=(long)Time.GetTicksMsec();Store(owner,"entries")[key]=result;evict(owner);owner.EmitSignal("waveform_ready",key.AsString());}}
+        var pending=Store(owner,"_pending");while(jobs.Count<2&&pending.Count>0){string key=pending.Keys.First().AsString();var value=pending[key];pending.Remove(key);var thread=new GodotThread();var token=owner.Call("_new_work").As<RefCounted>();var error=thread.Start(Callable.From<Settings>(()=>{using var operations=new AudioSourceCacheOperations();return operations.build_source_envelope(value,key,token);}));if(error==Error.Ok)jobs[key]=new Settings {["thread"]=thread,["generation"]=owner.Get("_generation"),["token"]=token,["source"]=value};else thread.Dispose();}
+    }
+    public Settings build_source_envelope(Variant value,string key,RefCounted token)
+    {
+        if(Cancelled(token))return new Settings {["cancelled"]=true};if(value.VariantType!=Variant.Type.Object||value.AsGodotObject() is not AudioStream){var stamp=Stamp(value);if(stamp["missing"].AsBool()||stamp["key"].AsString()!=key)return new Settings {["cancelled"]=true};if(value.AsString().GetExtension().ToLowerInvariant()=="wav"){var info=GD.Load<CSharpScript>("res://scripts/actors/core/ActorAudio.cs").Call("pcm_info",value.AsString()).AsGodotDictionary();if(info.TryGetValue("error",out var error)&&error.AsString().Length==0)return build_file_envelope(value.AsString(),info,token);}}var stream=GD.Load<CSharpScript>("res://scripts/actors/core/ActorAudio.cs").Call("source",value,token).As<AudioStream>();if(Cancelled(token))return new Settings {["cancelled"]=true};if(stream==null)return new Settings {["missing"]=true,["levels"]=new GArray(),["bytes"]=0,["retry_after"]=(long)Time.GetTicksMsec()+2000};return build_envelope(stream,token);
+    }
+    public void evict(Node owner){var entries=Store(owner,"entries");long total=0;foreach(var raw in entries.Values){var entry=raw.AsGodotDictionary();total+=entry.TryGetValue("bytes",out var bytes)?bytes.AsInt64():0;}while(total>48*1024*1024&&entries.Count>1){var oldest=entries.Keys.First();foreach(var key in entries.Keys)if(entries[key].AsGodotDictionary()["used"].AsInt64()<entries[oldest].AsGodotDictionary()["used"].AsInt64())oldest=key;var entry=entries[oldest].AsGodotDictionary();total-=entry.TryGetValue("bytes",out var bytes)?bytes.AsInt64():0;entries.Remove(oldest);}}
+    public void exit_tree(Node owner){owner.Set("_generation",owner.Get("_generation").AsInt64()+1);var jobs=Store(owner,"_jobs");foreach(var raw in jobs.Values)raw.AsGodotDictionary()["token"].AsGodotObject().Call("cancel");foreach(var raw in jobs.Values){var thread=raw.AsGodotDictionary()["thread"].As<GodotThread>();thread.WaitToFinish();thread.Dispose();}jobs.Clear();Store(owner,"_pending").Clear();Store(owner,"entries").Clear();}
+}

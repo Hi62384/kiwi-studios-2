@@ -70,10 +70,18 @@ func run() -> void:
 	tool.weight_tool="Select faces"; tool.region.clear(); tool.select_region(Rect2(canvas.project(Vector3(.25,1.,.55)),Vector2.ZERO)); await settle()
 	check(tool.region.size()==3,"Face weighting selects the three vertices of the ray-hit triangle")
 	tool.weight_tool="Brush"; tool.region.clear(); tool.brush_mode="Replace"; tool.brush_value=.31; tool.brush_radius=1.2; tool.brush_strength=1.; tool.paint_hidden=true
+	var before_brush := body.binding.signature()
 	tool.drag="weight"; tool.stroke_session=session; tool.paint(canvas.project(Vector3(.3,1.,.55)),false,true)
 	check(not tool.weight_before.is_empty(),"Weight brush hits the visible deformed mesh and changes influences")
 	tool.finish(); await settle(); check(session.document.component(body_id).binding.validate(editor.rig()).is_empty(),"Painting keeps every vertex normalized and valid")
 	check(visual.material_override is StandardMaterial3D and visual.material_override.vertex_color_use_as_albedo,"Selected bone influence is displayed through a non-destructive heatmap")
+	var after_brush := body.binding.signature(); session.undo(); await settle()
+	check(body.binding.signature()==before_brush,"Completed brush stroke undoes to exact original influence arrays")
+	session.redo(); await settle(); check(body.binding.signature()==after_brush,"Completed brush stroke redoes to exact painted influence arrays")
+	tool.drag="weight"; tool.stroke_session=session; tool.paint(canvas.project(Vector3(.3,1.,.55)),true,true)
+	check(not tool.weight_before.is_empty(),"Temporary subtract stroke records changed vertices")
+	tool.finish(true); await settle(); check(body.binding.signature()==after_brush,"Canceling a brush stroke restores exact weights without committing an action")
+
 	editor.detach(); await settle()
 	check(visual.skin==null and visual.skeleton.is_empty() and visual.material_override==null,"Detaching removes the preview skin and heatmap rather than leaving stale rendering state")
 	session.undo(); await settle(); check(visual.skin!=null and visual.material_override!=null,"Undoing detach restores the binding and weight visualization together")
@@ -95,7 +103,9 @@ func run() -> void:
 	var loaded := ResourceLoader.load(file,"",ResourceLoader.CACHE_MODE_IGNORE) as KiwiModelDocument
 	check(loaded.validate().is_empty() and loaded.component(body_id).binding!=null and not loaded.component(gear_id).binding.rigid_bone_id.is_empty(),"Save roundtrip retains the editable mixed soft/rigid rig")
 	var image_path := "res://.godot/verification/model_workspace/rig_authoring.png"; DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(image_path.get_base_dir()))
-	await RenderingServer.frame_post_draw; root.get_texture().get_image().save_png(image_path)
+	await process_frame
+	RenderingServer.force_sync(); RenderingServer.force_draw(false)
+	check(root.get_texture().get_image().save_png(image_path)==OK,"Rig viewport capture explicitly renders and saves the current frame")
 	# Starting a calculation then switching away must not install into another tab.
 	session.select(body_id); workspace.rig_ui.bind_async("Smooth"); workspace.open_source(KiwiModelDocument.new()); await settle()
 	check(workspace.session.document.components.is_empty() and workspace.rig_ui.worker==null,"Switching away safely cancels and joins the weighting worker")

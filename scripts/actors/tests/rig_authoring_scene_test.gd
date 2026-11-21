@@ -23,7 +23,7 @@ func run() -> void:
 	for item in [body,rig,part]: item.parent_id=container.id
 	check(session.document.validate().is_empty(),"Authored mixed rig has a valid transformed component hierarchy")
 	var path := ProjectSettings.globalize_path("user://Authored Scene Rig.tres"); ResourceSaver.save(session.document,path)
-	var model_runtime := session.document.instantiate_model() as KiwiRigModelRuntime; root.add_child(model_runtime); await settle()
+	var model_runtime: Node3D = session.document.instantiate_model(); root.add_child(model_runtime); await settle()
 	var nodes := {}
 	for node: Node3D in model_runtime.find_children("*","Node3D",true,false):
 		if node.has_meta("kiwi_component_id"): nodes[str(node.get_meta("kiwi_component_id"))]=node
@@ -47,7 +47,7 @@ func run() -> void:
 	var pose: Dictionary=rig_actor.values[&"bone_poses"]["2"]; var original: Vector3=pose.rotation
 	ActorSkeletonPose.key_pose(editor.model,rig_actor,2)
 	editor.canvas.playhead=2.; editor._evaluate_runtimes(); await settle()
-	ActorSkeletonPose.commit(editor.model,ActorSkeletonPose.capture(editor.model,rig_actor),2,{"rotation":original+Vector3(0,0,70)})
+	ActorSkeletonPose.commit(editor.model,ActorSkeletonPose.capture(editor.model,rig_actor),2,{"rotation":original+Vector3(0,0,70)},false)
 	editor.canvas.playhead=1.; editor._evaluate_runtimes(); await settle()
 	check(rig_actor.animation_tracks.size()==3 and rig_actor.animation_track(ActorSkeletonPose.path(2,"rotation")).keys.size()==2,"Authored rig uses the existing scene bone keyframe tracks")
 	check(not (gear_runtime.content.global_transform as Transform3D).is_equal_approx(bind_world),"Rigid mechanical part follows animated bone poses in the scene")

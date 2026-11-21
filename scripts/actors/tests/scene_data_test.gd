@@ -612,7 +612,7 @@ func run() -> void:
 		var audio_actor := editor.registry.get_definition(&"audio").create_actor()
 		audio_actor.values[&"pitch"] = 1.25
 		audio_actor.values[&"fade_in"] = 0.1
-		var audio_clip := ActorClip.create(audio_actor, 0.2, 0.5)
+		var audio_clip := (load("res://scripts/actors/core/ActorClip.cs").call("create",audio_actor, 0.2, 0.5) as ActorClip)
 		audio_clip.playback_speed = 1.5
 		var filter: String = SceneExporter._audio_filter(audio_actor, audio_clip, 0, 0.5)
 		var ffmpeg_output: Array = []

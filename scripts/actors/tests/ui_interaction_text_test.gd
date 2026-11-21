@@ -97,7 +97,7 @@ func run() -> void:
 	var track := ActorAnimationTrack.new()
 	var first := ActorKeyframe.new()
 	first.value = "AB"
-	first.interpolation = ActorKeyframe.Interpolation.STEP
+	first.interpolation = ActorKeyframe.interpolation_modes().STEP
 	var last := ActorKeyframe.new()
 	last.value = "ABCDEF"
 	last.time = 1

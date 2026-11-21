@@ -1,6 +1,6 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Buildings=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_session.gd")
-const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 const Foundation=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_foundation.gd")
 func run() -> void:
 	var session:=KiwiEnvironmentSession.new(); var terrain:=session.add_terrain(); var root:=Buildings.add(session); Foundation.set_modifier(session,root.id,terrain.id); session.selected=[root.id,terrain.id]; session.duplicate_selected(); var copied_root: KiwiModelComponent; var copied_terrain: KiwiModelComponent

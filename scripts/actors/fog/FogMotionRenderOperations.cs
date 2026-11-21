@@ -1,0 +1,26 @@
+using Godot;
+using System;
+using System.Collections.Generic;
+using Settings=Godot.Collections.Dictionary;
+public partial class FogMotionRenderOperations:RefCounted
+{
+    private Shader BuiltIn=>GD.Load<Shader>("res://scripts/actors/fog/fog_surface.gdshader");
+    private static FogVolume? Content(Node runtime){var value=runtime.Get("content");return value.VariantType==Variant.Type.Object?value.AsGodotObject() as FogVolume:null;}
+    public void procedural(Node runtime,Settings values,double time)
+    {
+        var fog=Content(runtime);if(fog?.Material is not ShaderMaterial material||material.Shader!=BuiltIn)return;int mode=values.GetValueOrDefault("fog_motion_mode",0).AsInt32();bool enabled=mode is 1 or 3;material.SetShaderParameter("procedural_motion",enabled);if(!enabled)return;
+        var wind=values.GetValueOrDefault("fog_wind",Vector3.Zero).AsVector3()*(float)values.GetValueOrDefault("fog_wind_influence",1.0).AsDouble();double frequency=values.GetValueOrDefault("fog_gust_frequency",1.0).AsDouble(),gust=values.GetValueOrDefault("fog_gust_strength",0.0).AsDouble(),elapsed=frequency>0?time+gust*(1-Math.Cos(time*frequency))/Math.Max(.000001,frequency):time;
+        var dimensions=fog.Size.Max(Vector3.One*.001f);var local=fog.GlobalBasis.Inverse()*wind*(float)elapsed;material.SetShaderParameter("motion_unit_offset",local/dimensions);material.SetShaderParameter("motion_world_offset",wind*(float)elapsed);material.SetShaderParameter("motion_rotation",Basis.FromEuler(values.GetValueOrDefault("fog_procedural_rotation",Vector3.Zero).AsVector3()*(float)(time*Math.PI/180)));material.SetShaderParameter("motion_turbulence",values.GetValueOrDefault("fog_turbulence",0.0));material.SetShaderParameter("motion_scale",values.GetValueOrDefault("fog_turbulence_scale",1.0));double seed=values.GetValueOrDefault("fog_seed",1).AsDouble()*1.732;material.SetShaderParameter("motion_phase",time*values.GetValueOrDefault("fog_turbulence_frequency",1.0).AsDouble()+seed);material.SetShaderParameter("motion_seed",seed);
+    }
+    public void clear(Node? runtime)
+    {
+        if(runtime==null||Content(runtime) is not FogVolume fog)return;if(fog.Material is ShaderMaterial material)material.SetShaderParameter(material.Shader==BuiltIn?"has_simulation":"kiwi_simulation_enabled",false);foreach(string key in new[]{"kiwi_fog_simulation_texture","kiwi_fog_simulation_key","kiwi_fog_shadow_grid"})if(fog.HasMeta(key))fog.RemoveMeta(key);
+    }
+    public Settings apply(Node runtime,Settings state,Settings values)
+    {
+        var result=new Settings{["upload_ms"]=0.0,["error"]=""};if(Content(runtime) is not FogVolume fog||!state.ContainsKey("fog_density"))return result;if(fog.Material is not ShaderMaterial material){result["error"]="Assign a built-in appearance or a fog shader with the kiwi_density sampler interface.";return result;}if(material.Shader==null){result["error"]="The assigned fog material has no shader.";return result;}bool builtIn=material.Shader==BuiltIn,compatible=false;if(!builtIn){foreach(var value in material.Shader.GetShaderUniformList()){var uniform=value.AsGodotDictionary();if(uniform.GetValueOrDefault("name","").AsString()=="kiwi_density")compatible=true;}if(!compatible){result["error"]="Simulation is calculated, but this custom fog shader does not sample kiwi_density.";return result;}}
+        int n=state["fog_n"].AsInt32();var density=state["fog_density"].AsFloat32Array();long key=GD.Hash(new Godot.Collections.Array{n,density});var texture=fog.HasMeta("kiwi_fog_simulation_texture")?fog.GetMeta("kiwi_fog_simulation_texture").As<ImageTexture3D>():null;
+        if(!fog.HasMeta("kiwi_fog_simulation_key")||fog.GetMeta("kiwi_fog_simulation_key").AsInt64()!=key){ulong started=Time.GetTicksUsec();var bytes=new byte[density.Length*4];Buffer.BlockCopy(density,0,bytes,0,bytes.Length);var slices=new Godot.Collections.Array<Image>();for(int z=0;z<n;z++){var slice=new byte[n*n*4];Buffer.BlockCopy(bytes,z*slice.Length,slice,0,slice.Length);slices.Add(Image.CreateFromData(n,n,false,Image.Format.Rf,slice));}if(texture==null||texture.GetWidth()!=n){texture=new ImageTexture3D();texture.Create(Image.Format.Rf,n,n,n,false,slices);fog.SetMeta("kiwi_fog_simulation_texture",texture);}else texture.Update(slices);fog.SetMeta("kiwi_fog_simulation_key",key);result["upload_ms"]=(Time.GetTicksUsec()-started)/1000.0;}
+        var pose=state["fog_pose"].AsTransform3D();var dimensions=state["fog_size"].AsVector3();fog.GlobalTransform=pose;fog.Size=dimensions;fog.Shape=RenderingServer.FogVolumeShape.Box;fog.SetMeta("kiwi_fog_shadow_grid",new Settings{["n"]=n,["density"]=density,["key"]=key});var toUnit=new Transform3D(Basis.FromScale(Vector3.One/dimensions),Vector3.One*.5f)*pose.AffineInverse();material.SetShaderParameter(builtIn?"simulation_density":"kiwi_density",texture!);material.SetShaderParameter(builtIn?"simulation_to_unit":"kiwi_density_world_to_unit",toUnit);material.SetShaderParameter(builtIn?"has_simulation":"kiwi_simulation_enabled",true);if(builtIn){material.SetShaderParameter("world_to_local",pose.AffineInverse());material.SetShaderParameter("volume_dimensions",dimensions);material.SetShaderParameter("shape_kind",3);material.SetShaderParameter("global_volume",false);procedural(runtime,values,state["fog_time"].AsDouble());}return result;
+    }
+}

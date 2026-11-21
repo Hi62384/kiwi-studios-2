@@ -18,7 +18,7 @@ func run() -> void:
 	check(workspace.session.document.component(id).mesh.vertices==before,"Cancelled worker cannot install late geometry")
 	Edit.request(workspace,id,"seed",94,true); workspace.session.undo(); await settle(workspace)
 	check(workspace.session.document.component(id).parameters.height==12.,"Undo cancels a pending worker without undoing another completed action")
-	var job:=preload("res://Workspaces/ModelWorkspace/natural_job.gd").new(); job.cancel(); job.start("Tree / Oak",{})
+	var job: RefCounted=preload("res://Workspaces/ModelWorkspace/NaturalGenerationJob.cs").new(); job.cancel(); job.start("Tree / Oak",{})
 	while not job.complete(): await process_frame
 	var cancelled: Dictionary=job.collect(); check(cancelled.get("cancelled",false) and cancelled.mesh==null,"Worker cancellation returns no partial mesh")
 	workspace.session.dirty=false; Edit.request(workspace,id,"seed",95,false); Edit.cancel(workspace)

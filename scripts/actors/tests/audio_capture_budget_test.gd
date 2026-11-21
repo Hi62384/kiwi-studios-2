@@ -1,5 +1,5 @@
 extends SceneTree
-const Writer=preload("res://scripts/actors/core/audio_take_writer.gd")
+const Writer=preload("res://scripts/actors/core/NativeAudioTakeWriter.cs")
 var failures:=0
 func _initialize()->void:run.call_deferred()
 func check(value:bool,message:String)->void:
@@ -20,7 +20,7 @@ func run()->void:
 	while writer.busy():await process_frame
 	var result:=writer.finish();check(written==target_frames and str(result.error).is_empty(),"Long equivalent capture finalizes without loading it")
 	var info:=KiwiAudioPCMFile.inspect(result.path);check(int(info.get("frames",0))==target_frames,"Long capture keeps all frames")
-	check(peak_queue<=Writer.MAX_PENDING_BYTES,"Capture queue stays within two MiB")
+	check(peak_queue<=Writer.max_pending_bytes(),"Capture queue stays within two MiB")
 	check(peak_memory-memory_start<16*1024*1024,"Writer working memory does not grow with the take")
 	# Reusing an inactive writer must reset its counters and closure state.
 	check(writer.start(directory.path_join("reused.wav"),48000,false).is_empty(),"Writer can be reused after Stop");writer.append_frames(block);writer.request_finish()

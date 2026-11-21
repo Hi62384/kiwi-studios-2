@@ -1,6 +1,6 @@
 extends SceneTree
-const Workspace=preload("res://Workspaces/CompositingWorkspace/compositing_workspace.gd")
-const Document=preload("res://Workspaces/CompositingWorkspace/compositing_document.gd")
+const Workspace=preload("res://Workspaces/CompositingWorkspace/CompositingWorkspace.cs")
+const Document=preload("res://Workspaces/CompositingWorkspace/CompositingDocument.cs")
 const Layer=preload("res://Workspaces/CompositingWorkspace/composite_layer.gd")
 var checks:=0
 var failures:=0
@@ -11,11 +11,13 @@ func check(ok: bool,label: String) -> void:
 	print("PASS " if ok else "FAIL ",label)
 func run() -> void:
 	var document=Document.new(); document.title="Workspace test"; document.canvas_size=Vector2i(8,4); document.layers.clear(); var background=document.add_layer(Layer.Kind.SOLID,"Background"); background.color=Color(.2,.1,.05,1.)
-	var workspace=Workspace.new(); root.add_child(workspace); await process_frame; workspace.open_source(document); await process_frame
+	var workspace=Workspace.new(); root.add_child(workspace); await process_frame; workspace.open_source(document,{}); await process_frame
 	check(workspace.image_view.texture!=null and workspace.dirty,"New compositions open in the dedicated workspace and render an interactive preview")
 	workspace._add_layer(Layer.Kind.SOLID); var selected=workspace.document.layer(workspace.selected_id); selected.color=Color.BLUE; workspace._render(); check(workspace.document.layers.size()==2 and workspace.image_view.texture!=null,"Workspace adds and previews editable layers")
 	workspace.undo(); check(workspace.document.layers.size()==1,"Workspace layer edits participate in undo")
 	workspace.redo(); check(workspace.document.layers.size()==2,"Workspace layer edits participate in redo")
+	workspace._set_layer_property("Lock layer","locked",true); workspace.undo(); var lock_undone: bool=not workspace.document.layer(workspace.selected_id).locked; workspace.redo()
+	check(lock_undone and workspace.document.layer(workspace.selected_id).locked,"Layer lock changes participate in dirty-state history and undo/redo")
 	workspace._new_graph(); workspace._add_graph_node("Solid Color"); var graph=workspace.document.graphs[0]
 	check(graph.nodes.size()==2 and graph.compile_errors().size()>=1,"Workspace preserves graph node data and flags disconnected required inputs")
 	workspace._set_mode(1); workspace._filter_graph_nodes("luma"); var luma_visible:=false; var source_visible:=false
@@ -23,7 +25,7 @@ func run() -> void:
 		if button.text=="Luma Key": luma_visible=button.visible
 		if button.text=="Image Source": source_visible=button.visible
 	check(workspace.graph_search.visible and luma_visible and not source_visible,"Graph node search filters the node library by name")
-	var path: String="user://compositing_workspace_"+ActorData.new_id()+".tres"; workspace._save_path(path); var loaded=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE) as KiwiCompositingDocument
+	var path: String="user://compositing_workspace_"+ActorData.new_id()+".tres"; workspace._save_path(path); var loaded=ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE) as Resource
 	check(loaded!=null and loaded.validate().is_empty() and loaded.layers.size()==2 and loaded.graphs.size()==1,"Workspace saves complete editable layer and node graph state")
 	if not ActorVideo.executable("ffmpeg").is_empty():
 		workspace.document.duration=.25; workspace.document.frame_rate=8.; var export_path: String="user://compositing_workspace_export_"+ActorData.new_id()+".mp4"; var exported: bool=await workspace.export_video(export_path)
@@ -36,12 +38,12 @@ func run() -> void:
 	check(curve_editor!=null and adjustment.settings.get("curves",{}).get("master",[]).size()==3,"Adjustment curves can be edited from the channel curve control")
 	workspace.undo(); check(not workspace.document.layer(adjustment.id).settings.get("curves",{}).has("master"),"Curve editing is one undoable workspace change")
 	var group=workspace.document.add_layer(Layer.Kind.GROUP,"Hierarchy test"); var child=workspace.document.add_layer(Layer.Kind.SOLID,"Animated child"); child.parent_id=group.id; workspace.document.set_layer_key(child.id,"opacity",0.,.3); workspace.selected_id=group.id
-	var original_count: int=workspace.document.layers.size(); workspace._duplicate_layer(); var copied_group=workspace.document.layer(workspace.selected_id); var copied_child: KiwiCompositeLayer
+	var original_count: int=workspace.document.layers.size(); workspace._duplicate_layer(); var copied_group=workspace.document.layer(workspace.selected_id); var copied_child: Resource
 	for item in workspace.document.layers:
 		if item.parent_id==copied_group.id: copied_child=item
 	check(workspace.document.layers.size()==original_count+2 and copied_child!=null and workspace.document.has_layer_track(copied_child.id,"opacity"),"Group duplication preserves child hierarchy and animation ownership")
 	workspace.undo(); check(workspace.document.layers.size()==original_count,"Duplicating a hierarchy is undone as one operation")
-	workspace.selected_id=group.id; workspace._copy_layer(); var destination=Workspace.new(); root.add_child(destination); await process_frame; var destination_document=Document.new(); destination_document.canvas_size=Vector2i(8,4); destination.open_source(destination_document); var destination_count: int=destination.document.layers.size(); destination._paste_layer(); var pasted_group=destination.document.layer(destination.selected_id); var pasted_child: KiwiCompositeLayer
+	workspace.selected_id=group.id; workspace._copy_layer(); var destination=Workspace.new(); root.add_child(destination); await process_frame; var destination_document=Document.new(); destination_document.canvas_size=Vector2i(8,4); destination.open_source(destination_document,{}); var destination_count: int=destination.document.layers.size(); destination._paste_layer(); var pasted_group=destination.document.layer(destination.selected_id); var pasted_child: Resource
 	for item in destination.document.layers:
 		if item.parent_id==pasted_group.id: pasted_child=item
 	check(destination.document.layers.size()==destination_count+2 and pasted_child!=null and destination.document.has_layer_track(pasted_child.id,"opacity"),"Copy and paste preserve animated hierarchies across composition documents")
@@ -52,4 +54,8 @@ func run() -> void:
 	check(exr_ok and exr_image!=null and exr_image.get_pixel(0,0).r>1. and absf(exr_image.get_pixel(0,0).a-.4)<.01,"EXR sequences preserve HDR intensity and fractional alpha")
 	for file in DirAccess.get_files_at(sequence_directory): DirAccess.remove_absolute(sequence_directory.path_join(file))
 	DirAccess.remove_absolute(sequence_directory)
+	var unrelated_path: String="user://unrelated_composition_"+ActorData.new_id()+".tres"; ResourceSaver.save(Resource.new(),unrelated_path); var unrelated_bytes:=FileAccess.get_file_as_bytes(unrelated_path)
+	workspace.open_source(unrelated_path,{})
+	check(workspace.path.is_empty() and workspace.dirty and workspace.document!=null and FileAccess.get_file_as_bytes(unrelated_path)==unrelated_bytes,"Opening an unrelated resource creates an unsaved document without retaining its overwrite path")
+	DirAccess.remove_absolute(unrelated_path)
 	DirAccess.remove_absolute(path); workspace.queue_free(); print("COMPOSITING WORKSPACE: %d checks, %d failures"%[checks,failures]); quit(failures)

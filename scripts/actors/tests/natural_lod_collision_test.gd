@@ -8,7 +8,7 @@ func run() -> void:
 	var collision: PackedVector3Array=native.get_meta("kiwi_collision_faces"); var all:=native.get_faces()
 	check(collision.size()>0 and collision.size()<all.size(),"Tree collision includes wood and excludes leaf geometry")
 	var registry:=ActorRegistry.new(); BasicActors.register_all(registry); var data:=registry.get_definition(&"basic_mesh").create_actor(); data.set_value(&"mesh_path",session.document); data.values[&"model_component_id"]=tree.id
-	var runtime:=registry.get_definition(&"basic_mesh").create_runtime(data); root.add_child(runtime); runtime.evaluate_clip(ActorClip.create(data),0.)
+	var runtime:=registry.get_definition(&"basic_mesh").create_runtime(data); root.add_child(runtime); runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",data) as ActorClip),0.)
 	var captured:=KiwiPhysicsGeometry.capture(runtime,{})
 	check(captured.has("collision_points") and captured.collision_points.size()==collision.size() and not captured.points.is_empty(),"Scene physics captures wood proxy while retaining complete render geometry")
 	var settings:=KiwiPhysicsSettings.DEFAULTS.duplicate(true); settings.shape=6; settings.body_mode=1; var collider:=KiwiPhysicsGeometry.collider(captured,settings)

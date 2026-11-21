@@ -8,16 +8,14 @@ const PRESETS:=[
 	{"fluid_density":1100.0,"fluid_viscosity":35.0,"fluid_cohesion":7.0,"fluid_tension":2.5,"fluid_boundary_friction":.35,"fluid_color":Color(.25,.8,.12),"fluid_roughness":.3,"fluid_foam":.1,"fluid_emission":0.0,"fluid_opacity":.97},
 	{"fluid_density":2700.0,"fluid_viscosity":90.0,"fluid_cohesion":5.0,"fluid_tension":1.8,"fluid_boundary_friction":.6,"fluid_color":Color(1,.15,.015),"fluid_roughness":.6,"fluid_foam":0.0,"fluid_emission":2.0,"fluid_temperature":1100.0,"fluid_opacity":1.0}]
 static func effective(values: Dictionary) -> Dictionary:
-	var result:=values.duplicate(); var quality:=clampi(int(values.get(&"fluid_quality",1)),0,2)
-	result.spacing=maxf(.025,float(values.get(&"fluid_spacing",.22)))*[1.3,1.0,.75][quality]
-	result.iterations=clampi(int(values.get(&"fluid_iterations",3))+[-1,0,2][quality],1,10)
-	result.substeps=clampi(int(values.get(&"fluid_substeps",1))+[0,1,2][quality],1,6)
-	result.cell=result.spacing*[1.15,.85,.65][quality]*float(values.get(&"fluid_surface_scale",1.0))
-	result.budget=clampi(int(values.get(&"fluid_budget",1024)),16,4096)
-	return result
+	return _native_settings().effective(values)
+
 static func preset(model: RefCounted,actor: ActorData,index: int) -> void:
-	var before:=actor.values.duplicate(true); var after:=before.duplicate(true); after.merge(PRESETS[clampi(index,0,4)],true); after[&"fluid_preset"]=index
-	model.history.create_action("Fluid preset")
-	model.history.add_do_method(assign.bind(model,actor,after)); model.history.add_undo_method(assign.bind(model,actor,before)); model.history.commit_action()
+	_native_settings().preset(model,actor,index)
+
 static func assign(model: RefCounted,actor: ActorData,values: Dictionary) -> void:
-	actor.values=values.duplicate(true); actor.emit_changed(); model.changed.emit()
+	_native_settings().assign(model,actor,values)
+
+
+static func _native_settings() -> Object:
+	return Engine.get_singleton("KiwiNativeServices").call("service","fluid_settings")

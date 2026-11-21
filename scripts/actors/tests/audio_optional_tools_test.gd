@@ -1,5 +1,5 @@
 extends SceneTree
-const Transcript=preload("res://Workspaces/AudioWorkspace/audio_transcription.gd")
+const Transcript=preload("res://Workspaces/AudioWorkspace/AudioTranscription.cs")
 const Provider=preload("res://Workspaces/AudioWorkspace/audio_elevenlabs_provider.gd")
 const Vault=preload("res://Workspaces/AudioWorkspace/audio_credential_vault.gd")
 var failures:=0
@@ -24,8 +24,8 @@ func run()->void:
 	check(not Transcript.parse({"transcription":[{"offsets":{"from":-1,"to":0}}]},3).error.is_empty(),"Invalid transcript timing is rejected")
 	check(not Transcript.parse({"transcription":[{"offsets":{"from":4000,"to":5000}}]},3).error.is_empty(),"Out-of-clip transcript timing is rejected")
 	check(not Transcript.parse({"transcription":"invalid"},3).error.is_empty(),"Malformed recognizer output is rejected")
-	var samples:=PackedVector2Array();samples.resize(48000);samples.fill(Vector2(.05,.05));var stream:=KiwiAudioSourceCache.to_wav(samples,16000)
-	var session:=KiwiAudioEditSession.new();session.open(KiwiAudioDocument.from_source(stream));var id:=session.document.clips[0].id
+	var samples:=PackedVector2Array();samples.resize(48000);samples.fill(Vector2(.05,.05));var stream:=KiwiAudioSourceCache.to_wav(samples,16000,true)
+	var session:=KiwiAudioEditSession.new();session.open(KiwiAudioDocument.from_source(stream, ""));var id: String =session.document.clips[0].id
 	check(Transcript.apply(session,id,parsed,"Reviewed wording",true).is_empty(),"Reviewed transcript and cue markers apply")
 	check(session.document.markers.size()==2 and session.document.actor_for_clip(id).values[&"transcript"].text=="Reviewed wording","Transcript is editable metadata, not destructive audio edits")
 	session.undo();check(session.document.markers.is_empty() and not session.document.actor_for_clip(id).values.has(&"transcript"),"Transcript and markers undo together")
@@ -46,12 +46,12 @@ func run()->void:
 	check(not service.run("elevenlabs",request,consent).success and counts.send==1,"Approved request reaches adapter with explicit credentials")
 	var invalid:=request.duplicate();invalid.voice_id="../bad"
 	check(not service.run("elevenlabs",invalid,consent).success and counts.send==1,"Voice path injection is rejected before network")
-	var cancelled:=KiwiAudioJobs.Work.new();cancelled.cancel();var before:=int(counts.read)
+	var cancelled:=AudioWorkToken.new();cancelled.cancel();var before:=int(counts.read)
 	check(not service.run("elevenlabs",request,consent,cancelled).success and counts.read==before,"Cancelled jobs do not read credentials")
 	check(Vault.valid_id("elevenlabs") and not Vault.valid_id("../other-service") and not Vault.valid_id("UPPERCASE"),"Credential IDs are strictly namespaced")
 	var directory:=ProjectSettings.globalize_path("user://optional_tool_fixture_"+ActorData.new_id());DirAccess.make_dir_recursive_absolute(directory)
 	if not ActorVideo.executable("ffmpeg").is_empty():
-		var mp3:=directory.path_join("fixture.mp3");var doc:=KiwiAudioDocument.from_source(stream)
+		var mp3:=directory.path_join("fixture.mp3");var doc:=KiwiAudioDocument.from_source(stream, "")
 		var rendered:Dictionary=await worker(func():return KiwiAudioRenderer.render(doc,mp3,{"include_tail":false}))
 		check(bool(rendered.get("success",false)),"Synthetic provider response fixture renders")
 		if rendered.get("success",false):
@@ -63,8 +63,8 @@ func run()->void:
 	var root_path:=ProjectSettings.globalize_path("res://.godot/optional_speech_test")
 	var executable:=root_path.path_join("bin/Release/whisper-cli.exe");var model:=root_path.path_join("ggml-tiny.en.bin");var input:=root_path.path_join("jfk.wav")
 	if FileAccess.file_exists(executable) and FileAccess.file_exists(model) and FileAccess.file_exists(input):
-		var document:=KiwiAudioDocument.from_source(input)
-		var result:Dictionary=await worker(func():return Transcript.run(document,document.clips[0].id,executable,model))
+		var document:=KiwiAudioDocument.from_source(input, "")
+		var result:Dictionary=await worker(func():return Transcript.run(document,document.clips[0].id,executable,model,null))
 		check(str(result.get("error","")).is_empty(),"Real local whisper.cpp CLI completes")
 		check(str(result.get("text","")).to_lower().contains("country"),"Real public speech sample yields recognized words")
 		print("LOCAL_TRANSCRIPTION_RESULT ",str(result.get("text",result.get("error",""))))

@@ -1,0 +1,17 @@
+using Godot;
+using System;
+using Settings=Godot.Collections.Dictionary;
+using GArray=Godot.Collections.Array;
+
+public partial class EnvironmentClimateOperations
+{
+    public Settings apply_environment(Resource source,Godot.Environment? environment,double sceneTime,Vector3 position,Settings overrides)
+    {
+        if(environment==null)return new Settings();var state=evaluate(source,position,sceneTime,double.NaN,overrides);if(!environment.HasMeta("kiwi_climate_base")){var baseline=new Settings {["background_mode"]=(int)environment.BackgroundMode,["fog_enabled"]=environment.FogEnabled,["fog_density"]=environment.FogDensity,["fog_light_color"]=environment.FogLightColor,["ambient_light_color"]=environment.AmbientLightColor,["ambient_light_energy"]=environment.AmbientLightEnergy};if(environment.Sky?.SkyMaterial is ProceduralSkyMaterial procedural)baseline["sky_colors"]=new GArray {procedural.SkyTopColor,procedural.SkyHorizonColor,procedural.GroundBottomColor,procedural.GroundHorizonColor};environment.SetMeta("kiwi_climate_base",baseline);}var authored=environment.GetMeta("kiwi_climate_base").AsGodotDictionary();double elevation=state["sun_elevation"].AsDouble();float night=(float)Math.Clamp(-elevation/.8,0,1),clouds=(float)state["cloud_coverage"].AsDouble();
+        if(environment.BackgroundMode==Godot.Environment.BGMode.Sky&&environment.Sky?.SkyMaterial is ProceduralSkyMaterial material)
+        {var colors=Get(authored,"sky_colors",new GArray {new Color(.12f,.2f,.38f),new Color(.55f,.68f,.8f),new Color(.08f,.1f,.14f),new Color(.35f,.38f,.4f)}).AsGodotArray();float twilight=(float)Math.Clamp(1-Math.Abs(elevation)/.24,0,1);var top=colors[0].AsColor().Lerp(new Color(.006f,.012f,.035f),night).Lerp(new Color(.38f,.2f,.12f),twilight*.4f);var horizon=colors[1].AsColor().Lerp(new Color(.025f,.035f,.08f),night).Lerp(new Color(.95f,.36f,.12f),twilight*.65f);var overcast=new Color(.43f,.48f,.53f);material.SkyTopColor=top.Lerp(overcast,clouds*.68f);material.SkyHorizonColor=horizon.Lerp(overcast,clouds*.78f);material.GroundBottomColor=colors[2].AsColor().Lerp(new Color(.015f,.019f,.028f),night);material.GroundHorizonColor=colors[3].AsColor().Lerp(new Color(.17f,.19f,.21f),clouds*.45f);}
+        double fog=state["fog"].AsDouble()+state["rain"].AsDouble()*.12;environment.FogEnabled=Get(authored,"fog_enabled",false).AsBool()||fog>.01;environment.FogDensity=(float)Math.Max(Get(authored,"fog_density",0.0).AsDouble(),fog*.035);if(environment.FogEnabled)environment.FogLightColor=new Color(.48f,.54f,.62f).Lerp(new Color(.26f,.3f,.36f),night);environment.AmbientLightColor=Get(authored,"ambient_light_color",Colors.White).AsColor().Lerp(new Color(.2f,.27f,.4f),night*.65f).Lerp(new Color(.48f,.51f,.54f),clouds*.35f);double sunlight=state["sunlight_energy"].AsDouble();environment.AmbientLightEnergy=(float)(Get(authored,"ambient_light_energy",1.0).AsDouble()*Mathf.Lerp(.32,1.0,sunlight>0?sunlight/1.3:.15));return state;
+    }
+    public Godot.Environment make_environment(Resource source,double sceneTime)
+    {var environment=new Godot.Environment {BackgroundMode=Godot.Environment.BGMode.Sky,AmbientLightSource=Godot.Environment.AmbientSource.Color,AmbientLightColor=Colors.White,AmbientLightEnergy=1};using var sky=new Sky();using var material=new ProceduralSkyMaterial();sky.SkyMaterial=material;environment.Sky=sky;apply_environment(source,environment,sceneTime,Vector3.Zero,new Settings());return environment;}
+}

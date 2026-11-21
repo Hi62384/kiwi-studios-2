@@ -9,7 +9,7 @@ func run() -> void:
 	for item in environment.document.components:
 		if item.parameters.get("_module_bindings",{}).has(first.id) or item.parameters.get("_module_bindings",{}).has(second_id): parts+=1; valid=valid and item.mesh.vertices==box.mesh.vertices
 	check(error.is_empty() and parts==2 and valid,"Duplicated linked instances remap source bindings and remain independently refreshable")
-	var registry:=ActorRegistry.new(); BasicActors.register_all(registry); var actor:=registry.get_definition(&"environment_asset").create_actor(); actor.set_value(&"environment_path",root_path); var runtime:=registry.get_definition(&"environment_asset").create_runtime(actor); root.add_child(runtime); runtime.evaluate_clip(ActorClip.create(actor),0.)
+	var registry:=ActorRegistry.new(); BasicActors.register_all(registry); var actor:=registry.get_definition(&"environment_asset").create_actor(); actor.set_value(&"environment_path",root_path); var runtime:=registry.get_definition(&"environment_asset").create_runtime(actor); root.add_child(runtime); runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip),0.)
 	var linked_geometry:=0
 	for item in runtime.source_document.components:
 		if item.mesh!=null and item.mesh.vertices==box.mesh.vertices: linked_geometry+=1
@@ -19,7 +19,7 @@ func run() -> void:
 		if item.mesh!=null and item.mesh.vertices==box.mesh.vertices: linked_geometry+=1
 	check(linked_geometry==2 and runtime.physics_geometry_ready(),"Source refresh replaces actual scene environment geometry and collision from linked modules")
 	var snapshot: KiwiModelDocument=runtime.source_document.snapshot(); runtime.queue_free(); await process_frame
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(source)); Files.invalidate(source); var fallback:=registry.get_definition(&"environment_asset").create_runtime(actor); root.add_child(fallback); fallback.evaluate_clip(ActorClip.create(actor),0.)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(source)); Files.invalidate(source); var fallback:=registry.get_definition(&"environment_asset").create_runtime(actor); root.add_child(fallback); fallback.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip),0.)
 	check(not fallback.linked_source_warning.is_empty() and fallback.source_document!=null and fallback.physics_geometry_ready(),"A missing linked source reports its warning while retaining the saved editable geometry and physics")
 	check(snapshot.validate().is_empty() and original!=null,"Runtime link resolution preserves valid source snapshots")
 	fallback.queue_free(); await process_frame; print("ARCHITECTURE MODULE RUNTIME: %d checks, %d failures"%[checks,failures]); quit(failures)

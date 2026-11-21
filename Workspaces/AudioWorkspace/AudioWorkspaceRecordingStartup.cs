@@ -1,0 +1,35 @@
+using Godot;
+using System;
+using GArray=Godot.Collections.Array;
+using Settings=Godot.Collections.Dictionary;
+public partial class AudioWorkspaceOperations
+{
+    public Settings begin_record_startup(Control o,long token,long preparedId)
+    {
+        if(!record_request_current(o,token)){abort_record_preparation(o,token,"");return new Settings();}var context=new Settings{["token"]=token,["prepared_id"]=preparedId,["preferences"]=Dict(o,"_record_preferences").Duplicate(true),["signature_check_at"]=0L};if(preparedId==0)return context;var prepared=o.Get("_record_prepared").AsGodotObject();if(prepared==null||unchecked((long)prepared.GetInstanceId())!=preparedId||!prepared.Call("valid").AsBool()){abort_record_preparation(o,token,"The prepared backing changed or disappeared. Prepare the take again.");return new Settings();}o.Set("_record_phase","priming");Field<Button>(o,"record_button").Text="Cancel buffering";var playback=Field<Node>(o,"playback");playback.Set("exact_required",true);playback.Call("set_document",o.Get("_record_document"));string error=playback.Call("prepare_recording_file",prepared.Get("path"),o.Get("_record_start"),prepared.Get("info"),prepared).AsString();if(error.Length==0)return context;abort_record_preparation(o,token,error);return new Settings();
+    }
+    public int poll_record_priming(Control o,Settings context)
+    {
+        long token=context["token"].AsInt64();if(context["prepared_id"].AsInt64()==0)return 1;var playback=Field<Node>(o,"playback");var prepared=o.Get("_record_prepared").AsGodotObject();if(prepared!=null&&playback.Call("recording_file_ready",prepared).AsBool())return 1;long now=unchecked((long)Time.GetTicksMsec());bool check=now>=context["signature_check_at"].AsInt64();if(!record_request_owned(o,token)||!playback.Get("file_preview").AsGodotObject().Get("active").AsBool()||check&&!record_request_current(o,token)){abort_record_preparation(o,token,"Recording preparation changed or stopped before the PCM buffer was ready.");return -1;}if(check)context["signature_check_at"]=now+250;return 0;
+    }
+    public bool begin_record_countdown(Control o,Settings context)
+    {
+        long token=context["token"].AsInt64();if(!record_request_current(o,token)){abort_record_preparation(o,token,"The arrangement changed before recording. Start the take again.");return false;}o.Set("_record_phase","countdown");int count=o.Get("_countdown").AsInt32();context["count"]=count;context["until"]=0L;if(count==0)return true;if(!record_request_current(o,token)||!record_backing_ready(o,context["prepared_id"].AsInt64())){abort_record_preparation(o,token,"The arrangement or prepared playback changed before recording. Start the take again.");return false;}Field<Button>(o,"record_button").Text=count.ToString();context["until"]=unchecked((long)Time.GetTicksMsec())+1000;return true;
+    }
+    public int poll_record_countdown(Control o,Settings context)
+    {
+        int count=context["count"].AsInt32();if(count<=0)return 1;long token=context["token"].AsInt64();if(!record_request_owned(o,token)){abort_record_preparation(o,token,"");return -1;}long now=unchecked((long)Time.GetTicksMsec());if(now<context["until"].AsInt64())return 0;context["count"]=--count;if(count<=0)return 1;if(!record_request_current(o,token)||!record_backing_ready(o,context["prepared_id"].AsInt64())){abort_record_preparation(o,token,"The arrangement or prepared playback changed before recording. Start the take again.");return -1;}Field<Button>(o,"record_button").Text=count.ToString();context["until"]=now+1000;return 0;
+    }
+    public bool prepare_record_device(Control o,Settings context)
+    {
+        long token=context["token"].AsInt64(),id=context["prepared_id"].AsInt64();if(!record_request_current(o,token)||!record_backing_ready(o,id)){abort_record_preparation(o,token,"The arrangement or prepared playback changed before recording. Start the take again.");return false;}if(RecorderSchema().Call("backing_requested",context["preferences"]).AsBool()&&requires_exact_preview(o)&&id==0){abort_record_preparation(o,token,"The arrangement now needs processed playback. Start recording again to prepare it.");return false;}var target=Document(o).Call("track_for_id",o.Get("_record_track")).AsGodotDictionary();if(target.Count==0||Get(target,"locked",false).AsBool()){abort_record_preparation(o,token,"The recording track was removed or locked.");return false;}var recorder=Field<Node>(o,"recorder");context["previous_preferences"]=recorder.Get("preferences_override");recorder.Set("preferences_override",context["preferences"]);o.Set("_record_phase","starting");Field<Button>(o,"record_button").Text="Starting...";return true;
+    }
+    public Settings complete_record_device(Control o,Settings context,string error)
+    {
+        long token=context["token"].AsInt64(),id=context["prepared_id"].AsInt64();var playback=Field<Node>(o,"playback");var recorder=Field<Node>(o,"recorder");Dict(playback,"_track_effects").Clear();recorder.Set("preferences_override",context["previous_preferences"]);if(error.Length>0){abort_record_preparation(o,token,error);return new Settings();}bool timeline=recorder.Get("record_timeline").AsBool(),monitor=recorder.Get("monitor_timeline").AsBool();if(!record_request_current(o,token)||id!=0&&!(timeline||monitor)||!record_backing_ready(o,id))return new Settings{["stop"]=recorder.Get("recording"),["abort"]="The arrangement or prepared playback changed during device startup. No take was saved.",["reset_output"]=false};o.Set("_record_previous_loop_enabled",playback.Get("loop_enabled"));playback.Set("loop_enabled",false);o.Set("_record_processed_capture",id!=0);if(timeline||monitor){if(id==0)playback.Call("set_document",Document(o));string bus=recorder.Get("timeline_bus_name").AsString();playback.Call("set_output_bus",bus.Length>0?bus:"Master");if(id!=0){string startError=playback.Call("start_recording_file",o.Get("_record_prepared")).AsString();if(startError.Length>0)return new Settings{["stop"]=recorder.Get("recording"),["abort"]=startError,["reset_output"]=true};}else{playback.Set("exact_required",false);playback.Set("position",o.Get("_record_start"));playback.Set("playing",true);playback.Call("synchronize");playback.EmitSignal("state_changed");}}o.Set("_record_elapsed",0.0);o.Set("_record_busy",false);o.Set("_record_phase","recording");Field<Button>(o,"record_button").Text="■ Stop take";Field<Label>(o,"status").Text=(monitor&&!timeline?"Recording dry overdub":"Recording take")+(id!=0?" · streamed processed backing":"");return new Settings();
+    }
+    public void abort_record_device(Control o,Settings context,Settings result)
+    {
+        if(Get(result,"reset_output",false).AsBool()){var playback=Field<Node>(o,"playback");playback.Call("set_output_bus","Master");playback.Set("loop_enabled",o.Get("_record_session").AsGodotObject()==Session(o)?o.Get("_record_previous_loop_enabled"):Document(o).Get("loop_enabled"));o.Set("_record_processed_capture",false);}abort_record_preparation(o,context["token"].AsInt64(),Get(result,"abort","").AsString());
+    }
+}

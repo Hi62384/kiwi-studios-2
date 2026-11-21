@@ -1,0 +1,11 @@
+using Godot;
+using System;
+using System.Collections.Generic;
+public partial class UiActorOperations
+{
+    public void visual_ready(Node2D visual){var texture=ActorUIVisual.SharedSolidTexture;if(texture==null){using var white=Image.CreateEmpty(1,1,false,Image.Format.Rgba8);white.Fill(Colors.White);texture=ImageTexture.CreateFromImage(white);ActorUIVisual.SharedSolidTexture=texture;}visual.Set("solid_texture",texture);}
+    public void visual_draw(Node2D visual)
+    {
+        var dimensions=visual.Get("dimensions").AsVector2();var rect=new Rect2(-dimensions/2,dimensions);var texture=visual.Get("texture").As<Texture2D>();if(texture!=null){float ratio=Math.Min(dimensions.X/texture.GetWidth(),dimensions.Y/texture.GetHeight());var fitted=texture.GetSize()*ratio;visual.DrawTextureRect(texture,new Rect2(-fitted/2,fitted),false);return;}int shape=visual.Get("shape").AsInt32();if(shape<0)return;var fill=visual.Get("fill").AsColor();float width=visual.Get("width").AsSingle();if(shape==5){visual.DrawLine(new Vector2(-dimensions.X/2,0),new Vector2(dimensions.X/2,0),fill,Math.Max(width,1),true);return;}var polygon=new List<Vector2>();switch(shape){case 1:for(int i=0;i<64;i++)polygon.Add(new Vector2(Mathf.Cos(i*Mathf.Tau/64),Mathf.Sin(i*Mathf.Tau/64))*dimensions/2);break;case 2:polygon.AddRange(new[]{new Vector2(0,-dimensions.Y/2),dimensions/2,new Vector2(-dimensions.X/2,dimensions.Y/2)});break;case 3:polygon.AddRange(new[]{new Vector2(0,-dimensions.Y/2),new Vector2(dimensions.X/2,0),new Vector2(0,dimensions.Y/2),new Vector2(-dimensions.X/2,0)});break;case 4:for(int i=0;i<10;i++){float angle=i*Mathf.Tau/10-Mathf.Pi/2;polygon.Add(new Vector2(Mathf.Cos(angle),Mathf.Sin(angle))*dimensions/2*(i%2==0?1:.45f));}break;default:polygon.AddRange(new[]{rect.Position,new Vector2(rect.End.X,rect.Position.Y),rect.End,new Vector2(rect.Position.X,rect.End.Y)});break;}var uvs=new Vector2[polygon.Count];for(int i=0;i<polygon.Count;i++)uvs[i]=(polygon[i]-rect.Position)/dimensions;visual.DrawColoredPolygon(polygon.ToArray(),fill,uvs,visual.Get("solid_texture").As<Texture2D>());if(width>0){polygon.Add(polygon[0]);visual.DrawPolyline(polygon.ToArray(),visual.Get("outline").AsColor(),width,true);}
+    }
+}

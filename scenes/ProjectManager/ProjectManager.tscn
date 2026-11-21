@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bsbaem286ksho"]
 
-[ext_resource type="Script" uid="uid://cimwjbgwqiug0" path="res://scenes/ProjectManager/project_manager_ui.gd" id="1_bpdik"]
+[ext_resource type="Script" path="res://scenes/ProjectManager/ProjectManagerUi.cs" id="1_bpdik"]
 [ext_resource type="Texture2D" uid="uid://b8lxo8dn1ahk4" path="res://resources/Images/Logos/KiwiStudiosLogo.png" id="1_e2h8r"]
 [ext_resource type="StyleBox" uid="uid://ck4h6q1rp4uqc" path="res://resources/StyleBoxes/Default.tres" id="2_gt6lk"]
 [ext_resource type="SystemFont" uid="uid://bwdt8qysdchp6" path="res://resources/fonts/ReemKufi.tres" id="3_qjc1s"]
@@ -11,13 +11,13 @@
 [ext_resource type="Texture2D" uid="uid://cqwv3phf7hbob" path="res://resources/Images/ToolImages/Copy.png" id="7_j4n8e"]
 [ext_resource type="StyleBox" uid="uid://bwq7q8kmumxnk" path="res://resources/StyleBoxes/button.tres" id="7_jak7c"]
 [ext_resource type="Texture2D" uid="uid://b25d122d020e7" path="res://resources/Images/ToolImages/TrashCan.png" id="8_bqi65"]
-[ext_resource type="Script" uid="uid://d3wgvbquosu7f" path="res://scenes/ProjectManager/project_manager.gd" id="11_vhhin"]
-[ext_resource type="Script" uid="uid://mrvy57bp00j6" path="res://scenes/ProjectManager/create_project_panel.gd" id="12_fhdkl"]
+[ext_resource type="Script" path="res://scenes/ProjectManager/ProjectManagerController.cs" id="11_vhhin"]
+[ext_resource type="Script" path="res://scenes/ProjectManager/ProjectParameterPanel.cs" id="12_fhdkl"]
 [ext_resource type="Texture2D" uid="uid://dbllu7xvhjcej" path="res://resources/Images/BasicImages/X.png" id="12_vhhin"]
-[ext_resource type="Script" uid="uid://cbwugyqv7rtpg" path="res://scripts/Extra/DialogParamChooser/dialog_param_chooser_mapping.gd" id="13_1p5a0"]
-[ext_resource type="Script" uid="uid://cpbb83r3o2iah" path="res://scripts/Extra/DialogParamChooser/dialog_param_chooser.gd" id="15_1p5a0"]
-[ext_resource type="Script" uid="uid://bajqf1yngp3i0" path="res://scenes/ProjectManager/duplicate_project_panel.gd" id="15_jak7c"]
-[ext_resource type="Script" uid="uid://bp8vr2c67fsky" path="res://scenes/ProjectManager/delete_project_panel.gd" id="16_v7rjq"]
+[ext_resource type="Script" path="res://scripts/Extra/DialogParamChooser/DialogParamChooserMapping.cs" id="13_1p5a0"]
+[ext_resource type="Script" path="res://scenes/ProjectManager/ProjectParameterPanel.cs" id="15_1p5a0"]
+[ext_resource type="Script" path="res://scenes/ProjectManager/ProjectParameterPanel.cs" id="15_jak7c"]
+[ext_resource type="Script" path="res://scenes/ProjectManager/DeleteProjectPanel.cs" id="16_v7rjq"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mg8ax"]
 bg_color = Color(0.2020233, 0.21845171, 0.28642842, 1)

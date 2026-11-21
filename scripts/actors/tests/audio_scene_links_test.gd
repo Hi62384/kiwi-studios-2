@@ -35,9 +35,9 @@ func run() -> void:
 	var audio_path := directory.path_join("composition.tres")
 	var wrong_path := directory.path_join("material.tres")
 	var pcm := PackedVector2Array(); pcm.resize(4410); pcm.fill(Vector2(0.1, -0.1))
-	var source := KiwiAudioSourceCache.to_wav(pcm)
-	var clip := editor.model.create_actor(editor.registry.get_definition(&"audio"), 1.25, {&"audio": source, &"volume_db": -7.0, &"pan": 0.3})
-	var actor_id := clip.actor_id
+	var source := KiwiAudioSourceCache.to_wav(pcm,44100,true)
+	var clip: ActorClip = editor.model.create_actor(editor.registry.get_definition(&"audio"), 1.25, {&"audio": source, &"volume_db": -7.0, &"pan": 0.3})
+	var actor_id: String = clip.actor_id
 	check(tabs.save_current(first_path) == OK, "Scene saves its stable identity")
 	var scene_id := str(tabs.documents[0].id)
 	var uid := str(tabs.documents[0].persistent_id)
@@ -55,7 +55,7 @@ func run() -> void:
 	check(audio.session == original_session and audio.document_path == original_save_path, "Invalid composition preserves the active session and save destination")
 	var count := tabs.documents.size()
 	check(not tabs.open_audio(wrong_path) and tabs.documents.size() == count, "Invalid composition creates no blank tab")
-	var invalid := KiwiAudioDocument.from_source(null); invalid.version = 999
+	var invalid := KiwiAudioDocument.from_source(null, ""); invalid.version = 999
 	audio.open_source(invalid)
 	check(audio.session == original_session and audio.document_path == original_save_path, "Unsupported composition version preserves the active document")
 	check(FileAccess.get_file_as_bytes(wrong_path) == original_bytes, "Failed opens preserve unrelated resource bytes")

@@ -8,14 +8,14 @@
 [ext_resource type="Texture2D" uid="uid://dln4iaiin0dr1" path="res://resources/Images/BasicImages/Redo.png" id="5_2ajym"]
 [ext_resource type="Script" uid="uid://b5gm21p0e2sbv" path="res://CustomNodes/FileSystem/file_system_callable_actions.gd" id="5_cvybe"]
 [ext_resource type="Script" uid="uid://plyim2uw3aj1" path="res://CustomNodes/FileSystem/file_system_files_selector.gd" id="6_qnik3"]
-[ext_resource type="Script" uid="uid://cpbb83r3o2iah" path="res://scripts/Extra/DialogParamChooser/dialog_param_chooser.gd" id="8_s4chj"]
-[ext_resource type="Script" uid="uid://cbwugyqv7rtpg" path="res://scripts/Extra/DialogParamChooser/dialog_param_chooser_mapping.gd" id="9_bwcsr"]
+[ext_resource type="Script" path="res://scripts/Extra/DialogParamChooser/DialogParamChooser.cs" id="8_s4chj"]
+[ext_resource type="Script" path="res://scripts/Extra/DialogParamChooser/DialogParamChooserMapping.cs" id="9_bwcsr"]
 [ext_resource type="SystemFont" uid="uid://bwdt8qysdchp6" path="res://resources/fonts/ReemKufi.tres" id="10_nn77b"]
 [ext_resource type="Texture2D" uid="uid://dbllu7xvhjcej" path="res://resources/Images/BasicImages/X.png" id="11_5fp1n"]
 [ext_resource type="Script" uid="uid://biler6763synl" path="res://CustomNodes/FileSystem/file_mover.gd" id="12_bwcsr"]
 [ext_resource type="Script" uid="uid://btkxwby3ldicm" path="res://CustomNodes/FileSystem/file_system_extra_ui.gd" id="12_ck4ci"]
 [ext_resource type="Texture2D" uid="uid://h5xgw3ns54ys" path="res://resources/Images/ToolImages/FolderColored.png" id="13_nn77b"]
-[ext_resource type="Script" uid="uid://5b3es4pagcpo" path="res://CustomNodes/FileSystem/file_system_key_inputs.gd" id="16_ck4ci"]
+[ext_resource type="Script" path="res://scripts/Globals/ProjectFileSystemKeyInput.cs" id="16_ck4ci"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_ft6cd"]
 font = ExtResource("2_bwcsr")

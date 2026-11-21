@@ -1,0 +1,25 @@
+using Godot;
+using System;
+using System.Collections.Generic;
+public partial class ImageWorkspaceOperations
+{
+    private void MoveWorld(Resource document,Resource layer,Vector2 delta){var parent=_documents.layer_for_id(document,layer.Get("parent_id").AsString());if(parent!=null){var inverse=_documents.world_transform(document,parent).AffineInverse();delta=inverse.BasisXform(delta);}layer.Set("position",layer.Get("position").AsVector2()+delta);}
+    public void align_selected(Control owner,string mode)
+    {
+        var document=Document(owner);var canvas=Canvas(owner);var roots=_documents.selected_roots(document,canvas.Get("selected").AsGodotArray());if(roots.Count==0)return;var bounds=roots.Count>1?_canvas.selection_bounds(canvas):new Rect2(Vector2.Zero,(Vector2)document.Get("canvas_size").AsVector2I());Action(owner,()=>{foreach(var value in roots){var layer=value.As<Resource>();var rect=_documents.world_transform(document,layer)*new Rect2(Vector2.Zero,layer.Get("dimensions").AsVector2());var delta=mode switch{"left"=>new Vector2(bounds.Position.X-rect.Position.X,0),"right"=>new Vector2(bounds.End.X-rect.End.X,0),"top"=>new Vector2(0,bounds.Position.Y-rect.Position.Y),"bottom"=>new Vector2(0,bounds.End.Y-rect.End.Y),"center_x"=>new Vector2(bounds.GetCenter().X-rect.GetCenter().X,0),"center_y"=>new Vector2(0,bounds.GetCenter().Y-rect.GetCenter().Y),_=>Vector2.Zero};MoveWorld(document,layer,delta);}});
+    }
+    public void distribute_selected(Control owner,bool horizontal)
+    {
+        var document=Document(owner);var roots=_documents.selected_roots(document,Canvas(owner).Get("selected").AsGodotArray());if(roots.Count<3)return;var layers=new List<Resource>();foreach(var value in roots)layers.Add(value.As<Resource>());Vector2 Center(Resource layer)=>_documents.world_transform(document,layer)*(layer.Get("dimensions").AsVector2()*.5f);layers.Sort((a,b)=>(horizontal?Center(a).X:Center(a).Y).CompareTo(horizontal?Center(b).X:Center(b).Y));var first=Center(layers[0]);var last=Center(layers[^1]);Action(owner,()=>{for(int i=0;i<layers.Count;i++){var center=Center(layers[i]);var goal=first.Lerp(last,(float)i/(layers.Count-1));MoveWorld(document,layers[i],horizontal?new Vector2(goal.X-center.X,0):new Vector2(0,goal.Y-center.Y));}});
+    }
+    public void flip_layer(Control owner,bool horizontal)
+    {
+        var canvas=Canvas(owner);if(canvas.Get("selected").AsGodotArray().Count==0)return;var document=Document(owner);Action(owner,()=>{foreach(var id in canvas.Get("selected").AsGodotArray()){var layer=_documents.layer_for_id(document,id.AsString());if(layer==null)continue;var world=_documents.world_transform(document,layer);var parent=_documents.layer_for_id(document,layer.Get("parent_id").AsString());var inverse=parent!=null?_documents.world_transform(document,parent).AffineInverse():Transform2D.Identity;var reflection=horizontal?new Vector2(-1,1):new Vector2(1,-1);_layers.set_linear_basis(layer,inverse*new Transform2D(world.X*reflection,world.Y*reflection,Vector2.Zero));}});
+    }
+    public void fill_selected_to_parent(Control owner)
+    {
+        var document=Document(owner);var roots=_documents.selected_roots(document,Canvas(owner).Get("selected").AsGodotArray());if(roots.Count==0)return;Action(owner,()=>{foreach(var value in roots){var layer=value.As<Resource>();var parent=_documents.layer_for_id(document,layer.Get("parent_id").AsString());layer.Set("rotation",0.0);var properties=layer.Get("properties").AsGodotDictionary();properties.Remove("basis_x");properties.Remove("basis_y");properties["yaw_up_down"]=0.0;properties["yaw_left_right"]=0.0;layer.Set("position",Vector2.Zero);_documents.resize_layer(document,layer,parent!=null?parent.Get("dimensions").AsVector2():(Vector2)document.Get("canvas_size").AsVector2I());}});owner.Get("status").As<Label>().Text=roots[0].As<Resource>().Get("parent_id").AsString().Length>0?"Filled the parent bounds":"Filled the canvas";
+    }
+    public void resize_image_aspect(Control owner){var layer=main_layer(owner);if(layer==null||layer.Get("kind").AsString()!="image"||layer.Get("texture").As<Texture2D>() is not Texture2D texture)return;var size=texture.GetSize();if(size.X<1||size.Y<1)return;var area=layer.Get("dimensions").AsVector2();float ratio=size.X/size.Y;var target=area.X/area.Y>ratio?new Vector2(area.Y*ratio,area.Y):new Vector2(area.X,area.X/ratio);Action(owner,()=>{_documents.resize_layer(Document(owner),layer,target);layer.Get("properties").AsGodotDictionary()["keep_aspect"]=true;});}
+    public void restore_layer_paint(Control owner){var restorable=new List<Resource>();foreach(var id in Canvas(owner).Get("selected").AsGodotArray()){var layer=_documents.layer_for_id(Document(owner),id.AsString());if(layer!=null&&layer.Get("paint_base").AsGodotObject()!=null)restorable.Add(layer);}var status=owner.Get("status").As<Label>();if(restorable.Count==0){status.Text="This layer has no paint history to restore.";return;}Action(owner,()=>{foreach(var layer in restorable)layer.Set("texture",layer.Get("paint_base"));});status.Text="Restored the original layer pixels";}
+}

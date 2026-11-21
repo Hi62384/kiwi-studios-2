@@ -90,85 +90,19 @@ var cache := KiwiTransformationMorphCache.new()
 var shader := Shader.new()
 var views: Dictionary={}
 var status := ""
+func _native() -> Object: return Engine.get_singleton("KiwiNativeServices").call("service", "transformation_renderer")
 func _ready() -> void:
-	shader.code=CODE; viewport.disable_3d=true; viewport.world_2d=World2D.new(); viewport.transparent_bg=true; viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS; add_child(viewport); add_child(cache)
+	_native().call("ready", self, CODE)
 func texture() -> Texture2D: return viewport.get_texture()
 func clear_views() -> void:
-	for view in views.values(): view.node.free()
-	views.clear(); cache.requests.clear(); status=""
+	_native().call("clear_views", self)
 static func transform_at(a: KiwiTransformationState, b: KiwiTransformationState, t: float, turns: int=0) -> Dictionary:
-	var dimensions := a.artwork.dimensions.lerp(b.artwork.dimensions,t); var pivot := a.pivot.lerp(b.pivot,t)
-	var rotation := a.artwork.rotation+ (wrapf(b.artwork.rotation-a.artwork.rotation,-PI,PI)+turns*TAU)*t
-	var anchor := a.anchor().lerp(b.anchor(),t)
-	# Shared canvas group scaling can retain an affine residual (skew / flip).
-	# Keep that residual so a state renders exactly as it did while editing,
-	# while explicit rotation still takes the shortest angular path.
-	var frame_a := a.artwork.local_transform(); var frame_b := b.artwork.local_transform()
-	var residual_a := Transform2D(a.artwork.rotation,Vector2.ZERO).affine_inverse()*Transform2D(frame_a.x,frame_a.y,Vector2.ZERO)
-	var residual_b := Transform2D(b.artwork.rotation,Vector2.ZERO).affine_inverse()*Transform2D(frame_b.x,frame_b.y,Vector2.ZERO)
-	var basis := Transform2D(rotation,Vector2.ZERO)*Transform2D(residual_a.x.lerp(residual_b.x,t),residual_a.y.lerp(residual_b.y,t),Vector2.ZERO)
-	basis.origin=anchor-basis.basis_xform(dimensions*pivot)
-	return {"transform":basis,"dimensions":dimensions,"opacity":lerpf(a.artwork.opacity if a.artwork.visible else 0.,b.artwork.opacity if b.artwork.visible else 0.,t)}
+	return Engine.get_singleton("KiwiNativeServices").call("service", "transformation_renderer").call("transform_at", a, b, t, turns)
 func mesh_for(mapping: Dictionary, extent: Vector2) -> ArrayMesh:
-	var arrays := []; arrays.resize(Mesh.ARRAY_MAX); var positions := PackedVector3Array(); var colors := PackedColorArray()
-	for i in mapping.uv_a.size():
-		var uv: Vector2=mapping.uv_a[i]; var target: Vector2=mapping.uv_b[i]; positions.append(Vector3(uv.x*extent.x,uv.y*extent.y,0))
-		var hi := (target*255.).floor()/255.; var lo := (target-hi)*255.; colors.append(Color(hi.x,hi.y,lo.x,lo.y))
-	arrays[Mesh.ARRAY_VERTEX]=positions; arrays[Mesh.ARRAY_COLOR]=colors; arrays[Mesh.ARRAY_TEX_UV]=mapping.uv_a; arrays[Mesh.ARRAY_INDEX]=mapping.indices
-	var mesh := ArrayMesh.new(); mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays); return mesh
+	return _native().call("mesh_for", mapping, extent)
 func sync(session: KiwiTransformationSession, time: float, samples: Dictionary = {}) -> void:
-	viewport.size=session.document.canvas_size; var live := {}; status=""
-	for item in session.document.components:
-		live[item.id]=true
-		if not views.has(item.id):
-			var node := MeshInstance2D.new(); var material := ShaderMaterial.new(); material.shader=shader; node.material=material; viewport.add_child(node); views[item.id]={"node":node,"signature":""}
-		var view: Dictionary=views[item.id]; var node: MeshInstance2D=view.node; viewport.move_child(node,viewport.get_child_count()-1)
-		var event_state := KiwiMorphComponentEvents.evaluate(session.document,item.id,time)
-		if not item.visible or not event_state.visible: node.visible=false; continue
-		var sample: Dictionary = samples[item.id] if samples.has(item.id) else session.sampled(item,time); var a: KiwiTransformationState=sample.a; var b: KiwiTransformationState=sample.b; var key: KiwiTransformationKey=sample.key
-		if a==null or b==null: node.visible=false; continue
-		var t := float(sample.t); var mode := key.mode if key!=null else "Step"; var mapping := KiwiTransformationMorph.identity(); var morph := false; var growth := 0; var reveal_replace := false; var prepared: Dictionary={}
-		if a!=b and mode not in ["Step","Crossfade"]:
-			var pair_id := cache.signature(a,b,key)
-			if view.get("pair_id","")!=pair_id: view.pair_id=pair_id; view.prepared={}
-			prepared=view.get("prepared",{})
-			if prepared.is_empty():
-				prepared=cache.get_pair(a,b,key)
-				if not prepared.is_empty(): view.prepared=prepared
-			if prepared.is_empty(): status="Preparing morph… temporary crossfade preview."
-			else:
-				if prepared.empty_a!=prepared.empty_b: growth=1 if prepared.empty_a else -1
-				elif mode in ["Reveal","Grow / Reveal"]: growth=1; reveal_replace=true
-				elif prepared.valid: mapping=prepared; morph=true; status=prepared.get("method","")+" · "+prepared.reason if not prepared.reason.is_empty() and prepared.reason!="Crossfade" else prepared.get("method","")
-				else: status=prepared.reason
-		var settings := transform_at(a,b,t,key.turns if key!=null else 0); var signature := str(hash([mapping.uv_a,mapping.uv_b,mapping.indices,a.artwork.dimensions,b.artwork.dimensions]))
-		if view.signature!=signature: node.mesh=mesh_for(mapping,a.artwork.dimensions.max(b.artwork.dimensions)); view.signature=signature
-		node.transform=settings.transform; node.visible=item.visible and float(settings.opacity)>.00001
-		var material := node.material as ShaderMaterial
-		material.set_shader_parameter("mask_count",event_state.masks.size())
-		for i in event_state.masks.size(): material.set_shader_parameter("transfer_mask"+str(i),event_state.masks[i])
-		var fields := prepared.has("field_a") and prepared.has("field_b")
-		material.set_shader_parameter("has_fields",fields); material.set_shader_parameter("implicit_shape",morph and prepared.get("topology",false)); material.set_shader_parameter("feature_appearance",key!=null and key.appearance=="Feature reveal" and mode!="Crossfade"); material.set_shader_parameter("topology_bias",key.topology_bias if key!=null else 0.)
-		if fields: material.set_shader_parameter("field_a",prepared.field_a); material.set_shader_parameter("field_b",prepared.field_b)
-		var origin := key.morph_origin if key!=null and key.origin_enabled else (b.pivot if growth==1 else a.pivot)
-		var reveal_kind := ["Point","Path","Directional","Shape expansion"].find(key.reveal_mode) if key!=null else 0
-		if key!=null and mode=="Reveal" and key.reveal_path.size()>1: reveal_kind=1
-		material.set_shader_parameter("reveal_kind",reveal_kind); material.set_shader_parameter("direction",Vector2.from_angle(deg_to_rad(key.direction)) if key!=null else Vector2.DOWN)
-		var bounds: Rect2=prepared.get("bounds_b" if growth==1 else "bounds_a",Rect2(Vector2.ZERO,Vector2.ONE)); var radius := .001
-		for point in [bounds.position,bounds.end,Vector2(bounds.end.x,bounds.position.y),Vector2(bounds.position.x,bounds.end.y)]: radius=maxf(radius,origin.distance_to(point))
-		material.set_shader_parameter("growth_radius",radius)
-		material.set_shader_parameter("reveal_replace",reveal_replace)
-		material.set_shader_parameter("image_a",a.artwork.texture); material.set_shader_parameter("image_b",b.artwork.texture); material.set_shader_parameter("progress",t); material.set_shader_parameter("morph",t if morph else 0.); material.set_shader_parameter("dimensions",settings.dimensions); material.set_shader_parameter("opacity",settings.opacity); material.set_shader_parameter("growth",growth); material.set_shader_parameter("origin",origin)
-		var path := key.reveal_path if key!=null else PackedVector2Array(); var buffer := PackedVector2Array(); buffer.resize(64)
-		for i in path.size(): buffer[i]=path[i]
-		material.set_shader_parameter("path_count",path.size()); material.set_shader_parameter("path_points",buffer); material.set_shader_parameter("path_width",key.reveal_width if key!=null else .3)
-	for id in views.keys():
-		if not live.has(id): views[id].node.free(); views.erase(id)
+	_native().call("sync", self, session, time, samples)
 func flattened() -> Image:
-	# Convert the premultiplied viewport to straight-alpha native pixels on GPU.
-	var output := SubViewport.new(); output.world_2d=World2D.new(); output.size=viewport.size; output.disable_3d=true; output.transparent_bg=true; add_child(output)
-	var display := TextureRect.new(); display.texture=texture(); display.size=Vector2(output.size); output.add_child(display)
-	var material := ShaderMaterial.new(); var conversion := Shader.new(); conversion.code="shader_type canvas_item; render_mode unshaded,blend_disabled; void fragment(){vec4 c=texture(TEXTURE,UV);COLOR=vec4(c.rgb/max(c.a,.00001),c.a);}"
-	material.shader=conversion; display.material=material; output.render_target_update_mode=SubViewport.UPDATE_ALWAYS
-	for i in 3: await RenderingServer.frame_post_draw
-	var image := output.get_texture().get_image(); output.queue_free(); return image
+	var job: Object = _native().call("flatten", self)
+	if not job.finished: await job.completed
+	return job.result

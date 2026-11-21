@@ -1,0 +1,973 @@
+C# migration is the top-priority queue item. New production work uses C#.
+
+Build: use the Godot 4.6.1 .NET edition under .godot/tools/godot-dotnet-4.6.1.
+The project uses .NET 8; global.json selects an installed compatible SDK.
+NuGet.Config resolves Godot packages from that editor's bundled nupkgs.
+The standalone WASAPI C# helper remains separately compiled and is excluded
+from the Godot assembly. Delivery archives under tools are excluded as well.
+
+Completed: project-manager project display panel ported to C#, scene reference
+switched, public script-facing property names retained. C# build passed with
+zero warnings/errors. The full migration is NOT complete.
+
+docs/csharp_migration_inventory.json lists the remaining GDScript files.
+Port dependency roots before consumers; preserve serialized names, resource
+identity, signals, undo/redo, and public calls during the transition. Test each
+converted subsystem with Godot .NET. Remove legacy scripts only after references
+have been switched and behavior verified. Resume the feature backlog after
+the migration, implementing it in C#.
+
+No application export is authorized by this migration request.
+
+Project-list controller and removal panel are now C#. Scene references switched;
+legacy scripts removed. Controller create/rename/duplicate/remove smoke passed
+using an isolated listing. Combined .NET app startup exited 0 without script
+errors; existing per-user clipboard write/certificate/shutdown warnings persist.
+The main project-manager UI and serialized project resources remain GDScript.
+
+Main project-manager UI and create/duplicate/rename parameter panels are C#.
+Old UI/create/duplicate scripts removed and scene references switched. Existing
+parameter mapping resources remain compatible. Confirmation and cancellation
+passed through the actual UI using isolated storage. StaticData retains a
+minimal setter bridge until its consumers are ported.
+
+Compositor blur now executes in CompositePixelFilters.cs using contiguous float
+arrays with premultiplied alpha. The GDScript evaluator is a transitional caller.
+Godot .NET compositor core regression: 24 checks passed, including alpha-safe
+blur. C# assembly build: zero warnings/errors. See csharp_ui_confirmation.log
+and csharp_composite_filters_compositing_core_test.log in .godot/verification.
+
+2026-10-29 continuation: grading/exposure/contrast/saturation/temperature/tint,
+master/RGB curves, chroma and luminance keys, alpha extraction, matte application,
+masked adjustment mixing and layer blend modes now execute in C# pixel arrays.
+The evaluator retains temporary GDScript resource/graph/workspace bridges.
+Build passed with zero warnings/errors. Core and workspace suites passed after
+grading/keying and alpha/mask ports (csharp_grade_keying and csharp_alpha_masks).
+Direct C# smoke also passed HDR/alpha grading and default chroma-key parity.
+Final blend-backend regression logs: csharp_blend_backend_*.log.
+Next migration targets: compositor transform/source image raster operations,
+then resource/graph models and their serialized references, then workspace UI.
+Full production migration and the feature backlog are not complete.
+
+Continuation checkpoint: CompositeBuffer.cs and CompositeCurveEditor.cs are now
+active production replacements; old buffer and curve GDScripts removed.
+Evaluator uses explicit CompositeBufferNative C# preload/type alias to avoid
+collision with the old cached global class. C# pixel backend now also performs
+normalization, transforms, opacity and shape rasterization.
+Verification: csharp_transform_raster core/workspace passed; csharp_curve_control
+workspace passed; csharp_buffer_bridge2 core 24/workspace 15 passed. Direct C#
+smoke in csharp_buffer_clone.log verifies placement, curve pointer input, clone
+metadata and independent pixels plus project UI operations. Build zero warnings.
+
+NEXT: migrate serialized graph connection/node/layer/document resources with
+backward-compatible old .tres script references. Before deleting any legacy
+serialized resource script, test a pre-migration saved fixture loading after
+the change. Investigate path remaps or an explicit C# resource migration loader;
+do not silently break saved projects. Then port graph evaluator/workspace UI.
+Remaining temporary production bridges: evaluator/workspace GDScript, project
+resource/mapping GDScripts and StaticData setter. Entire queue still active.
+
+Serialized-resource checkpoint: graph connections now use CompositeGraphConnection.cs
+for new production objects. Graph/workspace use explicit GraphConnectionNative
+preloads. Graph connection arrays accept Resource to retain old binary schemas.
+MigrationBootstrap registers LegacyResourceLoader before existing autoloads.
+It recognizes only .tres files containing the known old connection script path;
+translates references in a cache copy, resolves relative external paths, strips
+stale remapped script UIDs and restores the original resource path after load.
+The source .tres remains byte-identical; saving uses the actual C# path and no
+cache-file dependencies. A pre-migration nested fixture is tracked in
+scripts/actors/tests/fixtures/compositing_legacy_graph.tres.
+
+Godot .gd.remap and direct script aliases were tested and REJECTED: both produce
+C# registered-path identity errors. Do not reintroduce those approaches.
+Old composite_graph_connection.gd remains a four-export legacy data schema only
+for .res backward compatibility. This bridge is tracked as PARTIAL migration,
+not complete. Binary data loading and text->C# round-trip are verified in
+csharp_resource_compat_final.log, including immutable original and cache isolation.
+C# build passed with zero warnings/errors. New compositor regressions are in
+csharp_connection_compat_final_*.log.
+
+NEXT: extend the proven text loader map as resource node/layer/document classes
+are ported; preserve legacy binary schema bridges until a tested binary resource
+upgrade is available. Graph-node resource is the next dependency. All queue work
+remains active; ignore accidental Coraline specification; no application export.
+
+Graph-node checkpoint: CompositeGraphNode.cs now owns node IDs, kind, placement,
+settings/exposed state and all port-type/input/output rules. Production callers
+use explicit GraphNodeNative preload; instance helpers replace old static calls.
+Graph arrays and method parameters accept Resource so legacy binary schemas
+remain loadable. The old node .gd is schema-only (no port behavior).
+LegacyResourceLoader now has a replacement map for connections AND nodes.
+Tracked pre-node-migration fixture contains placement, exposure, color and nested
+RGB curve data. Binary graphs with legacy nodes/connections validate through
+C# rules. Text fixture loads as native C# nodes; save/reload preserves curves
+and colors, original bytes unchanged, no cache-file dependencies in output.
+Build: zero warnings/errors. csharp_graph_node2 core/workspace suites passed;
+csharp_node_compatibility.log passed binary plus rich text compatibility.
+
+NEXT DEPENDENCY: composite_graph.gd -> C# graph resource, including graph lookup,
+validation, cycle detection and compile_errors. Keep binary .gd schema/behavior
+bridges until binary migration is solved. Extend text-loader replacements and
+legacy fixture verification before changing serialized graph script references.
+Then layer/document resources, evaluator orchestration and workspace UI.
+
+Graph-resource checkpoint: CompositeGraph.cs owns graph IDs/name, nodes/edges,
+output selection, node lookup, port/input validation, DFS cycle detection and
+compile_errors. Production workspace creates C# graphs; document/evaluator
+accept Resource for legacy binary support. The old graph .gd now contains
+only exported schema and delegates lookup/validation/compile to C#.
+Text compatibility loader maps the graph script as well as nodes/connections.
+The tracked pre-migration fixture now loads a native C# graph containing C#
+nodes/connections; saves preserve nested settings and no cache dependencies.
+Binary .res legacy graphs validate through the C# algorithms via bridge.
+
+Verification: csharp_graph_resource3 core/workspace passed;
+csharp_graph_compat_final.log passed genuine valid-port cycle rejection, missing
+required inputs, duplicate inputs, lookup identity, binary fallback and text
+round-trip/immutability. C# build zero warnings/errors. Native startup log is
+csharp_graph_startup.log. Legacy schema bridges remain PARTIAL migration.
+
+NEXT: capture pre-migration layer hierarchy fixture (group/child, transforms,
+mask/graph references, settings/effects, source image, timing and keyframes).
+Port CompositeLayer resource/validation. Preserve Kind/Blend numeric values
+across GDScript/C# callers and binary schemas. Extend loader map before
+switching text references; change document layer arrays/lookup types carefully
+and fix dynamic-boundary inference explicitly. Then document resource,
+evaluator source/graph orchestration and workspace UI. Full queue still active.
+
+Layer-resource checkpoint: CompositeLayer.cs owns all layer fields and validation.
+Document creation uses C# layers; layer arrays and typed boundary parameters
+accept Resource for legacy binary support. Layer loader replacement added.
+Legacy composite_layer.gd retains schema, Kind/Blend numeric-enum bridge and
+validate delegate only. IDs/default values, double timing and rotation,
+opacity, hierarchy, mask/graph refs, effects/settings and embedded textures
+are preserved. Before switching, tracked fixture was enriched with group/child,
+shared child reference, embedded image, mask, graph link and opacity keys.
+Text->C# load and roundtrip tests preserve that data; original file immutable.
+Legacy binary .res layer also loads and validates through C# delegate.
+
+A pre-existing bug was fixed: document signature omitted locked, bypassing
+dirty/undo tracking. Signature now includes it and workspace undo/redo test
+covers lock changes.
+Verification: csharp_layer_final core 24/workspace 16 passed;
+csharp_layer_compat_final.log passed graph diagnostics, legacy binary graph
+and layer fallback, rich layer/node/graph text compatibility and roundtrip.
+No script/parse/managed-exception errors in final logs. C# build zero warnings.
+Existing certificate-store/clipboard-directory warnings persist in harness.
+
+NEXT DEPENDENCY: port compositing_document.gd to C#. Preserve full exported
+state, validation, parent-cycle checks, content signature, layer creation/lookup,
+animation track insert/update/sample. Capture a pre-migration document fixture
+with render/color/workspace state and animation before switching. Extend
+loader mapping and retain binary document schema/delegates until upgrade
+coverage exists. Then evaluator source/graph orchestration and workspace UI.
+All temporary schemas/enum references are partial, not a finished migration.
+
+Document-resource checkpoint: CompositingDocument.cs owns all exported document
+state, validation/hierarchy checks, content signature, layer lookup/creation,
+track lookup, key insertion/replacement/sorting and interpolation. Production
+workspace/scene tabs/tests create C# documents; explicit type checks accept
+native documents or legacy binary schema. The old document .gd is exports plus
+C# delegates only. LegacyResourceLoader maps its text references too.
+
+Pre-document fixture tracked separately: compositing_legacy_document.tres.
+It preserves color/processing/render/workspace/cache settings, media references,
+active/solo IDs, rich layer hierarchy and animation. Compatibility test covers
+loading C# root, deep snapshot signature equality, graph-setting edits changing
+signatures, repeated-time key replacement, save/load state, immutable source
+and binary .res document animation/validation delegates.
+Signatures now hash graph node/edge contents rather than object identity;
+embedded image signatures use pixel content to remain stable across cloning.
+Mutable textures rehash each check because ImageTexture.Update does not emit
+Changed reliably. Imported compressed textures use change-invalidated hashes.
+Mutable texture hashing can be expensive; a revision-aware media interface is
+a future optimization. Actual GPU texture-update signature check passed with
+D3D12 (csharp_document_gpu_cache.log); headless dummy renderer cannot verify
+GPU Update, so that one check explicitly reports NOT RUN in headless mode.
+
+Compatibility loader bug fixed: _GetResourceType returns empty for unrelated
+files instead of labeling GDScript as Resource. This was found by video_link_test
+and the fixed video integration passed (csharp_document_video_fixed).
+Unreadable/unrelated composition sources now open unsaved blanks with no
+overwrite path; workspace regression covers original bytes unchanged.
+
+Latest verification: build zero warnings/errors; csharp_document_verified core
+24/workspace 17 passed; video_link_test passed after loader fix. Rich resource
+compatibility passed with normal renderer; final headless compatibility log is
+csharp_document_headless_final.log. Existing certificate-store/clipboard-folder
+write warnings remain environmental. No app export.
+
+NEXT: port compositing_evaluator.gd orchestration/source handling/cache to C#.
+Pixel operations are already in CompositePixelFilters.cs; buffer/layer/node/
+graph/document are C#. Keep Resource-compatible binary schema behavior and
+ActorVideo static-call bridge until media migration. Port text rasterization
+(real font SubViewport path plus deterministic headless fallback), linked
+composition recursion checks, graph memoization, solo/group rendering, cache
+keys/limits and source-time mapping. Then compositor workspace UI and tab
+bridges; ultimately remove temporary schemas only after binary upgrade support.
+Queue still active; migration is not complete.
+
+Startup csharp_document_startup.log exited 0 (existing certificate/clipboard write warnings only). Loader recognition now requires an ext_resource path declaration; arbitrary text mentioning an old script must not trigger migration. Guard regression: csharp_document_loader_guard.log. No script-class alias remaps reintroduced.
+
+Evaluator checkpoint: CompositingEvaluator.cs now handles document evaluation,
+layer/group/solo traversal, animated layer copies, linked document cycle guards,
+source-time mapping, image/video/pass sources, graph dispatch/memoization,
+bounded image/text caches, buffer metadata and diagnostics. Image math uses
+CompositePixelFilters; bitmap fallback glyphs moved to CompositeBitmapFont.cs.
+Old compositing_evaluator.gd removed; production workspace and tests preload
+C# evaluator. GDScript callers pass explicit false for force-cache arguments
+because C# optional defaults are not recognized by GDScript call validation.
+ActorVideo.frame remains a tested GDScript static-call bridge.
+
+Strengthened text regression by hiding the existing ellipse: it exposed blank
+real-font output in the deferred Label redraw path. C# now shapes TextLine and
+draws directly to viewport canvas before ForceDraw. Isolated real-font graphics
+regression passes. Linked sources require native documents or exact legacy
+schema; font loading falls back safely for resources that are not Font.
+Native evaluator cache test verifies a layer-color edit renders without manual
+cache clearing and preserves pixel aspect. Legacy .res rendering checked too.
+
+Verification: build zero warnings/errors; csharp_evaluator_verified headless
+core 24/workspace 17/video_link all passed. Real-font GL checks passed in
+csharp_evaluator_text_direct and csharp_evaluator_final_graphics. Native app
+startup csharp_evaluator_startup exited 0. Resource compatibility/native-cache
+checks in csharp_evaluator_resource_compat and csharp_evaluator_legacy_render.
+Existing certificate-store/clipboard-directory warnings remain; no app export.
+
+NEXT DEPENDENCY: port compositing_workspace.gd UI/undo/playback/export/file
+dialog/graph interaction orchestration to C#. Preserve composition_saved and
+document_changed signals, source/state capture APIs, scene-tabs integration,
+clipboard hierarchy and graph-reference remapping, inspector curves and keys,
+node editor selection/positions/connections, media preview retries, silent MP4
+and PNG/EXR sequence exports. Native evaluator/resource classes are ready.
+Then port compositor regression scripts to C# and remaining scene-tab bridges,
+continue the broader production migration inventory. Legacy binary schemas
+and numeric enum bridges are still partial and must not be marked complete.
+
+Workspace continuation checkpoint: CompositeWorkspaceEdits, History, Preview,
+GraphEdits and Exporter now run in C# and are wired into the production GD UI.
+Hierarchy edits preserve canonical shared children, graph ownership, animation
+and cross-document clipboard. History uses deep snapshots and stable signatures.
+Native graph actions reject invalid connections transactionally; deleting a node
+keeps its layer processing graph assignment instead of silently disconnecting it.
+Native export snapshots the document, yields between frames, awaits asynchronous
+FFmpeg without blocking UI, protects existing outputs on encoder failure, rejects
+concurrent jobs and sequence overwrites, preserves EXR HDR/alpha, retries pending
+video frames and cleans only unique job-owned temporary directories. MP4 odd
+dimensions pad to encoder-compatible even size. No application export performed.
+Verification: clean C# build; csharp_workspace_preview, csharp_workspace_graph,
+csharp_workspace_export core24/workspace17 passed. Native resource migration
+test passed added shared hierarchy, graph ownership, undo/redo, paste/delete,
+animated preview scaling and transactional graph mutation checks. Dedicated
+CompositorExporterTest passed snapshot isolation, concurrent guard, overwrite
+protection, invalid format/rate and failed encoder destination preservation.
+Remaining compositor migration: native inspector/layout, graph UI, playback,
+file/save dialog orchestration; old GD binary schemas remain intentionally.
+Migration and broad feature queue are NOT complete. Continue without treating
+this checkpoint as completion.
+
+Further workspace migration: native CompositeGraphView builds ports/connections
+and captures node positions; CompositeWorkspaceFiles validates and saves documents
+and constructs save/sequence dialogs; CompositeWorkspaceLayout builds the main
+panel hierarchy and graph/selection wiring. Native animation helpers tested for
+unkeyed versus keyed edits and sampled transform keying. Native inspector basic
+fields remain; curve transaction callbacks restored to proven GD integration
+after the native callback attempt failed (recorded inspector timeouts were real
+failures, not passing tests). Corrected csharp_inspector_safe passed17; graph_view
+and workspace_files core24/workspace17 passed, workspace_layout passed17. Native
+playback seek/advance/configuration now connected, checks pending below. Remaining
+GD workspace includes inspector property definitions/curves, toolbar construction,
+source opening/state coordination and UI callback wrappers. Still partial.
+
+Direct curve integration now uses native resource/settings edits and workspace
+method calls, avoiding borrowed GDScript lambda callbacks. Verified 17 checks
+in csharp_inspector_direct_curves. Native controls return widgets and GD connects
+callbacks directly; removed attempted native callable retention. Layer tree and
+selected-layer enumeration now C#; source opening and background creation now
+C#. csharp_workspace_tree_files core24/workspace17 passed. Playback core/workspace
+passed. Added native CompositorWorkspaceUiTest to exercise actual numeric input,
+undo/redo and native seek/loop boundaries. Inventory now explicitly partial for
+workspace, with native component list and remaining GD scope.
+
+Layer and graph inspectors now fully built by CompositeLayerInspector.cs and
+CompositeGraphInspector.cs, including animation, source/timing, type-specific
+controls, channels, node settings and undoable callbacks. Toolbar/import picker
+construction now CompositeWorkspaceToolbar.cs. csharp_layer_inspector and
+csharp_graph_inspector core24/workspace17 passed. csharp_workspace_toolbar_graphics
+passed17 on actual GL renderer. Direct native UI test now presses Nodes/Blur
+toolbar buttons and changes layer opacity/graph radius with undo/redo; passed
+in csharp_workspace_toolbar_direct.log. No managed/script errors in these checks.
+Remaining GD is now orchestration/state holder plus async compatibility wrappers;
+next consolidate into CompositingWorkspace C# Control and retain only necessary
+await bridges until callers migrated. Native helper source loading supports
+legacy document schemas; unrelated resource path cleared. Do not mark root
+workspace fully ported yet.
+
+Compositor root migration completed: CompositingWorkspace.cs holds all state,
+UI/selection/history/render/source/file/playback/graph orchestration. Removed
+compositing_workspace.gd and switched scene_tabs preload to native C#. Failed
+intermediate cross-language inheritance bridge was removed; exports return
+awaitable Godot Signals, preserving existing GD await behavior. open_source
+requires explicit state dictionary in remaining GD callers/tests. Removed
+unused callable-based edit API; lock test uses _set_layer_property with equivalent
+undo/redo checks. Nonempty renames now commit history; restored mode reaches UI.
+Native root suites: csharp_workspace_native_root_fixed core24/workspace17 passed
+headless; csharp_workspace_native_verified core24/workspace17 passed graphics.
+Direct native UI test also passed rename undo/redo and mode/time restoration.
+An intermediate graphics failure was caused by editing a new native image row
+before its assembly was built; rerun after build passed (not a passing first run).
+Legacy graph/layer/document GD binary schemas remain partial intentionally.
+
+ImageOperationRow.cs now replaces operation-row GD; both image stack consumers
+use reorder_requested signals, validated payload ownership and source index.
+image_studio passed headless; image adjustment math and mirror passed graphics.
+Headless adjustment timed out because renderer-dependent tests require graphics;
+not counted as a pass. Direct operation signal/foreign payload checks passed.
+InteractionHints.cs now replaces timeline hint GD; consumers preload native or
+use RefCounted interface. Direct priority/owner update/restoration checks passed;
+timeline_layers_test passed. Broader production migration remains active.
+Next running migration: RigModelRuntime.cs replaces per-frame rigid bone-follow
+runtime. Model document and rig authoring test switched; build/tests pending.
+
+RigModelRuntime.cs verified: rig_authoring_scene16 passed actual graphics in
+csharp_rig_runtime. Removed obsolete ForceUpdateAllBoneTransforms; normal bone
+pose reads preserve tested rigid behavior. RigWeightJob.cs now owns worker
+dispatch and Interlocked/Volatile cancellation; underlying weighting algorithm
+still GD. Extended rig_authoring_core to run a real native job on Thread and
+verify its returned binding; cancellation check retained. csharp_rig_weight_job
+passed69. RigGeometry.cs now builds welded vertices, adjacency, connected islands
+and average edge length with native collections. GD geometry method delegates;
+weighting remains partial. csharp_rig_geometry passed69 (including islands).
+Last tiny precision change uses double multiplication before Godot rounding to
+match GDScript scalar arithmetic; follow-up checks required after latest build.
+No application export/package performed. Broad queue still active. Next migrate
+weight calculation/smoothing/correction in rig_weighting.gd, then native binding
+and rig math interfaces; preserve imported skin/morph/lock/bake behavior.
+
+Weighting now fully executes in RigWeighting.cs: distances/envelope scoring,
+island exclusions, normalization, Jacobi smoothing and packed surface output,
+plus locked-weight correction and binding normalization. Native worker calls it
+directly. GDScript facade retains static APIs/defaults and legacy binding type.
+csharp_rig_weights_complete actual graphics core69/scene16/hierarchy57 all passed.
+RigMath.cs now implements ensure, rest/pose globals, signatures, bone frame/tail,
+rest editing, add/move/reparent, descendants and validation; GD math is now a
+static/default-argument facade. csharp_rig_math headless core69 passed.
+Next binding migration started: RigBindingGeometry.cs now transforms packed
+vertices/normals/tangents and evaluates deformed points. Legacy binding still
+serializes original names/types. Latest build/regressions pending below; finish
+them before claiming this binding stage verified.
+
+Binding continuation verified: RigBindingWeights.cs performs batch assignment,
+remapping/lock identity migration, topology caching, copy snapshots and signatures.
+RigBindingGeometry.cs validates weights, creates Skin binds and builds ArrayMesh
+surfaces while preserving names/materials/custom formats/relative morph targets;
+packed vertex/normal/tangent transformation and CPU pose evaluation remain native.
+Legacy binding's exported schema and direct packed-array vertex reads remain GD.
+Avoid naive C# per-vertex AsInt32Array/AsFloat32Array conversion: that copies whole
+surfaces on every query. A full native data-model transition must preserve live
+array edit semantics or migrate callers before introducing a managed cache.
+csharp_rig_binding_geometry, csharp_rig_binding_ops, csharp_rig_mesh_render and
+csharp_rig_binding_state each passed actual graphics core69/scene16/hierarchy57.
+
+RigPreset.cs now creates new reusable preset resources. LegacyResourceLoader maps
+old .tres preset declarations to native while preserving source files. Old
+rig_preset.gd remains binary schema/accepts/factory facade, so native and legacy
+.res resources both remain accepted by rig editor, project picker and thumbnail
+lookup. Clipboard type recognition includes RigPreset. Native migration tests
+cover text upgrade, legacy binary compatibility, native binary round-trip,
+metadata/rest preservation, original source bytes, rig icon and actual picker
+filter acceptance for native and legacy resources. csharp_rig_preset_compat and
+csharp_rig_preset_picker passed. csharp_rig_presets graphics69/16/57 passed.
+Latest build zero warnings/errors. No app export/package.
+Next: remaining native rig binding schema/callers, then rig editor/session/UI and
+other pending production scripts. Broad feature backlog remains behind full
+production/test migration priority. This record is a checkpoint, not completion.
+
+Rig editor continuation: native RigMath now duplicates/mirrors chains, fits
+presets, captures neutral preset bones and creates fitted armature resources.
+RigBindingImport prepares canonical imported skins without mutating originals
+and retains custom-space/bind matrices with the same error messages.
+RigBindingWeights now applies sparse undo patches, rebuilds touched meshes once
+and refreshes all rig bindings. RigWeighting prepares cleanup/mirror/clear patches
+from one managed surface snapshot per target; normalization caches bone/lock
+context per operation instead of copying it per vertex. Static C# context shared
+only within each operation, no stale persistent weight cache introduced.
+Verification: csharp_rig_chain graphics69/57; csharp_rig_weight_patch graphics69/57;
+csharp_rig_fit_verified graphics70/57 (added expired undo-owner guard);
+csharp_rig_preset_factory graphics70/16/57; csharp_compositor_rig_integration
+graphics24/17; csharp_rig_import graphics70/57; csharp_rig_cleanup and
+csharp_rig_refresh graphics70/16/57 all passed. Native closest-segment calculation
+uses Geometry3D directly to retain engine edge-case behavior.
+New RigArmatureEdits.cs now connected for delete/insert/reset/mirrored-move inside
+existing session transactions. New RigArmatureEditsTest.cs checks inserted-joint
+neutral geometry, valid bindings, undo/redo and deletion. Build and these tests
+are current next checkpoint: do not claim verified until logs show actual passes.
+
+RigArmatureEdits.cs delete/insert/reset/symmetric move verified in
+csharp_rig_armature_edits graphics70/16/57. New direct C# test passed neutral
+geometry/binding preservation, atomic insert undo/redo and delete remapping.
+Native RigBindingWeights now prepares locked rebinds and installs bindings inside
+the existing session action; csharp_rig_install graphics70/16/57 and direct joint
+test passed. RigBindingImport now resolves immutable source geometry and
+prepares rigid/soft binds, enforces the same 100k/3m limits, and leaves transaction
+application to the editor. Lazily created importer avoids script-load cycles.
+csharp_rig_bind_prepare graphics70/16/57 passed; C# direct test also verified
+budget refusal preserves original mesh and session revision. MaxVertices/MaxPairs
+constants now live in native weighting too; keep GD facade constants aligned
+until remaining callers migrate.
+Current next checks: csharp_model_rig_consumers model_workspace_test,
+model_interaction_test, model_scene_integration_test, model_source_defaults_test
+on actual GL renderer. Do not assume their results before inspecting report.
+Then continue remaining rig editor/session/UI and full migration inventory.
+No application export/package; latest C# build clean zero warnings/errors.
+
+RigEditor.cs now owns full rig editor state and command/history orchestration.
+rig_editor.gd is now property/default-argument/type forwarding plus static native
+service facades; existing callers unchanged. Native actions call session.begin/
+commit directly; exceptions cancel the gesture. Native cleanup history callbacks
+capture only stateless helper, weak owner and weight dictionaries, not editor.
+C# API corrections: GodotObject.WeakRef (nullable checked); Callable.From closures
+for bound arguments (Callable.Bind is absent in this SDK); Array<Resource> must
+be explicitly converted to untyped Array. Intermediate compile failures fixed.
+csharp_rig_controller actual graphics70/16/57 passed;
+csharp_rig_controller_history direct test passed cleanup exact undo/redo AFTER
+editor disposal, plus joint edits and budget refusal. Native build now clean.
+csharp_rig_controller_consumers actual GL model_workspace, model_interaction,
+model_scene_integration and model_source_defaults all passed.
+Current verification: csharp_rig_controller_viewport rig_authoring_viewport_test
+launched on GL; inspect its result next. Next migration: rig_ui async job/UI and
+rig_viewport consumers. Async bind callers are fire-and-forget in repo, but
+worker cancellation/join and stale-document checks must be preserved. Original
+UI save/load async dialogs may need thin bridges until picker is native.
+Ignored rollback text at .godot/verification/rig_editor_before_native_controller.txt
+contains the previous working implementation if diagnostics require comparison.
+Do not restore it over later user edits. Full migration/feature queue unfinished.
+
+Native rig follow-through: controller viewport 30/30 passed. RigBindingWorker now
+owns async job preparation/start/poll/join, generation cancellation and stale
+session/revision/signature/gesture checks. rig_ui keeps a thin await bridge and
+UI construction; csharp_rig_worker viewport 30/30 passed including doc switch.
+RigTemplates now generates all template hierarchies/mirror links in C#; GD holds
+only categories/default-argument facade. csharp_rig_templates core70/scene16/
+hierarchy57 all passed GL. Native RigEditor calls native templates directly.
+Selected-region weight assignment now prepares per-surface managed snapshots
+once and uses sparse native history patches. Added exact undo/redo assertion in
+RigArmatureEditsTest; csharp_rig_region_history passed and viewport30 passed GL.
+RigViewportGeometry now owns world bone transforms, joint/line picking, plane
+intersection, gizmo geometry and hit testing. Build clean; current verification
+csharp_rig_view_geometry viewport/model_interaction running. Remaining viewport
+sync/drawing/gesture/paint logic and rig UI layout still pending migration.
+
+Rig viewport native follow-through: csharp_rig_view_geometry viewport30 and
+model_interaction passed. csharp_rig_placement viewport30 passed. RigViewportSync
+now owns skeleton rest/pose sync, rigid attachments, skinning heat display and
+cache eviction. Shared heat material avoids per-frame allocations. GL viewport,
+hierarchy and model workspace all passed csharp_rig_sync. RigSkeletonRuntime
+now shared between model preview and scene rig actors; scene16/hierarchy57
+passed csharp_rig_runtime. GD actor retains inherited actor orchestration.
+RigPaintGeometry prepares cached posed/rest mesh triangles natively. RigWeighting
+brush loop now batches managed packed arrays, preserves per-surface smooth
+semantics and locks. csharp_rig_paint viewport30/core70 passed. RigViewportGestures
+now joint/envelope/pose calculations, begin/finish/cancel/history; native sparse
+paint callbacks weakly reference session. csharp_rig_gestures and csharp_rig_finish
+both viewport30/model_interaction passed. Build clean at those stages.
+Current compile: native RigViewportOverlay and RigViewportInput plus brush outer
+ray selection. Not wired yet: verify build session then switch remaining GD draw,
+paint,handle_event to native helpers and rerun viewport/model UI regressions.
+Full migration remains incomplete; GD rig_viewport currently holds state and
+thin bridges plus remaining draw/paint/input (native replacements just written).
+
+Native RigViewport.cs now owns all state and orchestration; rig_viewport.gd is
+only typed property/default argument interface. Native Overlay/Input and brush
+outer ray-picking integrated. Initial csharp_rig_native_view timed out at image
+capture AFTER functional/save checks; no script errors. Subsequent full native
+root runs csharp_rig_root and csharp_rig_root_confirm passed viewport30, with
+model workspace and interaction also passing. Do not erase initial timeout.
+Added exact brush undo/redo and cancel restoration regression; viewport now34
+checks, passed csharp_rig_brush_history. C# batched paint reads retain earlier
+surface updates for smoothing, and overlay reads each surface once per draw.
+RigUiToolbar and RigUiInspector now native actual widgets, quick/templates,
+mode/context toolbar, operations menu, bone/pose/placement/weights/locks/status.
+GD rig_ui only retains workspace state plus coroutine picker/binding bridges.
+csharp_rig_toolbar and csharp_rig_inspector GL viewport34/model_workspace pass.
+Direct RigUiTest.cs native GL csharp_rig_ui_controls2 passed Quick Rig, categorized
+template selection, text rename with undo, draggable number with exact undo,
+pose bend slider with exact undo. Numeric test uses actual step-rounded displayed
+value, not unsnapped requested value. Direct launch has known restricted user
+cache/clipboard/certificate warnings; behavioral assertions all passed. Build
+zero warnings/errors. Native test scene .godot/verification/rig_ui.tscn.
+Next: remove remaining GD-only UI state/await bridges when picker APIs migrate;
+continue substantive production model workspace migration. Full queue unfinished.
+
+Model production migration: ModelNaturalRender native collision wood-only faces,
+foliage LOD preservation and recursive material TIME/link sync; natural_lod_collision,
+natural_wind,natural_render all passed GL csharp_natural_render. TerrainMeshLod
+native ImporterMesh adapter; terrain_lod6, terrain_actor_prepare4 and natural LOD
+passed GL csharp_terrain_lod (8192 full vs534 coarse primitives, border preserved).
+ModelComponentOperations native independent component copy and render/material
+scope/architecture/natural integration; csharp_model_component workspace/hierarchy/
+natural LOD all pass. GD component resource remains original exported schema.
+ModelMeshOperations bulk snapshots, copy/render/from_mesh/append/bounds; normal,
+center,edges,triangles,uv_at/validate scalar GD helpers remain pending consumer
+migration (avoid copying entire packed arrays once per scalar call). csharp_model_mesh
+geometry72/hierarchy57/naturalLOD pass. ModelModifiers all algorithms native;
+csharp_model_modifiers geometry/workspace/interaction/naturalLOD pass.
+ModelGeometryOperations native compact/remove/weld/boundary smoothing, Cuts
+partial native plane clip/convex halfspace bevel. csharp_model_cuts geometry72
+and workspace passed. Edits partial extrude/inset/subdivision now compiled/wired,
+latest build session still running; next rerun geometry/workspace/interaction.
+IMPORTANT failure: csharp_model_topology geometry passed72 assertions but crashed
+on engine shutdown (late .NET finalizer after GDMono destroyed). Workspace and
+natural LOD passed. Changed stateless helper bridges to lifecycle-owned shared
+services in MigrationBootstrap, registered as Engine singleton KiwiNativeServices
+(thread-safe lazy creation), dispose services and drain pending managed wrappers
+before Mono teardown. Initial lifetime1/2/3 runs failed compile because C# autoload
+name not available as a GD identifier; switched Engine.get_singleton().call().
+Corrected csharp_model_lifetime_fixed1/2/3 all geometry72/exit0 with no late fatal.
+Native short-lived modifier/LOD helpers now explicitly disposed using using.
+No application exports performed. Full queue/migration still incomplete.
+
+csharp_model_topology_full GL geometry72/workspace/interaction/naturalLOD all
+passed after full native topology wiring. Component render/copy and natural
+collision now directly call native mesh/modifier helpers; stable composed services
+avoid per-operation helper churn. ModelPrimitives native defaults/basic shapes,
+box/prism/gear/bolt/arch/stairs, compound parts appended via in-memory Topology;
+GD keeps SHAPES constant/type/default facade and natural generator remains its
+own pending module. csharp_model_primitives geometry72/workspace/rig viewport34/
+natural_generator all passed GL. ModelMeshOperations edges cache and validation
+native; csharp_mesh_validation geometry/interaction/natural_generator all pass.
+ModelSelection native grow/shrink/connectivity; csharp_model_selection geometry72
+and interaction pass GL. Build clean. Indexed packed-property probe returned null
+(get_indexed vertices:0/faces:0 cannot access packed entries); do not use that
+approach. Next mesh scalar port passes only the requested face points from
+legacy storage adapter to native math to avoid copying entire mesh per query.
+Native center/normal/triangles/UV math and edge_key just added; current build
+session pending before GD wiring, then rerun geometry/workspace/render workflows.
+Full migration/resource schema compatibility bridges and feature queue remain.
+
+csharp_mesh_scalar geometry72/workspace/natural_generator all pass. Model mesh
+math now native for center/normal/triangles/UV/defaultUV/edge_key too; GD only
+schema, typed static/default wrappers and tiny _face_points/array-append storage
+adapter remain (avoid full packed-mesh conversion for every scalar face query).
+ModelDocumentOperations core + Instantiation + Actors native snapshots/material
+sharing/hierarchy/validation/thumbnail/TRS/source instantiation/scene conversion.
+GD retains exported resource schema + validation override hook + default/type
+facades. csharp_model_document geometry/hierarchy/workspace/naturalLOD pass;
+csharp_model_instantiate geometry/hierarchy/rigcore/naturalLOD pass;
+csharp_model_actor_scene hierarchy57/scene integration/rigscene16/naturalLOD pass.
+ModelImport native file/resource/GLTF/PackedScene/mesh import copies, real node
+hierarchy/material overrides/skins/rest geometry. csharp_model_import geometry/
+hierarchy/scene integration/naturalLOD pass. ModelBooleanOperation native async
+input snapshot/render/CSG bake/cleanup, thin GD await bridge; boolean workspace
+through-hole acceptance + geometry passed csharp_model_boolean.
+ModelHierarchy native Tree replaces old .gd/.uid in BOTH model/environment UIs;
+explicit Tree annotation and set session. csharp_model_hierarchy_tree workspace/
+interaction/environment workspace passed. Environment test retains4 Jolt shape
+exit leaks (not new script error). Direct RigUiTest expanded to hierarchy drop,
+undo, reject foreign payload; csharp_rig_hierarchy_ui passes all6 UI workflows
+with isolated APPDATA, only known certificate-store warning.
+ModelReferenceRemap native component/structural/module/world/terrain metadata;
+csharp_model_remap hierarchy57/world_parent_preservation/environment_workspace
+all pass. All current builds zero warnings/errors. Actual D3D12 app startup and
+exit180frames passed csharp_model_native_startup (known certificate warning).
+Use rg --no-ignore for whole-source searches: ordinary rg omitted some affected
+untracked environment files. Full sweep Workspaces/scripts/scenes found no old
+removed buffer/evaluator/row/hints/rig-job/runtime script references. Tree consumers
+both updated. Current next module: model_source_link.gd caches/reconcile/runtime
+weak references, native preserve animated/instance overrides. Original source
+read; no native implementation written yet. Feature/migration queue incomplete.
+
+ModelSourceLink native caches/path/UID, weak registry, nested override/animation
+reconcile. GD keeps defaults/type/static getters + two environment asset revision
+getters. csharp_model_source_link source_defaults6/module_links/module_runtime/
+hierarchy57 all pass GL. Direct ModelSourceLinkTest headless source_semantics
+passes nested animation protection/new-field independent copy/deleted field and
+local overrides + queued-runtime exclusion. Build clean.
+ModelSessionHistory native primary/snapshot/restore/begin/cancel/commit/undo/redo/
+custom cleanup/signature; GD keeps owning state, invocation of legacy callables,
+custom callback entry creation, packed vertex count accessor. Virtual source
+snapshot/signature/commit preserved (EnvironmentSession override). Initial
+csharp_model_history geometry72/rigcore70/environment passed but viewport timed
+out after save checks at passive screenshot wait (same prior intermittent issue).
+Viewport capture now explicitly process_frame + force_sync/force_draw(false),
+checks PNG save; current viewport35 assertions. csharp_history_capture viewport35
+and environment passed. NativeSessionEdits select/add/selected_vertices passes
+csharp_session_core geometry/workspace/natural_generator/environment. Native
+mesh command integration passes geometry/interaction/workspace. Native hierarchy
+commands duplicate/group/parent/delete/join now across partial class files;
+csharp_session_hierarchy all5 geometry72/interaction/hierarchy57/viewport35/
+environment_workspace pass. Added shared indexed world/ancestor helpers in
+ModelDocumentOperations; original saved schemas and callback/default adapters
+still required, do not mark full migration complete.
+NaturalGenerationJob now native WorkerThreadPool/Interlocked cancellation/locked
+result and Active job registry; bootstrap cancels/joins before service teardown.
+Old natural_job.gd/.uid removed and all3 consumers updated (edit,async/cache tests).
+First csharp_natural_worker async test FAILED (cache/workspace passed): concurrent
+GDScript calls into shared C# RefCounted service adapters caused invalid GCHandle,
+corrupted generated arrays and failed save. Addressed by thread-owned stateless
+adapter instances (key service + CurrentManagedThreadId). ModelSourceLink adapters
+share explicit synchronized CacheState so invalidation remains global. Corrected
+csharp_natural_thread_adapters async10/cache4/source_defaults6 all pass with no
+handle/script errors. Added native Godot Array pins for service instances so
+native script handles cannot weak/strong transition during calls; pins released
+before disposal, shared cache cleared before GC drain. Latest pinned verification
+running: exec session50450 csharp_pinned_adapters async/geometry/source_defaults.
+Active-worker shutdown direct C# test scene .godot/verification/natural_worker_shutdown.tscn
+running in session42404, log csharp_natural_active_shutdown.log. Inspect next.
+NaturalEditCoordinator not written yet: original natural_edit.gd request/finish/
+cancel/flush/_collect read; next can port job state orchestration with child Node
+lifecycle, preserving world/building async flush bridges. Or continue remaining
+production model viewport/workspace/generation/UI. No exports. Full queue huge.
+
+Native service pins verified: csharp_pinned_adapters async/geometry/source_defaults all pass; active-worker shutdown exits0. NaturalEditCoordinator now owns source-edit request/finish/cancel/collect as workspace child; natural_edit.gd retains typed API and world/building await flush bridge. Stale owner/document results rejected and jobs joined on exit. csharp_natural_coordinator async/workspace/model tests pass; workspace-shutdown test exits0.
+ModelViewportOverlay native projection/batched edges/normals/elements/handles/navigation uses topology snapshots; old GD draw loops replaced. csharp_model_overlay model20/interaction22/natural_async10/environment13 all pass, exit0. Face screenshot RGB identical; table differs1 pixel. Async observed22.359s vs earlier36.719s (uncontrolled comparison). Known environment Jolt exit leaks remain.
+ModelViewportPicking native ray/projection/object/face/edge/vertex hit tests now wired; bulk source snapshot avoids per-triangle GD crossings. Native slab ray/AABB test handles parallel rays. csharp_model_picking workspace20/interaction22 pass, exit0; build0 warnings/errors. Subsequently moved click selection and rectangle selection into native helper, preserving additive/toggle/X-ray semantics; latest csharp_model_selection_native running. No application export. Full migration/feature queue remains incomplete.
+
+Native viewport selection verification: csharp_model_selection_native3/4, rig reported missing geometry method because its process had loaded previous DLL while source changed; all35 assertions passed but errors correctly counted failure. Repeated completed assembly cohort csharp_model_handles_native4/4 workspace20/interaction22/rig35/environment13 pass, exit0.
+ModelViewportNavigation now owns camera orientation/standard views/frame/grid/fly. csharp_model_navigation interaction/environment pass. ModelViewportTransforms owns begin/update/finish drag, numeric/grid/surface snapping, parent-aware world transforms, cached proportional weights, extrusion and sculpt. csharp_model_transform_gestures interaction/hierarchy_rig pass; csharp_model_sculpt_extrude workspace/interaction pass. Direct native ModelSculptViewportTest validates5 modes with exact undo/redo, plus subtract cancellation; all6 checks pass exit0 (cert warning only).
+ModelViewportSync moved render mesh/evaluation signatures, upload budget, natural material updates to native. csharp_model_sync4/5: model/interaction/rig/async passed, environment13 had3 failures. Root cause native process called own sync bypassing environment viewport override; fixed to canvas.Call(sync). Audited virtual boundaries for pick/geometry/frame so environment specializations preserved. Verification pending after rebuild. ModelViewportInput staged native mouse/key/creation routing, not wired yet.
+
+Fixed native sync virtual dispatch; csharp_model_sync_virtual environment passes13. growth_workspace has11 assertions pass but access violation on managed shutdown; repeat confirms. Original GD sync baseline also crashes, so not caused by native sync alone. Diagnostic opt-in disposal trace confirmed engine-late managed references; diagnostics REMOVED. RigViewport.release now detaches editor.session/canvas and clears cached native resource dictionaries on viewport tree_exiting, so GDScript graph not retained through script unload. csharp_growth_owner_release all11 checks/exit0. Native sync restored. ModelViewportInput and ModelViewportState capture/restore/cancel now wired, test cohort csharp_model_input_native running. State.setup staged, not wired yet.
+
+ModelViewportInput/State integrated: csharp_model_input_native5/5 workspace20/interaction22/rig35/environment13/growth11 pass exit0, no script exceptions. Setup factory now native ModelViewportState.setup (camera/environment/lights/display/rig proxies and lifecycle wiring); build0 warnings/errors; csharp_model_setup running model/environment/growth. Signals use native target Callables to retain automatic disconnect when canvas destroyed. model_viewport.gd now only field/type/default adapters and flush_preview await loop, all substantive behavior in native helpers. Remains partial because native root blocked by EnvironmentViewport GDScript inheritance plus typed callers; must replace those before removing facade.
+
+ModelViewport setup csharp_model_setup3/3 model/environment/growth pass. Natural settings moved to ModelNaturalSettings; csharp_natural_settings generator105/render/cache-dependent async10 pass. Complete natural geometry now native ModelNaturalGenerator + ModelNaturalGeometry + ModelNaturalTrees + ModelNaturalPlants: plain topology builder, tubes/junctions/stitches/leaves/blades/rocks/vines, native cancel delegate in NaturalGenerationJob, bounded locked artifact cache. GD generator now constants/default/static/Callable cancellation compatibility facade only. Service registry and bootstrap cache teardown wired. csharp_natural_geometry3/4 cache4/vine/async10 pass; all105 generator checks pass but native shutdown failed0xC000001D with unsafe Resource references, correctly counted fail. Fixed explicit cache Dictionary.Clear/Dispose for evictions/shutdown instead of leaving native dictionary references to CLR finalizers; rebuilding/retest pending.
+
+Explicit cache eviction/shutdown Dictionary.Clear/Dispose fixed generator finalizer crash; csharp_natural_cache_release generator105/render1 pass exit0. Baseline scratch comparison9 shapes caught unsigned GD.Hash seed sign-extension; fixed uint reinterpret before RNG seed. Float vertex differences now <=0.000004; seam triangle ordering still differs for a few narrow connections (recorded csharp_natural_parity_scalar.log), native closed manifold acceptance remains unchanged. Precision matching uses double angular ordering/trig and original default clamp scalar precision. csharp_natural_geometry_final5/5 generator105/cache4/vine/async10/render1 pass exit0.
+Natural cluster native ModelNaturalCluster now owns seeded placement, stable identities, manual mesh/pose preservation, child deletion safety, spacing warnings, bounded actions, and property controls. Static typed/constants facade remains. Build0 warnings/errors; csharp_natural_cluster tests running. Next inspect results then continue pending native modeling/growth/workspace/environment modules. No application exports.
+
+Native cluster verification csharp_natural_cluster2/2 cluster6/environment natural workspace6 pass, exit0. ModelNaturalUi owns inspector fold controls/numeric async gestures/season+wind/material clone/branch editor; ModelNaturalPathUi owns vine path and transformed attachment UI. GD natural_ui and natural_path_ui now static typed adapters. Direct C# NaturalSourceUiTest new scene .godot/verification/natural_source_ui.tscn checks6 real workflows: numeric regeneration+undo, folds, season geometry independence+undo, branch popup, path insert/remove, attachment/detach+undo. First test insufficient deferred-signal wait; second surfaced existing Range step rounding10->10.02, test now checks displayed control value. csharp_natural_path_ui all6/exit0; cert warning only. Native build0 warnings/errors. App startup csharp_model_natural_startup running; next inspect, then continue native model workspace commands/UI and remaining growth/environment behavior. No application exports.
+
+Direct startup csharp_model_natural_startup exits0 with normal D3D12 Forward+ renderer; only certificate warning. No application export. Native ModelWorkspaceOperations staged/integrated selection expansion/material/normal selection, face separation/center pivot, view commands, geometry live preview dialog. Dialog now retains its owning session so closing after document switch cannot restore a different scene; explicitly releases preview snapshot on hide/exit. Build0 warnings/errors; csharp_model_workspace_operations scene integration/workspace/interaction running. Model workspace root still substantial pending GDScript.
+
+Workspace operations regression csharp_model_workspace_operations3/3 scene integration/model/interaction pass. Direct native ModelWorkspaceOperationsTest now checks6 workflows: material/normal selection, separated topology+undo, center pivot+undo, stale dialog on scene switch, actual CSG Boolean editable output+cutter hiding+single undo, stale Boolean rejection. csharp_workspace_boolean_direct all6/exit0. Native Boolean job now captures session/revision before initial yield, owns/cancels model CSG child, frees snapshot, preserves async public bridge. Native menu/search/fuzzy filtering/dispatcher now ModelWorkspaceMenus; `_choice_menu` retains tiny GDScript Callable invocation bridge only (callback nulled on popup exit), choice list constants via schema adapter. Build clean; csharp_model_commands cohort running4 suites. ModelPrimitives/ModelNaturalRender now call native natural APIs directly (staged, rebuild after cohort).
+
+Native menus/command cohort csharp_model_commands4/4 model/scene integration/interaction/rig35 pass. Native generic numeric factory, selected TRS setters, primitive regeneration and transform-field sync now ModelWorkspaceInspectorFields, with Resource-based callback invocation bridge to avoid GD Callable marshalling loss. Session-bound gestures reject stale controls; callback cleared and cancelled on exit. csharp_model_inspector_fields3/3 integration/interaction/async passed before subsequent closed-control guard; native direct csharp_workspace_fields_direct8 workflows pass including primitive dimension undo and multi-selection transform undo. Direct natural calls in ModelPrimitives/ModelNaturalRender rebuilt. ModelWorkspaceModifierUi now owns modifier list/enable/reorder/axis/numeric/apply and shading/material add/color/face assignment; _load_material await picker remains GD. Build0 warnings/errors; csharp_model_modifier_ui model/scene integration/async running.
+
+Modifier/surface UI regression csharp_model_modifier_ui3/3 model/integration/async pass. Direct ModelWorkspaceOperationsTest expanded12 workflows; csharp_workspace_modifier_direct all12/exit0, including actual native chooser, bisect toggle+undo, Apply stack+undo, cloned material color+undo, selected-face material assignment+undo. Native tree rows/ancestor parenting/icons/click visibility+lock/selection primary/rename now ModelWorkspaceTreeUi; ModelHierarchy detaches session on exit. Build0 warnings/errors; csharp_model_tree_native model/hierarchy/environment/growth running. Full model workspace root setup/theme/refresh/files/state still GD; no full migration claim.
+
+Native tree cohort csharp_model_tree_native4/4 model/hierarchy57/environment/growth11 pass exit0. ModelWorkspaceRefresh now owns context and inspector rebuild, rig/growth dispatch, structure role/connections, TRS/parametric fields, precision controls, refresh scheduling and dirty notifications. Uses storage-only _vertex_count bridge for metrics, avoiding large array copies. Proportional toggle now immediately refreshes radius controls. Structural physical connection defaults still obtained from pending physics definition adapter; growth/architecture inspectors still pending GD modules called by native orchestrator. Build0 warnings/errors after fixing generic Variant.As analyzer issue with constrained cast. csharp_model_refresh_native integration/rig/growth/natural workspace running.
+
+Native refresh cohort csharp_model_refresh_native4/4 scene integration20/rig35/growth11/natural workspace6 pass. ModelWorkspaceLayout now owns all ready UI construction, theme, header/tool callbacks, generic button/label/clear/draw helpers, panel capture/restore and initial-layout calculations. Root retains one-frame await bridge and save-to-scene await bridge temporarily. Modern SplitOffsets arrays replace obsolete C# SplitOffset usage; build clean0 warnings/errors after8 initial obsolete warnings resolved. Native generic button callbacks use same GDScript resource invocation bridge, cleared on node exit. csharp_model_layout_native4 suites running. Root pending actual source-open/save/state/file dialog/key routing behavior.
+
+Layout/theme cohort csharp_model_layout_native4/4 integration20/interaction22/rig35/growth11 pass. ModelWorkspaceState now owns document import/open/validation/native-path guard, retained sessions, signal rebinding, rig/viewport/panel restoration, capture cancellation, exit binding cancellation and ancestor-focus keyboard routing. Architecture/module link APIs still pending GD dependencies. Build0 warnings/errors; csharp_model_state_native integration/interaction/rig/async running. Root remaining substantive code primarily file picker and save pipeline; initial-layout/save-to-scene thin awaits and callback/type/schema bridges also remain.
+
+Native state cohort csharp_model_state_native4/4 scene integration20/interaction22/rig35/async10 pass. ModelWorkspaceFileJob now owns open/material/save/save-as/save-to-scene/save-to lifecycle, source session guards, pending natural/world/building flush, preview upload sync, document validation/snapshot/PNG thumbnail, bounded revision dirty handling, tab saved signals and filesystem refresh. Root methods now await Signal adapters only. New model_workspace_await_bridge.gd contains temporary shared-picker/world-flush awaits and static FS redirect only. Save thumbnails force sync/draw after preview upload frame rather than waiting on potentially static post-draw signal; previous rig capture demonstrated hang risk. Build0 warnings/errors; csharp_model_files_native integration/model/rig/async running. Native root replacement and remaining shared dependency migration still required.
+
+Native file pipeline cohort csharp_model_files_native4/4 integration20/model20/rig35/async10 passed, exit0. Guarded refresh after save signal against a listener freeing the workspace. Continuing growth settings/region behavior migration; full growth algorithms remain pending.
+
+Growth settings/regional native cohort csharp_growth_settings4/4 surface/region/workspace/material tests passed, exit0. SurfaceGrowthSettings now owns defaults/style merge/region material selection and region cache; base-style hash refreshed before region cache validation fixes stale shared-style settings. SurfaceGrowthGeometry stages native point frames, skin poses, groom layering, guide/motion curves, resampling; remaining generation/render/groom APIs still pending. Initial build corrected Dictionary helper API mismatch; subsequent build clean.
+
+Native curve cohort csharp_growth_geometry5/5 surface24/region9/physics/LOD/feather passed. New C# SurfaceGrowthNativeTest10 direct settings/cache/layer/pose/guide checks pass, exit0. Native rendering SurfaceGrowthRender owns batched ribbons/tubes/rachis/custom attributes, region grouping, chunk invalidation/material updates/cache/budgets; reuses one source snapshot per rebuild. csharp_growth_render6/6 surface24/region9/feather/performance/GPU/LOD passed, exit0. Dense grooming8000 roots rebuilt6 of63 chunks per brush stroke. Not a controlled cross-language benchmark. Native generation and creation transactions next integrated; initial Vector3I constructor API mismatch corrected.
+
+Native root generation cohort csharp_growth_generation6/6 surface24/multi-source/workspace/scene/showcase/export passed, exit0. SurfaceGrowthGeneration owns create/layered-fur undo transactions, triangle mapping, area-weighted/ordered sampling, spacing, stable sorting, topology guards and skin transfer. surface_growth.gd now only static schema/default/type adapters. Root sort subsequently optimized to cache cells/IDs rather than dictionary reads per comparison; verification next. SurfaceGrowthGroom/GroomViewport own spatial query, all18 brush application modes, posed hits/rest-space mapping/symmetry and undoable stroke finish. Remaining groom input/overlay/guide editing pending. First groom build1 nullable warning fixed by explicit weak-ref ownership assertion.
+
+Native groom brush cohort4/5 passed; growth_workspace_test correctly exposed wrapped Variant ID comparison failing stroke undo/redo. Replaced with value string comparison. Native guide creation/editing/history, hit selection, input and overlays now SurfaceGrowthGroomGuides/Input; groom_tool.gd state/default/type facade only. csharp_groom_viewport4/4 workspace11/tools19/advanced8/performance passed, exit0. Native generation sort optimization tested surface24 after cached-cell change: preparation173.6ms in this run versus792.8ms before optimization; uncontrolled timing, no language speed claim. GrowthMaterialOperations now integrated presets/cloning/signatures/source versioning/texture refresh/custom shader TIME/coverage/runtime parameters; build/tests next.
+
+Native growth material cohort csharp_growth_material4/4 material14/resources8/regions9/workspace11 passed, exit0. GrowthMaterialOperations handles real appearance behavior; external ActorObjectData/image generator/shader TIME/native material adapters still GD dependencies tracked elsewhere. Initial ShaderUniformList untyped array cast and3 nullable conversions fixed; clean build. GrowthThumbnail now staged native SVG strand/feather previews with bounded cache; growth_style preset instantiation now native using retained schema constant data. Expanded C# direct tests14 include all style thumbnails/noise signature/independent copies. Build and direct tests next.
+
+Native thumbnails direct14/14 checks passed, exit0; old growth_thumbnail.gd removed after caller updates. GrowthInstanceRuntime owns per-instance material copies/TIME/LOD/skin+guide selection/pose update. Obsolete forced skeleton update removed; public pose reads verified actual animated GPU output. csharp_growth_instance5/5 GPU9/region9/LOD/resources8/workspace11 passed exit0, including changed skeletal pose without manual force-update. GrowthGpuRuntime now integrated texture uploads/tables/guide binding/regional materials, preserving per-instance state schema adapter. SurfaceGrowthDataOperations owns independent resource copying; old data schema retained. Build/tests next.
+
+Native GPU attachment and growth copy cohort csharp_growth_gpu_native6/6 GPU9/dense-GPU3/regions9/workspace11/resources8/surface24 passed, exit0. Both real GPU guides and multi-bone deformation match CPU viewport references; steady motion upload budget passes. GrowthGpuRuntime uses prepared per-buffer settings, avoiding settings hash per strand. GrowthPhysicsOperations/Playback now port timeline attachments, bounded authored/auto controls, nearest4 weights, constraint graphs, root pins, frozen/baked/corrected guide application. Timeline solver/actor sampled values remain external GD dependencies. Build and timeline verification next.
+
+Native growth physics cohort csharp_growth_physics4/4 physics/multi-source6/export/scene passed, exit0. Timeline scrubbing/bakes/frozen+corrected guides and separate source ownership verified. Continuing native growth inspector controls/appearance/regions; saved source baselines in ignored verification folder.
+
+Native growth main inspector ModelGrowthUi/ToolsUi/Inspector now owns generation menu/icons/source/groom parameters/presets/guides/individual controls/layer operations. growth_ui.gd typed adapter only. csharp_growth_inspector4/4 workspace11/scene integration20/advanced8/regions9 passed, exit0. Native ModelGrowthRegionUi now owns scope assignments/order/controls/local colors/style/material loading; shared file awaits through existing temporary bridge. Pending region picker results reject closed/switched sessions or reordered/deleted target slots. Build/regional UI verification next.
+
+Native appearance inspector ModelGrowthAppearanceUi/AssetUi/StyleUi now owns all style+material controls, noise/texture/gradient authoring, project pickers and resource save/link/unique actions. GD growth_appearance_ui facade only. csharp_growth_appearance_ui4/4 workspace11/material14/resources8/region9 passed. Direct ModelGrowthInspectorTest20/20 exercises assignment+undo/redo, local style/color undo, preset Save/update/new undo, noise+normal undo, gradient insertion undo, actual FileDialog material/style save paths + resource reload. csharp_growth_appearance_direct exit0; cert warning only. New test initial Button helper type-name compile collision corrected. GrowthActorOperations and GrowthMotionUi now integrated for scene schemas/sample application and motion-correction controls; build/tests next.
+
+Native scene actor cohort csharp_growth_scene_actor5/5 scene7/physics17/multi-source6/workspace11/resources8 passed, exit0. GrowthMotionUiTest7/7 actual dialog checks pass, exit0: deterministic fixture, actual guide list, multi-guide correction, undo/redo, separate keyframe tracks, single-action key undo. Direct app startup next. Native document prepares growth directly with a lazy generator (avoids document/generator construction recursion); workspace refresh/tree/menu now call native growth methods directly. Inventory reconciled all growth files as partial except removed thumbnail; schemas/default/caller compatibility adapters explicitly still pending. No full migration claim.
+
+Actual app startup csharp_growth_app_startup exits0 on D3D12 Forward+; existing certificate warning only. EnvironmentViewportRuntime/Picking/Input/Placement now own all environment viewport state/lighting/picking/overlay/brush/input/drop behavior; GD derived viewport state/type/default API facade retained. Initial old-runner cohort reports5/5 assertions/exit pass; retrospective error audit finds2 GL texture shutdown leaks in climate test, so it is not clean. Other4 logs have no unexpected engine errors. Runner now discovers native C# Node tests (generated ignored scenes), accepts snake-case names, flags unexpected engine errors even exit0. Native_runner_growth3/3 direct14/20/7 pass with strict error checks. Native EnvironmentWeatherRuntime staged/integrated emitter creation/update/explicit material release and climate test waits3 frames for queued cleanup. Build/strict climate tests next.
+
+Strict environment weather cohort3/5: cave/water/main workspace clean, climate11 assertions but2 GL texture shutdown leaks, biome7 assertions but1 Jolt shape leak. Neither counted clean. Separate actual rendered sky/empty/rain/snow probes each exit0 without leaks when allowed render frames before destruction. Climate regression now renders2 frames per emitter before verifying state, then3 cleanup frames. Terrain shape leak traced to ConcavePolygonShape3D stored in cached render-mesh metadata; EnvironmentCollisionRuntime now creates collider-owned shapes and releases collision references at exit, ports chunk/material/asset collision behavior. Native EnvironmentSessionTerrain/Scatter staged (not yet integrated). Build/strict leak reruns next.
+
+Cleanup follow-up csharp_environment_cleanup1/4 strict pass: climate11 now clean after rendered emitter lifetimes. Biome/workspace/runtime assertions all passed but1/4/9 Jolt shape leaks remain, so failed strict checks. Native collision shapes had managed creation references surviving their native collider ownership. Scoped Dispose now releases creation references immediately after assigning colliders (native collider retains resource), and chunks no longer read shape references back merely to test null. Rebuild/strict collision rerun next. EnvironmentSessionTerrain/Scatter/Core staged only, not integrated while cleanup tests remain unresolved.
+
+Scoped collision creation reference fix csharp_environment_shape_ownership3/3 strict biome7/workspace13/runtime9 pass, exit0, no Jolt shape leaks. Climate11 strict-clean in prior cleanup cohort after actual rendered weather lifetimes. Shape resources now collider-owned, managed creation references disposed immediately, no physics resource cached on persistent render meshes. Native EnvironmentSessionOperations terrain/scatter/core/assets/hierarchy now integrated for all session behavior (sparse brush undo/redo/cancel, signatures/commit links, selection/reusable environments, asset/scatter add+promotion, duplicate/delete/remap). Typed state/default schema adapter retained. Build/native session verification next.
+
+Native environment session strict cohort csharp_environment_session5/5 document16/portability/scatter/workspace13/world parenting pass, exit0 and no unexpected runtime errors. EnvironmentDocumentOperations/References now integrated validation/snapshot/terrain+group/water sampling/dependency traversal; original exported document schema/default API retained. Source baseline saved. Build/document+hydrology/reference verification next.
+
+Native environment document strict cohort csharp_environment_document5/5 document16/portability/workspace13/water/workspace/live dependencies pass, exit0 and no unexpected runtime errors. TimelineMaterialLink native Resource now owns weak source/target/shader bindings, source-change callbacks, bounded32/4MiB compiled shader cache, controlled TIME and independent parameter synchronization. Legacy Resource owner wrapper retained for historical .res metadata and immediate GDScript metadata ownership semantics. Callbacks target native object methods (no source-retaining delegate cycle). Bootstrap clears compiled shader cache before shutdown GC. Build/link lifetime+serialization tests next.
+
+
+Material binding migration follow-up: native owner Resource/Callable conversion retained GDScript metadata owners until GC and failed the immediate-release regression (three retained failed cohorts, not clean). Fixed with dictionary-only native state, weak-reference dispatch and engine-side signal hookup; no managed owner/target wrapper or Callable conversion. TimelineMaterialLink owns compilation/cache, change handling and independent uniform synchronization; GD facade retains serialized Resource identity and minimal weak dispatch/signal bridge. csharp_environment_binding_lifetime model_source_shader_time11 and architecture links pass strict; final cohort pending. EnvironmentAssetOperations/Loading now own content stamps, native geometry reuse including signed/unsigned historical hash normalization, asset loading/dependencies, invalidation, image/noise/material conversion and world environment resolution. Existing static cache facade retained; timeline material creation stays GD ownership bridge to preserve immediate Resource lifetime. Native EnvironmentDataHash integrated canonical recursive value/resource signatures. Added EnvironmentAssetNativeTest7 checks; build/direct tests next.
+
+Material weak-binding cohort3/3 strict shader-time11/architecture-module-links/world-live-dependencies pass. Environment assets + stable signatures direct/native regression cohort5/5 strict passes (direct7/cave-runtime/material/inline-scatter/portability). TerrainErosionOperations now owns hydraulic and thermal fields/transport/masks/cancellation; GD schema/default/cancellation weak Callable bridge retained. First test cohort compile failure due nonexistent packed-array assign corrected with explicit compatibility copy; fixed cohort3/3 strict erosion12/workspace/cave-workspace pass including conservation/determinism/cancellation/undo/reopen. Native TerrainPaintRender integrated; build/paint + historical erosion parity probe next.
+
+TerrainPaintRender strict cohort2/2 paint rendering + main environment workspace pass. Historical erosion parity probe2/2: hydraulic max field error9.35e-7, thermal0; single uncontrolled sample GD88.671ms/native17.643ms hydraulic and GD22.506ms/native2.637ms thermal (not a controlled benchmark). TerrainGenerationOperations/Foundations integrated all profiles/noise/landforms/masks/validation/signatures/foundation projection/presets, schema/default/cancellation adapter retained. Strict generation/foundation/erosion workspace cohort3/3 pass. Historical generator parity13/13 covers ten profiles x five modes x81 samples + twelve landforms x81 samples; max sampled profile absolute difference1e-14. TerrainWaterfallRender and incremental TerrainBakeJob+Operations now integrated; build/runtime/bake checks next.
+
+Native terrain biome+bake cohort4/4 strict passes bake5/waterfall6/cave-biomes/biome-material workflows. Bake bridge first mismatched Resource vs RefCounted schema; corrected and rerun clean. TerrainBiomeRender/Shader owns renderer-bounded palettes, PBR channels, 2D weight uploads, cave volume textures and shader generation. TerrainCaveOperations/Field and TerrainVolumeMesher own cave SDF, edits/smoothing/bounds, signatures/networks and tetrahedral extraction from snapshotted height/cave buffers; GD schema/state/default/compatibility facades remain. Strict cave cohort5/5 geometry12/seams/tools/runtime/workspace passes; geometry sample1611 vertices1600 triangles3840 cells31.734ms (uncontrolled). TerrainCaveWater now integrated bounded hydrostatic flooding/query/clipping/mesh assembly; build/flood+water acceptance tests next.
+
+Native cave-water strict cohort3/3 flood8/water/waterfall passes; covered tunnel real blue-water render, sealed dry chamber, independent saved connectivity, failure budget preserves last complete data. csharp_terrain_app_startup actual D3D12 Forward+ exits0, cert warning only. Native cave-biome volume cohort3/3 cave-biomes/flood/natural cave scatter passes. TerrainBiomeOperations/Generation/Sampler now integrates all surface/cave climate/suitability/noise/presets/masks/landforms and sample refresh. Cave-biome path now direct native sampler; water sampler snapshots shared for cheap repeated queries. Schemas, typed API/default/cancellation adapters remain partial. Latest build/tests next.
+
+Shared native biome suitability cohort4/4 strict: surface27, live mask painting, biome workspace and cave volume material pass. EnvironmentBiomeTool native input/preview/cancel/sparse mask edits integrated; strict brush/workspace/main workspace3/3 passes. EnvironmentWaterTool native draw/pick/drag/delete/insert/snap/source replacement integrated; strict water/main workspace2/2 and new native EnvironmentWaterToolTest actual handle controls1/1 pass (viewport drag, private preview, release, undo/redo, Escape, Delete, Shift insertion). EnvironmentCaveTool native target/draw/path/brush/cancel implementation now integrated; build+direct cave tools tests next.
+
+Native environment cave-tool strict3/3 cave tools/workspace/water controls pass. New EnvironmentCavePathTest13 actual viewport checks pass (tunnel/chamber picking, private drag, complete real geometry release, undo/redo, cancellation, chamber deletion, Shift insertion); native water renderer + waterfall + underground render strict cohort3/3 clean. TerrainHydrologyOperations/Paths/Mesh/Compatibility integrated all drainage/flood/lake/river carve/distance/moisture/mesh behavior, native heap helpers and retained schema/default/private compatibility API. Strict hydrology9/water workspace/flood8/native water controls12 cohort4/4 passes. Historical hydrology parity9/9 across river/basin/coast cases: exact scalar buffers, drainage links, coverage, mesh counts/indices. Cold sample GD28.408/native47.851ms rivers, GD32.414/native24.507ms lake, GD24.412/native7.355ms coast, so no general speed claim. Removed duplicate managed/native mesh buffer conversions by sharing a single native dictionary with owner debug buffers and returned result; rebuild/parity validation next.
+
+Native TerrainSliceView/TerrainSliceJob fully replace removed GD popup/worker (all production/test path references updated). Cancelable Task worker uses cloned resource/buffer data, native pinned lifetime, joined shutdown and main-thread image upload. Strict slice/cave-handles/hydrology cohort3/3 passes. Hydrology single-buffer sharing preserves historical parity9/9; warmed alternating four-sample local medians GD/native ms: river31.3335/13.4645, lake34.9805/8.476, coast30.537/6.66 (bounded fixture, not whole-app benchmark). Native EnvironmentScatterOperations/Generation/Masks/Caves and EnvironmentTerrainSampler/TerrainCaveBiomeSampler now own generation, spatial masks, anchors/overrides/clusters, climate/water/biome restrictions and real cave-surface search. Strict scatter/stability/cave/embedded/biomes5/5 passes. Historical scatter parity6/6 uniform/anchors/polygon+patch: same counts/attempts/IDs/palette, pose max0/0/1.2e-7. First parity fixture untyped array assignment failed; scratch fixture corrected, failure log retained. Cold native scatter samples slower, so optimized candidate hash/empty override reuse and output array wrappers before warmed comparison. Native EnvironmentScatterJob now replaces GD worker, cancellation-safe prepare and joined shutdown; async/workload verification running.
+
+Native scatter worker cohort3/3 async/stability/scatter passes. Warm four-sample alternating scatter parity6/6: uniform2000 GD60.233/native57.9745ms; anchors8 GD.2935/native.427ms; masked2000 GD88.027/native71.5295ms, bounded fixtures only. EnvironmentRuntimeOperations/Terrain/Assets/Scatter integrated runtime scheduling, uploads, direct collision/weather/LOD/render backends and scopes; strict environment runtime5/5 passes. Native EnvironmentInstanceStream regional buffers/culling/hysteresis cohort4/4 passes. EnvironmentBuildingStreamOperations/Process streaming/budgets/collision/cache policies cohort4/4 passes. BuildingSourceOperations authored plan copy/presets/validation cohort4/4 passes; exported schemas remain. BuildingMeshCache synchronized bounded native LRU cohort3/3 passes. BuildingGenerationJob native Task cancellation/join orchestration replaces GD worker; strict async/building/cache3/3 passes, geometry backend still indirectly GD. BuildingGeometryOperations/Roofs native wall/slab/cut/arch/roof topology integrated through GD API facade; build0 warnings/errors; geometry/cache/finish/trim cohort running. Stair bounds/cuts/upper landing native implementation staged, not yet integrated.
+
+Native building polygon cohort4/4 geometry/cache/finishes/trim passes. Native stair-helper cohort3/3 layout/foundation/collision passes. Finish/component integration4/4 finishes/trim/geometry/destruction passes. Complete native stairs/supports/opening integration4/4 geometry31/foundation/collision/simulation passes. Full BuildingGeometryGeneration worker call first emitted null-callback errors despite geometry checks passing; retained failed cohort1/5 and fixed using validated GD cancellation-state bridge (native worker uses managed Func directly). Corrected full-generator strict5/5 geometry/async/cache/world-stream/history passes. BuildingStyleOperations and BuildingLayoutOperations/Generation now own all facade/presets and rectangular room plan/navigation behavior; source/preset/default API schemas remain. Native styles/layout integration strict5/5 styles/layout/geometry/async/world-stream passes. StructureConnectionOperations shared native dictionary schema removes last structural GD helper call from geometry; build/verification next.
+
+Native shared structural connection schema strict3/3 destruction/simulation/geometry passes. BuildingSessionOperations/Update/Materials integrated regeneration/override preservation/source signatures/native transaction history/orphan world poses/material assignment/reset; strict session5/5 history/finishes/trim/async/module links passes. BuildingEditOperations revision/cancellation/job ownership and result integration now native; GD coroutine-await compatibility loop retained. Build and async acceptance next.
+
+BuildingEdit native orchestration strict4/4 async/history/workspace/world-building-stream passes. BuildingFoundationOperations projections/link refresh/deletion cleanup and BuildingCollisionOperations native disjoint convex cells integrated; strict foundation/collision/simulation/world-roads4/4 passes. Actual native_building_app_startup D3D12 Forward+ launch exits0 with only environmental certificate-store warning. BuildingModuleOperations native hierarchy import/remap/anchor snapping now integrated; module-link source tracking remains separate GD dependency pending port. Build/module checks next.
+
+Native module insertion strict4/4 modules/module-links/module-runtime/portability passes. ModuleLinkOperations/Replace/Session integrated source loading/cycle checks/rig-surface conflicts/override preservation/transactional refresh. First linked-runtime cohort exposed use of base ModelDocument snapshot on an EnvironmentDocument, losing terrain schema; staged fix dispatches virtual snapshot/validate on candidate documents. Failed runtime timeout/log retained, corrected rerun pending. ArchitecturalComponentOperations/Session/Ui staged native primitives, authored edits and controls, not yet integrated/built.
+
+ModuleLinkOperations virtual document snapshot/validation fix strict5/5 module links/runtime/workspace/architectural components/architecture workspace passes. ArchitecturalComponentOperations/Session/Ui owns all16 primitive families, normalization, dependent door/glass children, authored edit history and inspector controls. ModuleLinkUi/ModuleLinkRefreshJob now integrated linked inspector controls and multi-tab asynchronous refresh with stable owned sessions; build/UI acceptance next.
+
+Native ModuleLinkUi/RefreshJob UI cohort3/3 module workspace/runtime/architecture workspace passes. BuildingPlanOperations/Input/Display integrated complete draw/picking/wall-room-opening gestures/cutaway/state; first plan cohort3/4 found renderer Node3D incorrectly cast as RefCounted, fixed. Strict corrected plan cohort4/4 workspace13/async/trim/module workspace passes. BuildingUiOperations/Anchors + ApplyJob now owns opening/stair inspector controls/anchor window/frame/cancel/source lookup/asynchronous apply; native BuildingUiPlan/PlanJob split setup/restore/create integrated next with shared legacy await bridge for remaining pending-edit APIs. Build/verification pending.
+
+Native building inspector + plan jobs strict4/4 architecture workspace13/async/finishes/module workspace passes. BuildingUiProperties/FoundationLayout now own all building property controls/styles/levels/material actions/foundation/layout widgets. PlanJob handles split/create/restore and existing shared await bridge; FileJob now owns material/model picker choices and insertion with captured-session checks. Legacy script reduced to coroutine/API wrappers; unused callable widget constructors removed. Build/final architecture verification next.
+
+Native BuildingInspectorNativeTest8 actual controls checks passes alongside architecture workspace/module workspace/async (strict4/4). It verifies dimension history/undo/redo, level creation, style facade and live cutaway. Native BuildingUiFileJob picker orchestration compiled cleanly, shared project picker still GD dependency. EnvironmentGenerationJob now fully replaces GD orchestration worker with managed Task, atomic progress/cancellation, typed resource-clone settings and shutdown join; all8 production/test references updated, legacy worker removed. Underlying terrain schema algorithms remain separately tracked. Build/generation acceptance next.
+
+Native EnvironmentGenerationJob strict worker3/4 generation/water-runtime/scene-scale passed; combined acceptance identified renderer palette notices classified as errors, probe verified water=true/chunks=4. Runtime now deduplicates and retains these as warnings; acceptance explicitly checks nonfatal compatibility diagnostic, passes. EnvironmentActorOperations/Sources now own actor load/prepare/evaluate/remote/water/refresh/shader-time behavior. First actor/world cohort3/4 passed all9 world assertions but reported late GL sky texture cleanup; native EnvironmentWorldOverride plus scoped duplicated Sky creation ref fixes cleanup without weakening checks. Corrected strict world cohort3/3 world9/module runtime/generation passes. TerrainDataOperations/Meshes now integrates native sculpt modes/sparse undo masks/dirty keys/material painting/chunk meshes/volume mesh/proxy editable topology, scalar sampling and remaining preparation/schema algorithms still GD. Build/terrain checks next.
+
+Native terrain data strict5/5 generation/combined acceptance/paint render/brush41/cave geometry12 passes. All13 brush modes retain exact sparse undo/redo and conservative local erosion. TerrainDataPreparation now integrates native base-noise/generator sampling, paint/edit resampling, biome landforms, geological erosion/foundation stages and bounded synchronized64MiB/16-entry CPU cache. GD prepare retains only cheap packed-buffer validity/default/cancellation bridge; public cache byte diagnostic stays compatible. Build/generation/erosion acceptance next.
+
+Native base preparation strict4/5 generation/erosion-workspace/acceptance/foundation passes; large scene all4 behavior assertions pass but world RID shutdown diagnostics fail strict status. Weak world reference alone did not fix it (keys/lifetime cohort4/5: world9/LOD/cave12/brush41 clean, large4 assertions pass with same RID leak). Coordinator now explicitly releases its managed viewport-world reference during exit, before physics shutdown; focused rerun pending. TerrainDataKeys now owns validation/signatures/dirty chunk/local keys with batch prepared snapshots, avoiding full packed-buffer copies for each mesh chunk; source scalar sampling/preparation of water/volumes remains pending.
+
+Focused native_world_variant_release large scene scale strict1/1 now clean: all4 render/collision/byte-budget assertions pass with no Jolt leak diagnostics. Releasing temporary world lookup Variants explicitly (as well as the coordinator managed reference) resolves late world ownership. TerrainDataStages/Volumes now integrate native water/cave-ground tracing with snapshotted cave fields, biome generation/query cache, cave-biome generation, validity and budgeted cave-volume rebuild/progress; GD defaults and callback invocation bridge remain. Build/full integration tests next.
+
+Native terrain stages strict6/6 combined acceptance6/cave flood8/cave biomes/biome painting/large scene4/worker generation passes. Native terrain + environment Forward+ strict3/3 combined/world/climate passes. Actual native_environment_app_startup D3D12 Forward+ exits0, certificate warning only. EnvironmentClimateOperations/Weather/Render now integrate complete clock/sun/season evaluation, deterministic schedule/procedural weather, local region blends, atmosphere updates and native procedural sky creation with scoped creation refs. Resource schema/default wrappers retained. Build/climate parity/integration checks next.
+
+Native climate strict3/4 climate11/world9/combined terrain passes; environment scene integration exposed stale cached saved terrain and collision outside project folder. Repeated original tests2/2 reproduce failure; workspace-local probe passes, external user-data probe confirms disk base1 but cache/runtime base0. Signal probe shows existing actor receives base1, then recreated runtime reloads cache base0 because explicit TakeOverPath does not replace the loader canonical user-path cache entry. Actor load/reload now uses ResourceLoader Replace and retains canonical loader path, instead of Ignore+manual TakeOverPath. Focused strict rerun pending. EnvironmentLibraryOperations and EnvironmentActorDefinitionOperations staged, not yet integrated.
+
+Corrected external-path actor reload cache cohort3/3 scene integration8/climate11/world9 passes; scene collision refresh verified without explicit test reload. Historical climate parity352 state comparisons across manual/timeline/procedural/scheduled clocks, negative/boundary times, four region shapes and overrides: zero mismatches, max numeric/vector difference1.361984e-8; signatures match. EnvironmentLibraryOperations native scanning/filtering/drag data/UI and EnvironmentActorDefinitionOperations now integrated. EnvironmentWorkspaceOperations owns worker launch/cancel/poll/result freshness/transaction/disposal integration; root UI/property/filesystem bridges remain. Build/workspace acceptance next.
+
+Environment workspace/library/actor-definition integration: clean build; strict native_environment_workspace_flow cohort 6/6 (workspace13, erosion, cave, biome, water workspaces and generation). Native climate inspector controls and validated history now own clock/weather/wind/local-region edits. Native EnvironmentClimateInspectorTest six actual control/history checks plus climate/world strict cohort3/3 passed. Hierarchy display/filter/collapse/selection/visibility/name/lock edits now moved to EnvironmentHierarchyOperations; verification next.
+
+Native lighting and environment frame/transform logic: build clean, native_environment_frame4/4 including eight climate/lighting control checks and live cave/water workspace flows. Fully native EnvironmentLibrary + drag ItemList replaces deleted GD library; shared thumbnail await remains tracked. Library workspace/discovery/placement + async scatter2/2 clean. Native scatter inspector integrated, strict workspace/scatter/inline3/3 clean. Main property inspector composition, transforms, terrain dimensions/LOD/resolution and source collision controls moved to EnvironmentWorkspaceProperties; controls verification next.
+
+Main property composition strict native_environment_properties3/3 clean, including scatter controls5 and building controls8. Native layout/context strict native_environment_layout4/4 clean; rendered environment_workspace.png visually inspected. Native terrain profile/landform/erosion and water inspector integration: clean build; strict native_terrain_inspectors3/3 (erosion9 controls/history/cache/save checks, water workspace, generation). Source edit bridges carry original callbacks in dictionaries and invoke only in a tiny GD bridge; all resource cloning, transaction and generation dispatch lives in C#. Cave creation and inspector now native, verify next.
+
+Native cave inspector strict2/2 passes (workspace and13 path checks). Biome inspector strict2/2 passes including cave biomes. Native open/capture/editor state integration strict2/2 workspace13 and building inspector8 passes; camera, session, split, brush, scroll, hierarchy, library, cave/world UI state preserved. Native snapshot save job integrated next; waits for generation/asset upload, validates, renders preview explicitly, preserves revision/session checks, emits existing save signal, shared filesystem refresh.
+
+Native environment save modes: workspace and terrain bake strict2/2 pass. New real-dialog C# EnvironmentSaveWorkflowTest validates Save As, Ctrl+S existing-path overwrite, reusable selected hierarchy save, full editable terrain bake/save, and canceled Save As preserving path (7 checks, all pass in native_environment_real_save_ui_fixed). Initial test awaited an already-completed old save node; stopped that harness run and fixed its queued-deletion timing, without changing production behavior. Native file/actions workspace+hierarchy/material strict3/3 pass. World terrain snapshots now migrated to immutable C# arrays and native bilinear height/water/normal sampling; verification next.
+
+WorldTerrainField immutable native sampling/capture strict3/3 passes (terrain snapshot7, water routing, sites). Native seed and spatial broad phase strict3/3 passes (seed, occupancy9, roads). WorldSourceOperations now owns copy, region setup, validation and ordered canonical signatures, with external road/district validators retained as tracked migration dependencies. Verification next.
+
+Native world-source strict5/5 passes: identity, scene, workspace, seeds and spatial-index behavior. Historical world-source parity across all7 recipe profiles plus default/invalid settings:82 checks, zero mismatches (copy/signatures/validation/region setup). Native occupancy footprint capture, terrain-following road control adjustment, distant building topology and mesh stamps now integrated; tests next.
+
+World placement/follow/massing/stamp strict4/4 passes (occupancy, terrain, building stream, identity). Native continuous road geometry (sample/trim/strip/junction) strict2/2 roads and bridge/tunnel crossings passes. Complete native road-section profile/material/validation/solid band/lane marking/junction details pipeline now integrated; compile and geometry acceptance next.
+
+Native road-section pipeline strict3/3 pass (17 cross-section geometry/UV/closed-solid/junction/material/undo checks, roads11, real road editor workspace). Native A* routing graph/costs, protected polygon/water legality, reachable endpoints and simplification now integrated; surface and cancellation callback-only GD bridges remain tracked. Verify next.
+
+Native routing corrected build:3/3 strict road/hill routing, water/protected barriers/cancellation and settlement connection tests pass. Connection routing now uses native immutable terrain-field samples directly; arbitrary public surface callbacks retain a temporary GD invocation bridge. Real application Forward+ D3D12 startup exited0, certificate warning only. Native pure road source edits and bridge/rail/support/tunnel portal topology now integrated; verification next.
+
+Native road source edits/bridge/tunnel structures strict3/3 passed (source edits, road editor9, crossings11). WorldVisualEditOperations now handles topology-preserving material/distance snapshots, independent material roles and scatter override/default caps. Requirement source catalog docs/queued_requirements.json indexes44 explicit queued specification attachments with unaudited per-section entries; this is not acceptance completion and excludes Coraline.
+
+Native world visual-only snapshot strict3/3 passed (material/distance overrides, external parents, rendering). Native dependency scheduler, cancel/history pause, field/object invalidation, asynchronous update merge and composed sparse undo/redo callbacks now integrated through WorldDependencyOperations/UpdateJob/History. Shared legacy world_edit await and original callback invocation remain explicit temporary bridges. Verify live dependency workflows next.
+
+Native dependency scheduler/history strict2/2 passed (live11 including auto terrain building/road refresh, ordinary and sparse composed undo/redo, independent-building occupancy reservation, and workspace). WorldTerrainOperations/Tunnels now own transform validation, live sampling math, route fitting, grading layer construction and tunnel aperture/cave planning. Scalar terrain height and water APIs remain schema bridges to preserve live packed-array edits without per-query full-buffer copies. Verify terrain fitting/crossings next.
+
+Native world terrain fitting/grading/tunnel plan strict3/3 passed (terrain, crossings11, immutable field7). World generation/site/recipe worker scripts replaced by C# WorldWorkerJob-derived jobs using low-priority Godot WorkerThreadPool, atomic cancel, collected child terrain results, active registry and joined shutdown. All4 call sites and canceled recipe regression updated; old3 worker scripts removed. Site/network algorithms remain tracked GD migration dependencies. Build/worker regression next.
+
+Native world workers strict4/4 passed (site workspace, recipes, recipe save/undo/cancel6, terrain crossings11). WorldSiteOperations moves full mask/clearance/locked-region/slope/water/road-access scoring and deterministic sampling into C#. Native site/recipe jobs now call the algorithm directly; WorldSiteRequestJob owns source/session/revision/cancel/result workflow, retaining shared world_edit/flush await bridges. Verify next.
+
+Native site scoring/request workflow strict3/3 passed (sites, sites workspace, full preset save/undo/cancel6). Native WorldPropLibraryOperations and WorldForestOperations/Build now own all prop model construction, source presets, four forest palettes/layers, development masks, scatter baselines and override preservation; natural geometry is called directly in C#. Profile/species catalogs and typed/default/cancel adapters retained in GD. Build and forest/prop acceptance next.
+
+Native forests/prop library strict3/3 passed (forests10, forest workspace, library10), preserving source palettes, hand-painted clearings and edited scatter rules through regeneration/save/undo. Native prop source/build and roadside/grid/manual anchor generation integrated; original floating side-ID suffix format (-1.0/1.0) explicitly verified and preserved. Native library now calls prop source creation directly. Verify props next.
+
+Native prop population strict3/3 passed (props13, props workspace, library10). RoadNetworkOperations now owns canonical near-node merging, sampled/border/intersection splitting, bounded candidate broad phase, grade separation and stable edge/adjacency construction. Managed native buffers avoid repeated packed-array reads in pair loops. Remaining road_network generation orchestration/junction metadata still GD pending. Graph compatibility verification next.
+
+Road network continuation: native graph and junction planning preserve exact output across 12 intersecting-road fixtures (25 historical parity checks, zero failures; road_graph_native_parity_clean.log). Native road component creation and forest/prop population orchestration added. native_road_graph: world_identity_test, world_roads_test, road_editing_test all pass with no unexpected runtime errors. Build: zero warnings/errors. Road generation orchestration and other production GDScript remain unfinished.
+Native road generation orchestration now owns all road surfaces/details, junctions, bridges/automatic piers, tunnel portals, visibility/region attribution, building/population integration, validation and development reuse. GDScript road_network is a typed/default/callback facade. native_road_population 3/3; native_road_generation 4/4 (roads, crossings, identity, recipe workspace) with zero unexpected runtime errors. Direct worker-to-native generator integration is being verified next.
+Direct C# world/recipe worker generator integration: native_direct_world_workers 3/3 passed (world_roads, recipes, recipe workspace; no unexpected runtime errors). WorldDistrictOperations added for category defaults, geometry validation, district/block priority, effective settings and deterministic parcel density; district tests in progress.
+World districts complete algorithm port: native_world_districts 3/3 including seven native checks and actual district UI boundary editing/undo/redo/save. Historical parity 20 checks and 1000 exact density comparisons passed. Settlement helpers native; layout/build orchestration pending.
+Settlement integration exposed two existing regressions: (1) tiny spline spans at snapped junctions inverted solid road side faces; native RoadSectionSampling now removes tiny interior spans while preserving exact endpoints; (2) independent building survivors were hierarchy-validated before their planned reparenting. Native WorldPlacementHierarchy now validates the prospective hierarchy and retains the required world poses. world_settlement_test and world_settlement_terrain_test now pass; road_sections_test passes. Native settlement architecture orchestration staged for next integration, not yet accepted.
+Native settlement architecture orchestration integrated: buildings/stairs/foundation/style parameters, lazy massing and full editable geometry, source/material/pose metadata, visibility/region attribution, entrance stairs and cancellation. native_settlement_build 4/4 passed including new snapped-junction native regression and lazy building streaming. Initial settlement layout port now integrated; terrain fitting/parcel acceptance still pending.
+All native_settlement_fixes 4/4 passed: settlement generation including detach reservation, terrain-aware generation, road sections, and external parent preservation. Native settlement grid/village initial layout passed city/village regression; workspace/terrain checks in progress. Full native terrain fitting, bounded block coordination, district assignment, footprint collision/occupancy and accepted parcel planning staged in WorldSettlementPlanning.cs; not integrated yet.
+Full native settlement planning accepted: native_settlement_planning 4/4 passed terrain-aware placement, districts, occupancy, bounded road blocks. Actual D3D12 Forward+ app launch/180-frame exit0, certificate-store environmental diagnostic only. WorldConnectionOperations/Parts integrated next: native connected-set routing, deterministic nearest gate candidates, protected masks, safe-grade bridge approaches, ground/bridge section construction and editable chunk conversion; tests pending.
+Native world connections accepted: native_world_connections 3/3 passed connections, real connection workspace, water routing; no unexpected runtime errors. WorldBlockOperations extraction/fitting now integrated: native half-edge cycles, stable block identity, simplification, frontage queries and clipped parcel fitting. Layout calls these native algorithms directly; block tests pending.
+Native world block extraction/fitting accepted: native_world_blocks 3/3 passed bounded-block geometry, actual block editing workspace and district generation. Native WorldSessionOperations now staged/integrated for world/source/terrain creation, development snapshots, endpoint identity, preserved plot reservations and independent building detach history; generation install/conflict reconciliation still pending GDScript port.
+Native world-session creation accepted: native_world_session_creation 3/3 passed world identity, workspace, settlement/detach undo. Full native WorldSessionUpdate/Reconcile/Locks integrated: source/region locking, topology/source conflicts, manual pose/visibility/material/parent retention, skin/growth preservation, identity remapping, planned hierarchy validation, scatter setting preservation, terrain+geometry/history commit. Build zero warnings/errors; focused reconciliation regressions now running.
+Native world-session reconciliation accepted: native_world_session_update 4/4 passed identity/locked regions, parent preservation, settlement/custom-source protection/detach reservation, and visual/material edits; zero unexpected runtime errors. Native WorldEditOperations now integrated for background source capture, occupancy, terrain/portal preparation, visual fast path, worker launch, revision/dependency cancellation, result installation and dirty/history state. GDScript keeps only pending dictionary, callable invocation and frame-await adapter. Tests pending.
+Native world edit accepted: native_world_edit 4/4 passed identity/cancel, crossings, live dependencies/history and actual preset workspace/save-during-generation/cancel/undo/redo. Native WorldRecipeOperations now owns empty-source validation and configuration of seven terrain/settlement/style/district/forest/prop/ocean presets; asynchronous recipe workflow still pending port.
+Native preset configuration accepted: native_world_recipe_configuration 3/3 passed seven profiles, deterministic reseeding and actual preset workspace. Native WorldRecipeWorkflow integrated next for owned-terrain validation, staged terrain snapshot/generation, site/geometry generation, stale-tab/session/revision cancellation, atomic history commit, callback cleanup, dirty restoration and status/framing. Build zero warnings/errors; workflow integration tests running.
+Native preset workflow accepted: native_world_recipe_workflow 3/3 passed actual recipe generation/save/undo/cancel, profile configuration, and seven real native save workflows. Native world inspector capture/restore, option sizing, async apply/status, road grading and prop-file placement actions integrated. Shared await adapter now supports subscribe-before-call immediate world edit/flush to avoid a one-frame pending-registration/save race. UI integration tests pending.
+World inspector production port extended: native WorldUiPanels handles connections, object placement, forests and settlements; WorldUiRoads handles profiles, ground/bridge/tunnel controls, elevation, terrain fitting, point edit/split/join/extend, section settings and deletion; WorldUiSettings handles world/terrain/budgets/regions; WorldUiLayout composes contextual pages and native creation actions. Existing visible layout/captions retained. This subsequent UI work is build-checked only; no behavioral acceptance claimed, per implementation-efficiency priority.
+Native world/district inspector compilation passed with zero warnings/errors. WorldRoadTool/Drawing and WorldDistrictTool replace two complete GDScript production files (old scripts/UIDs removed, viewport points directly to C#). Port includes world selection, shared endpoint dragging, terrain/grid/Ctrl snap, draw/extend/point insert/delete/cancel, road-region previews, district drag/edge insertion/deletion/validation and terrain-aligned overlays. Retains safety checks for stale handles. Latest interaction code not behavior-verified; compilation checking only per priority.
+Native road/district viewport tool build passed zero warnings/errors. Shader library generated-data port: removed shader_library_data.gd and UID; builder now emits compiled ShaderLibraryData.cs with all 162 authored sources (matching source hashes checked during generation). Native ShaderSampleCatalogOperations owns lazy catalog/metadata normalization, isolated copies and lookup/code retrieval; shutdown clears native cache. Runtime no longer depends on GDScript data or loose JSON catalog loading. Catalog build checking in progress; no new behavioral verification run.
+Native shader renderer/logger and material application build passed zero warnings/errors. Shader browser layout, filtering/search/collections, card/cache logic, favorites/recents/preferences, copy/open/save and protected sample writes, material confirmation/application, preview controls, uniform editors and serialized selection/thumbnail jobs moved into ShaderBrowserOperations partials and ShaderBrowserJob. GDScript browser now retains typed state/API and callable wiring only. Latest shader/browser interaction work is not behavior-verified; compile checking in progress, with no app export/package.
+Native shader-browser compilation passed zero warnings/errors. Shader-workspace input, literal uniform defaults/hint parsing, linked parameter reads/writes/resets/material rebinding and noise/reference preview conversion now native (callback invocation remains a tiny GDScript bridge). Parameter-core compilation passed. Native shader preview modes/materials, project environment/HDRI loading, mesh rebuilding, fitted canvas preview/path normalization/test image generation and code-recompile updates integrated next. Shared glTF/FBX file loader now native and frees its temporary scene after packing. Latest shader-workspace work not behavior-verified; build checking in progress.
+
+Shader workspace continuation: native State/FileJob preserve awaited Save As completion and linked-parameter commits; Preview constructs isolated scene; Layout builds workspace panels; ParameterControls preserve numeric/color/vector live preview and commit origins; NoiseControls preserve owned interaction references, cancellation restoration and saved noise resources; TextureControls provide noise expansion, resource drops and menus. Development-only native file import releases temporary imported scene roots. Latest dotnet build succeeded with 0 warnings and 0 errors. These UI changes are compile-checked only; no behavioral verification is claimed. Typed/callback bridges remain, so migration remains partial.
+
+Transformation workspace native migration: signed-distance fields, silhouette/topology/palette analysis, contour pairing, deformation validation, morph preparation, bounded worker caches, renderer synchronization, session history/edit operations and timed component split/merge are implemented in C#. Resource creation/copy/sampling and full document/transfer validation are native; exported GDScript resource schemas and typed API facades remain. Latest completed build before validation addition passed 0 warnings/0 errors. No behavior tests or app launches performed for these changes under implementation-first direction. Migration remains partial.
+
+Transformation continuation: full resource/document validation, timeline rendering/input, correspondence surface editing, component-tree drag/drop, workspace playback/drawing transaction capture and tree/UI-state operations now run in C#. Timeline/match and workspace integration builds passed with 0 warnings/0 errors after qualifying Godot.Range. Original typed resource schemas and property/layout/file-dialog bridges remain. No app/interactive acceptance evidence claimed for these changes.
+
+Transformation inspector/tool/key panels now use native controls and transactions; artwork shape/extract/detach/import/reveal/event removal operations are native. Artwork integration build passed 0 warnings/0 errors. Native three-frame premultiplied-to-straight-alpha readback job added and build passed 0 warnings/0 errors. No behavior verification claimed.
+
+Transformation workspace continuation: native layout/theme/ready/hotkeys, state restoration, duration/canvas/event/state menus, advanced morph and curve dialogs, correspondence popup layout and async file/save/merge jobs added. Final completed file-job integration build passed 0 warnings/0 errors. Worked examples generation migrated and build passed 0 warnings/0 errors. Only compile evidence for these additions.
+
+Transformation canvas overlay/input/pivot transform and all workspace helper implementations now native; original incoming GD Callable values retained as Variant metadata and invoked only in tiny GD dispatch bridge. Fixed shared canvas handle return type (typed Array rather than packed array). Final integration build passed 0 warnings/0 errors. Remaining Transformation GDScript consists of typed schemas/default APIs, shared-canvas super dispatch, shader literal and callback/await bridges. Do not treat this as completed all-production migration or behavior verification.
+
+Audio native migration: bounded RIFF PCM metadata/reads, waveform edits/zero crossings/alignment/FFT, selected-window PCM silence/transient/tempo analysis with full inspected source signature and post-analysis cancellation/revision guard, short-stream analysis/spectrogram, bounded decode/PCM16 conversion/pattern fitting, multiresolution envelopes and cache worker lifecycle moved into C#. Cache mip strides use 64-bit values for long files. Envelope and lifecycle integration builds passed 0 warnings/0 errors. No behavioral verification claimed. Remaining source/effects/renderer helpers, analysis external-process/audition methods and production audio UI still pending.
+
+Audio continuation: native shared Work token and jobs queue/progress/cancellation lifecycle; original GD Callable binding remains in a one-line bridge because Godot C# Callable lacks Bind and original targets must retain their context. Bounded boundary auditions now native; latest completed worker/audition integration build passed 0 warnings/0 errors. Loudness/time-pitch/noise-profile operations moved and final build passed 0 warnings/0 errors. No behavior tests/recordings/exports were run.
+
+Audio encoder process owner migrated to C#, preserving bounded pipe reads/drain, graceful quit, single forced kill, unknown exit status and temporary-file retention. Its integration build passed 0 warnings/0 errors. Renderer routing/automation/scope/peak/cleanup/publication helpers migrated next; native File.Move(overwrite:false) prevents replacing an external file appearing at publication time. Renderer-helper build passed 0 warnings/0 errors. No process tests/recordings/app exports performed.
+
+Audio renderer: native ordered convolution/Doppler/restoration staging, graph construction, complete render workflow/headroom correction and bounded native fallback now compile successfully. Effect catalog/defaults and Godot preview effects compiled successfully; offline filters/automation migrated next, build result recorded separately when complete. Existing source/notes/impulse/restoration/meter dependencies still use their respective typed APIs. No feature acceptance or all-production completion claimed.
+
+Audio effects catalog/native previews/offline filter construction/automation now native; final effects build passed 0 warnings/0 errors. Generated impulse models moved into AudioImpulseOperations, integration build passed 0 warnings/0 errors. Streaming Doppler reader, sinc interpolation, propagation-time solver and stage validation/cleanup migrated; build passed 0 warnings/0 errors. Static AFIR capability cache now clears at shutdown. No runtime/behavior evidence claimed for these migrations.
+
+Audio restoration multiband float-stage processing and breath candidate detection migrated; build passed 0 warnings/0 errors. ActorAudio pure path/signature/retention/fade/bounds helpers migrated next; cache/loading and FLAC inventory/promotion remain pending. ActorAudio helper build passed 0 warnings/0 errors. No behavioral verification claimed.
+
+ActorAudio shared cache/metadata/loading and FLAC digest/STREAMINFO/derived-disk cache logic migrated. Shared Godot mutex/state remains in static schema bridge, with counter and sources accessors keeping compatibility aliases current. Native FLAC publication is no-replace. Source-loader integration build passed 0 warnings/0 errors after wrapping nullable weak-reference creation. Godot editor import/parser build check now running; no runtime feature acceptance or full-migration completion claimed.
+
+Godot 4.6.1 .NET headless editor import completed with exit 0 and no SCRIPT ERROR/Parse Error/Failed to load script matches in native_audio_migration_import.log. Environmental diagnostics: root certificate-store read and denied editor doc/settings cache writes outside workspace. This is import/parser evidence, not runtime feature acceptance. Native MIDI tempo-map canonical/scaled timing and budget validators plus conductor meter/snap/grid logic built 0 warnings/0 errors. Native route meter tap/log reader added; integration build pending.
+
+Audio edit-session continuation: native AudioEditSessionOperations now owns transaction begin/preview/cancel, snapshot restoration, undo/redo dispatch, selection/primary/lock queries and clip timing validation. GDScript history commit and other editing operations remain pending. First selection/history build passed with zero warnings/errors; clip validation build pending. No behavior tests or application export performed.
+
+Audio session continuation: added AudioEditSessionOperations.cs and AudioEditSessionHistory.cs; native history memory/pruning/weak callbacks, selection, transaction lifecycle, clip/track edits, clipboard, reverse-aware splitting, conductor editing and automation shifting. C# builds through history passed; method generation confirms commit/source_footprint are registered after clean rebuild. Initial history regression failed: pre-autoload singleton unavailable (test deferred), then stale assembly lacked commit; no passing behavior result claimed. More note/relink/silence code and typed bridges remain. No app export.
+
+Further audio continuation: AudioEditSessionNotes/Relink/Silence now cover substantive note orchestration and immutable reviewed silence workflows. Added AudioLinkedPatternOperations, AudioStepControlOperations and AudioRegionEditOperations for linked-pattern validation/expansion, native controls/groove, bounded sample operations and transactional application. Latest builds passed with zero warnings/errors. Overflow guards for very long sample coordinates and clipboard resampling added, awaiting next build. Legacy typed/API/callback factories remain. No additional passing behavioral test evidence or app export.
+
+Native audio generation continuation: AudioSynthesisOperations/Render now own generator catalogs/defaults, all procedural sample loops, modulation, polyBLEP helpers, PCM, layering/variations and preset JSON. AudioInstrumentOperations/Render own preset and note preparation, ratchets, source decoding and per-sample synthesis/sampling/mixing. AudioMidiOperations/Writer own bounded MIDI import/export, event timing/order, sustain-copy and safe completed-file publication. Builds through MIDI writer passed with zero warnings/errors. No media export executed. Behavior/performance acceptance still unverified; typed facades/legacy helper compatibility remain partial.
+
+Additional audio production migration: AudioPresetOperations now covers preset extraction/validation/application/JSON; AudioAutomationLaneOperations and AudioAutomationRecordingOperations cover linked targets and bounded pass recording/splicing/monitor ownership; AudioPlaybackOperations covers runtime source/bus/effect synchronization, transport, exact/file preview, recording leases and meters; AudioFilePreviewOperations/Reader cover bounded read-ahead, native managed worker queue, generation/seek guards, priming and joined release. All latest builds passed with zero warnings/errors. No new passing behavior evidence; initial history regression failure remains recorded. Legacy Reader test still targets the retained GD compatibility class, pending applicable test migration. No application or media export executed.
+
+Audio library/recording continuation: AudioAssetIndexOperations ports bounded cancellable worker orchestration, trusted-root/link checks, asset enumeration and bounded WAV/FLAC headers. AudioRecordingPrepareOperations ports stable signatures, 512 MiB pre-render planning, backing validation/cleanup and lease ownership. Builds passed with zero warnings/errors. A final destructor bridge adjustment now passes the directory string rather than a RefCounted owner during predelete; next build pending. Behaviors remain untested in this batch. No media or application export executed.
+
+Composer/document continuation: AudioComposerOperations/Generation now implement all composer generation and partial regeneration; AudioComposerControlOperations implements instrument/section UI, snapshot/render orchestration and transactional arrangement application, including rollback if new source insertion fails. AudioDocumentOperations/Validation now implement core document queries, creation/insertion/snapshot/duration, MIDI budgeting and complete routing/clip/owner/automation validation. Fixed AudioEditSessionOperations.set_track_value to read validate() as PackedStringArray instead of text. Builds passed, zero warnings/errors. Nested audio document Recovery/PortableCopy remain substantive GDScript; behavior acceptance still pending, no export executed.
+
+Recovery continuation: AudioRecoveryOperations/Storage/Read now implement bounded metadata freeze/encode, checksum-addressed WAV/MP3 blobs, no-replace completed-file publication, store accounting, checksum/header/manifest reads, discovery and conservative pruning, graph validation/decoding and restored document validation. Native lock wrappers use finally to release the original shared Godot mutex and reset owned state. Resource kind/factory, typed-schema assignment and packed-size compatibility helpers remain GDScript, as does PortableCopy. Build before final lock wrapper passed; next build pending. No behavior tests/export performed.
+
+Portable-copy continuation: AudioPortableOperations/Workflow/Stage implement canonical source/manifest checks, bounded hash/copy, embedded-stream estimates and safe clones, reference resolution, collected-document save, review inventory, private staging, source/content/signature rechecks, cancellation cleanup and no-replace Directory.Move publication. Stage file tracking now uses an internal typed string Array rather than copying PackedStringArray values on each append; predelete cleanup passes path/ID/owned-file data only, not a deleting RefCounted owner. Typed schemas/factories/recovery assignment/packed-size and lifecycle compatibility bridges remain. Behavioral acceptance pending. No application or media export executed.
+
+Audio continuation: portable staging/publication build passed (0 warnings/errors). AudioWorkspaceLayoutOperations now owns construction/navigation/folds/inspector organization and synchronization, preserving original script callbacks through dispatch bridge. AudioPatternCanvasOperations + Drawing now own all note editing/drawing/input, source windows/tempo, clipboard/quantization/undo gestures. Both final C# builds passed (0 warnings/errors); no behavioral acceptance or app check claimed. GDScript state/factory/API/callback bridges remain partial.
+
+Native audio continuation: timeline MIDI projection, optional bounded process runner, credential validation/dispatch, transcription parsing/preparation/apply, provider service/ElevenLabs validation+transport, and sound library core+UI moved to C#. Full C# builds passed (0 warnings/errors) through library UI; final drag/lifecycle updates build pending. No credentials accessed, local optional tool invoked, or remote request sent. Behavioral verification remains pending. All temporary typed/API/factory/callback/inheritance bridges remain tracked partial.
+
+Targeted audio pattern/library regression initially failed script loading: repaired library bridge mixed indentation and layout UTF-8/newline encoding. Subsequent test executed all assertions with AUDIO_PATTERN_GEOMETRY failures=0 but strict runner correctly failed runtime logs: missing KiwiAudioJobs.cancel_kind API and UndoRedo rejecting method-less Delegate callables. Implemented native kind-specific queued/active cancellation and method-backed AudioHistoryRestoreAction (weak session, history-owned reference). Corrective build and regression pending; no acceptance pass claimed. Failed check-only runs without isolated user folders also hit Godot user-log initialization crashes; isolated APPDATA/LOCALAPPDATA/log path avoids those environmental failures.
+
+Corrective C# build passed (0 warnings/errors). Native audio pattern/library regression now PASSED: native_audio_pattern_history_fixed_audio_pattern_geometry_test.log, 16.703s, failures=0, no script/runtime errors under OpenGL. Covers pattern window/retiming/split/locks/note insertion/deletion/group dragging/undo/redo/effect-ranking persistence and track selection. Run completed against assembly before composition-template migration; templates are not covered by this pass. Existing certificate-store warning excluded by established runner. Continuing native template creation/effect-chain presets.
+
+Subsequent implementation: AudioTemplateOperations, complete AudioTimelineCanvasOperations/Input/Drawing, AudioOptionalWorkflowOperations/Ui, AudioWaveformCanvasOperations and AudioAutomationCanvasOperations all built successfully (0 warnings/errors). Static/typed/API/factory/callback bridges remain tracked partial. As directed, deferred behavioral reruns for these latest changes; only earlier pattern/history/library regression is a confirmed runtime pass. No application export, credential access, remote request, optional recognizer run or paid operation. Continuing conductor-controls and remaining production audio code.
+
+Further native audio implementation: conductor draft controls, reviewed dialogue batch, layer bundles, take finalization/recovery, schema-aware media repair, preset store/recovery, processed RMS/alignment, routed-group freeze, conductor fit and modulation matrix. Full C# builds passed (0 warnings/errors) through the latter three. Fixed dictionary.Values collection conversion compile failure in media repair before successful build. No behavioral reruns under implementation-first instruction. Main audio controller migration now started in AudioWorkspaceOperations (shared controls/theme/context/parameter gestures/dialogs); build pending. Temporary schemas/API/factory/callback/cache-state bridges remain partial.
+
+Main audio controller continuation: AudioWorkspaceOperations with MixerControls/Lifecycle/Documents/Layout/Inspector/EffectsMixer/Frame/Library/GeneratorInspector/Patterns now implements shared controls/theme/guarded editing, startup/sync/selection, composition resolving/opening/tab state, transport, full layout, actor/track/project/instrument inspectors, effect and mixer UI, per-frame clocks/meters, library/generator previews and drops, note pattern workflow/rendering and note tools. Builds passed with 0 warnings/errors through Patterns. Fixed a playback Node-versus-RefCounted cast by inspection before runtime; native library preset inheritance now matches GDScript compatibility and nullability warning corrected. PresetTags migration build pending. No new runtime/behavior tests since the earlier successful native_audio_pattern_history_fixed regression, as instructed to prioritize implementation. Still partial: substantial main-controller workflows and all temporary typed/API/factory/callback bridges remain.
+
+Main audio controller continuation: PresetTags/AutomationControls/AutomationEditors/SavingRender/FilePickers/MediaActions/Presets, LinkedDrums, ComposerDialog, Midi, ModulationDialogs, ArrangementDialogs, AnalysisActions/AnalysisPanel, RecordingState, Takes and JobResults compiled successfully. Latest JobResults build 0 warnings/errors. Corrected waveform selection conversion to Vector2i, nullable stream/weak-ref conversions, and native workspace notification collision. Necessary parser check exposed identical notification collisions in automation/timeline canvases; renamed all three audio canvas native entry points (including pattern), build pending. No new behavioral tests, recordings, source exports, application exports or remote calls. Main controller and global migration remain partial.
+
+Native controller continuation: recovery/portable review, relink/media repair, EditActions/Commands, WaveEdits, SilenceReview/DialogueReview, SmallActions and RecordingStartup phase polling now native; builds passed zero warnings/errors through startup. Fixed enum MaskCtrl/MaskShift and typed chord pitch compiler errors before clean builds. Native audio controller parser check passed native_audio_controller_startup_check.log after all audio notification collisions renamed. New native PixelSelectionAlphaOperations, PixelEdgeFieldKernel/Operations and PixelEdgeMagnetOperations registered; full C# builds passed zero warnings/errors. Edge kernel retains arrays to avoid per-lookup packed-array copies. New image behavior untested/unbenchmarked, no new regression reruns under implementation-first steering. All GD typed/API/factory/await/global/Callable adapters remain partial; entire migration and feature queue are NOT complete. No application export/package, recording, external provider request or media export was executed.
+
+Image continuation: native LiveEraser, SoftenBrush, OperationPreview, ProceduralTexture/Recipe, Healing, TextureSynthesis, PatternFill, MaterialResource copies, WarpKernel/Brush and WarpPicker built successfully with zero warnings/errors. Parser checks passed for selection engine/procedural texture/operation preview before segmenter+worker migration, and for warp brush/picker/texture synthesis after warp migration. PixelObjectSegmenter kernel+selection built 0 warnings/errors; subsequent allocation-free neighbor traversal and native PixelSelectionEngine worker orchestration build pending. No behavioral regression reruns or speed measurements; no runtime acceptance claimed. Serialized/type/API/callback/await bridges remain partial and must be removed before declaring migration complete.
+
+Further image implementation: object selector allocation-free neighbor traversal plus native worker orchestration built 0 warnings/errors after GodotThread binding-name correction. Both selector/engine parser checks passed. Native ImageLayerOperations and ImageDocumentOperations built 0 warnings/errors; document parser passed. Native ImageValueOperations CPU/GLSL/inverse solver built clean after local-name/field initialization corrections; inspected and repaired accidental GLSL pow token translation. Inverse search compiles operands once rather than rebuilding dictionaries per trial. Native selection-fill GPU setup/ownership/undo implementation now added; build pending, only three-frame waits and existing warp Callable adapter remain in GD. No GPU/behavioral acceptance or benchmark claimed. All schema/API/callback/await/factory bridges remain partial.
+
+Continuation checkpoint: native inline text/repair and warp UI, stroke correction state/kernel, immutable selection projection mapping, warp interaction and overlays, background repair processing/compositing, shared natural material shader specialization, and live texture-material rendering implemented. Temporary GDScript schemas/API/async/Callable bridges remain, so these are partial migrations, not completion claims. Warp interaction build: 0 warnings/errors. Repair build: 0 warnings/errors. Material renderer build passed with one nullable warning subsequently fixed (rebuild pending). Full image_workspace check-only passed in native_image_warp_interaction_check.log and native_image_repair_material_check.log. Behavioral regression and visual/GPU checks deferred under latest testing direction; no exports performed.
+
+Further native implementation: shared natural-material catalog/preset persistence/spatial adapter/map setup and cache; repair interaction input/settings/transactions/source/mask/material preview/generation/overlay; effects and adjustments stack/layout/controls/preview/shortcuts. All build with 0 warnings/errors in latest completed material-engine build; full image workspace parser passed native_image_repair_interaction_check.log, native_image_stack_editor_check.log, native_image_material_engine_check.log. Material browser native layout/controls/catalog/history/preview/lifecycle now implemented, build pending. Behavior/GPU acceptance remains deferred and unverified. Static/typed/API/async/Callable resource bridges still partial. No export/package performed.
+
+Canvas continuation: material browser build 0 warnings/errors and native_image_material_browser_check.log parser passed. Native selection preview/projective solver/bake, painting/alpha/flood, object controls, snapping, geometry/navigation/handles/hit, lifecycle/drawing, shape tools, inverse-color sampling, brush/native compositing/fill, corrected-stroke transactions added. Latest completed C# build passed 0 warnings/errors. Direct canvas parser initially failed due mixed tab/space indentation; normalized remaining file indentation, native_image_canvas_direct_fixed_check.log passed. Root image_workspace parser needs recheck after latest canvas changes. Native material stamp/scatter coordinate kernel and direct canvas calls added, build pending. No behavioral regression, visual/GPU or performance verification performed under latest testing direction. Temporary schemas/API/async/Callable bridges remain partial, migration and entire feature queue not complete.
+
+Canvas completion of substantive behavior: input, transforms, paint startup/source guard, material flood, cancellation, final transaction/bake preparation/completion and file-drop logic now native; GD is typed state/API, two async waits, and Callable mapping adapters. Stamp/scatter native kernel and ActorTextSettingsOperations built 0 warnings/errors. ImageLayerDrawingOperations now owns all image/shape/text/path/legacy gradient/noise drawing; full image workspace check-only passed native_image_canvas_complete_drawing_check.log. This remains partial migration until schemas, callers and bridges are removed. New ImageRendererOperations source signatures/animation/dependency propagation/pass scheduling/settling added, current build pending. Behavioral/visual/GPU/performance verification deferred; no exports performed.
+
+Renderer substantive port complete (bridges still partial): graph/stages/material parameters/curves/warp/values/clipping/live regions, capture/bake/flatten prep-completion, cache/dependency/preview lifecycle; 0 warning/error build and native_image_renderer_complete_check.log full image workspace parser passed. Added region/visibility stale-bake rejection, unverified behavior. Main ImageWorkspaceOperations state/history/actions/selection mapping, startup/process, document open/UI restore, theme/icons/button/menu, saved masks and layer-list selection now implemented. Immutable mapping fixes stale native mapping integration when main workspace used old GD closures. Main state build 0 warnings/errors and native_image_workspace_state_check.log passed. Subsequent saved-mask/layer-list build 0 warnings/errors; latest mask controls/context menu/RGBA8 selection byte-snapshot optimization build pending. Large main controller UI/presets/tools/file actions and all schema/API/async/Callable bridges remain. No behavioral/GPU/performance acceptance or exports performed.
+
+Main image controller continuation: native common property controls/inspector assembly, tool switching and layer creation, paint preset persistence/load/save/update/delete/reorder/thumbnail/strip, compact toolbar controls and value synchronization, text/noise defaults and polygon save/edit setup, effect fields/per-channel curves, effect creation/order and bake preparation/completion implemented. Builds passed 0 warnings/errors through effect actions; full image workspace parser passed native_image_workspace_presets_check.log and native_image_workspace_effect_actions_check.log. New native layer-selection capture and mask inversion initially failed compilation due missing projection extent; corrected projection call and nullable mask assignment, rebuild pending alongside native image noise configuration helpers. Remaining specialized inspector UI/main layout/context/file/edit/command logic and schema/API/await/factory/Callable bridges still partial. No current behavioral/visual/GPU/performance acceptance or application exports.
+
+Further image controller implementation: main workspace layout and overlay/sidebar tree wiring, native selection capture/mask inversion, text/noise specialized inspectors, font chooser/inline text controller, layer delete/copy/paste/group/parent/unparent/reorder, descendant/ancestor selection filtering, cropped-layer creation and polygon scanline spans implemented. Shared ActorImageGeneratorOperations owns image resolution, cached noise generation/normal maps/textures; GD is constants/static-cache/API facade. Corrected cached-noise ownership (do not dispose shared cache image). Builds passed 0 warnings/errors through layer-editing; layout parser passed native_image_workspace_layout_check.log. New image-source inspector and threshold controls build pending. Temporary typed state/API/factory/await/Callable bridges and remaining controller functions still partial; no runtime/visual/performance acceptance claimed and no application exports.
+
+Controller continuation: alignment/distribution/reflection/fill-parent/aspect restoration/paint restoration, pixel-source capture phases and selection copy/delete/extract, smart-selection pixel classification, styles, merge/rasterize/crop render phases, image resize/import/replacement, save snapshot/packing/worker/completion, file output helpers, live-material controls/history/bake phases and shader-effect uniform controls native. Soft mask conversion preserves fractional coverage and legacy invert-selection now commits through history; stale pixel/render results guarded. These behavioral changes are unverified. C# builds passed 0 warnings/errors through shader-effect controls; full parser passed native_image_workspace_layer_rendering_check.log. Native brush/eraser/fill context controls added, build pending. GD still owns typed/schema/API, file-picker and render/worker frame waits, part of main context and other workflow/command/UI functions. Full migration/queue remain incomplete; no behavioral/GPU/performance tests or application exports executed.
+
+Main controller context and command continuation: brush/eraser/fill and pixel-selection toolbar builders, complete context routing/transform controls, command registry/palette/recent/macro dispatch and keyboard shortcuts ported. Builds passed 0 warnings/errors through command/input; full parser passed native_image_workspace_context_check.log through context. Added native current-selection sampling/refinement/mask conversion dialogs and corrected mask channel consistency (renderer reads red, so inversion/import now read red) plus yaw-aware mask sampling; current build pending, behaviors unverified. Remaining dialogs/workflow/variants/assets/macros/export helpers/effects dock and typed/API/await/factory/Callable bridges still partial. No application export or current runtime/visual/GPU/performance verification executed.
+
+Native main image controller implementation now covers remaining workflow/asset/variant/selection/macros/shortcuts/shape operations/export-preset controls, compatibility adjustment/effects controls, and file-picker result handling; GD main controller retains schemas/API, callback/factory, static-service and frame/picker await drivers. New ActorDataOperations owns actor/object/reference copies, IDs, property access/preview, resolver validation; ActorAnimationTrackOperations owns keyframe interpolation/state transitions/text/components/bone rotations and key/track copies; ActorAnimationOperations owns nested/private object overrides and lookup; ActorPropertyOperations owns validation/defaults/aspect ratios. These built with zero warnings/errors; full image workspace/parser dependency check passed native_image_controller_actor_core_check.log. ActorDefinitionOperations registration/creation/defaults/runtime validation/object definitions now added; build pending. All original typed resource identities/bridges remain partial migration, never complete. Main-controller functional changes (soft masks/channel/yaw/history/variant redo/stale async results) remain unverified. No behavioral/GPU/performance checks or application export/package performed under implementation-first steering.
+
+Actor definitions/registry built clean and native_actor_definitions_check.log parser passed. Native clip timing/runtime evaluation/inspector state built 0 warnings/errors. Native multi-actor property batching initially hit unsupported C# Callable.Bind and typed-array conversion errors; replaced with method-backed ActorPropertyBatchRestoreAction (history-owned snapshots, weak model) and explicit Variant array conversion; build then passed 0 warnings/errors. Batch helper targets actual model rather than inspector lifetime; runtime base service entry renamed to avoid subclass helper collisions. Native ActorTimelineOperations now owns lookup/navigation/focus/selection/visibility domains/relative obstruction/hidden boxes/layer counts/undo routing; build pending. Other timeline history/media/animation/editing logic remains GD pending port. Schema/API/typed-array/callback/await bridges all remain partial. Current behavior and performance unverified; no application export.
+
+Actor timeline substantive port now covers history actions, media snapshots/video ownership, sections, animation keys/components/object previews, placement, parenting/world transforms, linked trimming, property edits, move/split/delete/paste, model and scene instantiation/remapping. ActorTimelineCreation/Clipboard built 0 warnings/errors; native_actor_timeline_creation_clipboard_check.log parser passed. Video probe/audio extraction/frame queue/process cleanup implemented by ActorVideoOperations; initial ICollection indexing build errors corrected; clean build followed. ActorTransformationStateOperations and history action implement weak asset cache/state selection/morph sampling; ActorSkeletonPoseOperations and history action implement pose previews/keys/undo. Latest build passed 0 warnings/errors after fixing weak-reference nullability. Model import validation corrected to PackedStringArray. Exported schemas, API/typed-array/factory/static manager and callable/await bridges still partial. Current behavior/GPU/performance acceptance deferred and unverified; no application exports/packages executed.
+
+Further actor/core ports: file import/environment conversion/catalog, drag resource slots, font and dimensionality UI, shader TIME token scanner, media formats/write/decode and preview transport/process cleanup now native; all built with 0 warnings/errors after fixing Dictionary versus Variant uniform/property-list access. Full image workspace and skeleton pose check-only passed native_image_actor_resource_ui_check.log / native_actor_skeleton_pose_check.log. Project asset picker UI/filtering/clipboard/thumbnail/selection native plus resumable cancellable C# file/folder scan; Node/PopupPanel argument mismatch corrected and build 0 warnings/errors; native_actor_project_picker_check.log and native_actor_media_preview_check.log passed. Save As browser validation/file/history result logic native, build pending; layout still GD. Picker scan now budgets folder processing and skips links; Save As tree skips links to avoid cyclic traversal. Current visual/runtime/behavior/performance acceptance unverified. Typed schemas/API/factory/Callable/async bridges remain partial. No application export/package executed.
+
+Save As browser complete substantive layout/clipboard/validation/file logic port built 0 warnings/errors; native_actor_save_dialog_check.log parser passed. ActorAudioSystemOperations now implements player buses/effects/scrub/seek/loop/pitch/fades and waveform decode/worker; clean build. NativeAudioTakeWriter implements bounded managed PCM queue/file worker, header checkpoints, limits and reusable start/finish; atomic CreateNew preserves existing files. Initial System/Godot Environment ambiguity corrected. ActorAudioRecorderOperations/Lifecycle implement config/preferences, capture setup/start/stop preparation/completion, PCM mix/mono/peaks/drain/errors/cleanup. GD now retains state, API and async waits. Initial generic Variant analyzer diagnostic corrected by using AsGodotObject/as rather than generic Variant.As<T>; current build pending. No writer/capture runtime or stress tests executed; no application export/package. All facades/typed schemas/API/async/callback bridges remain partial.
+
+Audio recorder/take writer/settings/system-loopback lifecycle ports built 0 warnings/errors after namespace/generic Variant fixes; native_actor_audio_capture_check.log and native_actor_audio_system_check.log check-only passed. Screen recorder target/bounds/start/stop/mux/cleanup native, build clean and native_actor_screen_recorder_check.log passed (inline GD teardown header corrected). Native basic catalog registration added, nullable optional-resource args corrected; catalog + 2D/camera viewport overlay built clean. ActorUIGizmoOperations/Input now cover geometry, camera viewport/lens/shared-world/2D mirrors, draw/preview placement, drag/input/selection/batch history; latest input build pending. New managed writer behavior, capture/FFmpeg, visual/GPU/input and performance verification remain deferred/unverified. No microphone/system/screen recording or media-export runs and no application export/package performed. Schema/API/factory/async/Callable bridges remain partial.
+
+Viewport gizmo substantive port now includes full 2D/camera, spatial 3D and skeleton overlays/input/gestures/grouped history. Fixed helper objects incorrectly assumed Node (rig/tool helpers are RefCounted), zero-bone clamp and disabled-state sync ordering. Build clean and native_actor_viewport_gizmos_check.log / native_actor_catalog_check.log parser passed. Native physics point-pin overlay/edit and authored/sampled settings/nested edits/remapping/history implemented and built 0 warnings/errors. PhysicsSettingsCanonical/Fingerprint now added; build pending. Point pin mode gate preserves original short-circuit before expensive authored settings. Current runtime/visual/input/physics/cache/performance behavior unverified and deferred; all schema/API/factory/async/Callable bridges partial, no export/package or recording executions.
+
+Physics settings canonical/fingerprint and destruction definition/history built clean; explicit fog dependency Array[String] read corrected. DestructionGeometryOperations/Evaluation port covers native topology kernels, solid islands, split/subtract/fracture/carve/bend/dent/twist/stretch/path/protected-region handling and existing bounds; clean build. DestructionAuthoringOperations/Editing/Simulation/history covers full setup/operation/fragment guidance/keys/overrides workflow, clean build. native_physics_settings_check.log and native_destruction_authoring_geometry_check.log parser passed. Destruction viewport controls and structural definition/edit/remap/history now native and each built 0 warnings/errors. Native structural gizmo overlay/physical endpoints/load/joint gestures added, latest build pending. GD schema/state/constants/typed-array/callback/await/factory bridges remain partial; geometry private packed-array compression helper retained for in-place API compatibility. No current runtime/geometry/physics/history/performance acceptance tests executed; no exports/recordings.
+
+Timeline physics controller continuation: native operations/state/cache, transform and bone/attachment resolution, capture/setup, activation-time skinning, seek evaluation, central simulation step, rigid collision impulse/friction/joint limits, particle constraints/pins and skeletal motion, bake interpolation with fluid/powder births, render application and undoable freeze, single/group baking validation/snapshot/cache reuse/final signature/history implemented. SortCustom unavailable in C# corrected through engine Expression with a native comparator. All latest native physics ports built 0 warnings/errors; Godot check-only native_timeline_physics_core_check.log and native_timeline_physics_bake_check.log passed, with logs inspected. GD still holds state/signals/typed API and frame/progress Callable drivers; geometry/collision/fluid/powder/destruction/structural dependencies remain partial/pending. Runtime physics/baking/history/visual/performance acceptance unverified and deferred. No app exports/packages or recording/media export executions.
+
+Physics geometry/deformation/rope and offline collision-world ports built clean; native_physics_geometry_collision_check.log parser passed. Shared VolumeSamplerOperations adds closed manifold validation/containment/deterministic bounded fill, clean build. FluidBridgeOperations/Simulation built clean and native_fluid_bridge_check.log parser passed before subsequent solver ports. Native FluidSettings/history, FluidSolverOperations/Step (CPU density projection and GPU orchestration/contact handling), FluidComputeOperations (buffer/shader/dispatch/readback lifecycle) now built 0 warnings/errors. Direct native controller/collision calls replace intermediate GD calls; local baked method/name collision corrected. FluidVolumeOperations added, build pending. All schemas/state/API/incoming Callable adapters remain partial; current runtime simulation/geometry/history/GPU/performance acceptance is unverified and deferred. No exports/packages or recording runs.
+
+Fluid solver/compute/volume complete substantive native ports built clean; native_fluid_solver_compute_check.log parser passed. Native PowderSettings/history, PowderSourceOperations/Grains and PowderBridgeOperations/Simulation now build clean; native_powder_source_bridge_check.log parser passed before latest solver replacement. Source bridge batches packed grain arrays through managed GrainBuffer instead of per-grain reconstruction. Reviewed/corrected an initial settings port that overwrote simple-mode coefficients. PowderSolverOperations/Step now implements native managed XPBD grain/boundary contacts, friction/cohesive bonds/restitution/sleep/support/compaction/grid/budget/finite recovery; Vector3I constructor fixed, clean build; latest parser pending. GD state/API/constant/incoming Callable adapters and transport/fluid-coupling dependencies remain. Runtime simulations/history/render/GPU/performance acceptance remains deferred and unverified; no app/media exports/packages or recording runs.
+
+PowderSolver native build and native_powder_solver_check.log parser passed. Native PowderFluidOperations and PowderTransportOperations/Deposition implement coupling/reprojection and deposition/erosion/reactivation/inventory; built clean, native_powder_transport_fluid_check.log parser passed. Native grain geometry/material recipes/apply/link/history/runtime/buffers/source overlay/actor-definition/material UI and fluid surface/runtime now each build clean; latest dependency parser pending. PhysicsMeshSnapshotOperations capture/save/error UI built clean; follow-up handles missing runtime safely and avoids reading cumulative vertex arrays solely to count them, current rebuild pending. C# material numeric literal issue corrected. Bake validation now guards nonfinite/overflow intervals before integer count casts. Declarative constant rows are retained GD schemas, mutable hints duplicated before modifying. All typed/API/schema/base-super/static-cache/await/incoming Callable bridges remain partial. Runtime visuals/GPU/simulation/history/serialization/performance acceptance remains deferred and unverified; no exports/packages or recordings.
+
+Further physics/controller migration: full native physics inspector controls/layout/targets/bone grouping/search/overrides/events/pins/actions and undo/drag-preview handling built clean; native_physics_inspector_powder_material_check.log parser passed. Fluid definition and refined snapshot capture built clean. DestructionWorkflowOperations/Bake/Fragments, PhysicsBakeCacheOperations, BakeEditingOperations and DestructionMaterialOperations now built clean. Bake cache includes resource/record interning, bounded Zstd chunks/manifests, exact owned-file cleanup/integrity/seek; no cache/bake file executions performed. Native DestructionBridgeOperations/Playback/Step now covers complete substantive preparation/cache/mass/colliders/render/interior material/interpolation/damage/direct impulses/fracture/debris dispatch; clean build, latest parser pending. Material raw Variant type checks corrected to preserve original non-object guards. GD schemas/state/API/static-cache/base-super/await/original Callable adapters remain partial. Structural/debris/fog modules and other production scripts still require migration; full feature queue remains unaudited. Current simulation/history/persistence/UI/GPU/performance behavior remains unverified and deferred. No app/media exports or recordings.
+
+StructureBridgeOperations/Failure/Step, DebrisBridgeOperations/Step, DestructionVfxOperations and DebrisDefinitionOperations now port substantive constraints/failure/islands, full debris integration/fluid coupling/secondary breakup, bounded analytic VFX and editable fragment copy. FogGroundSamplerOperations ports bounded collision height caching/sampling/material sync. Build clean (0 warnings/errors); native_structure_debris_fog_ground_check.log parser passed and inspected. Ground cache/schema/state/typed API facades remain partial. FogMotionRenderOperations implemented; current build pending. Runtime behavior, history, persistence, GPU and performance remain unverified; entire production migration and queued features are incomplete. No application exports/packages or recordings.
+
+FogTransportOperations/Step now implement native conservative density flux, pressure projection, advection/forces/obstacles/injection/diffusion/dissipation; FogMotionDefinitionOperations, FogMotionRenderOperations and FogMeshOperations implement substantive schemas/dependencies/remapping, renderer upload/motion and closed mesh occupancy cache. FogFieldOperations sampling/painting port built clean; native_fog_transport_field_check.log parser passed and inspected. Corrected original animatable flags. Latest sample-allocation improvement and FogCloudFieldOperations schema/noise/lobes/density port build pending. Field texture/definition/CPU preparation and motion bridge still require migration. All remaining facades tracked partial; runtime acceptance deferred/unverified. No exports/packages/recordings.
+
+FogFieldOperations/Textures/Definition and FogCloudFieldOperations now contain substantive field definitions/noise/cache/volume generation/masks/painting and cloud formation generation. FogAppearanceOperations, FogMotionBridgeOperations/Step and FogActorOperations/Layers port appearance/presets, complete fog transport timeline orchestration/playback/interpolation, and actor material/layer uniforms. Spread injection batched in FogTransportInjection to avoid per-cell packed-grid copies. Fixed seed conversion and prepared shape sampling contrast behavior; original keyframe flags retained. Clean build 0 warnings/errors; native_fog_bridge_resources_check.log and native_fog_actor_check.log parser checks passed and logs inspected. GD typed/schema/static-cache interfaces remain partial. Fog environment, lighting/shadow/UI and other production modules still need migration. Runtime/GPU/physics/history/persistence/performance acceptance remains deferred/unverified; no exports/packages or recordings.
+
+FogEnvironmentOperations, FogLightingOperations, FogCloudShadowOperations, FogCloudPresetsOperations and FogControlOperations now implement native world/camera overlays/restoration/signatures/light tracking/transient shadow refresh, light/shadow controls, bounded cloud decal projection, atmosphere recipes and inspector UI/reordering. History is method-backed FogPropertyHistoryAction, weak model/strong resources. Packed shadow density is read once per projection. Build 0 warnings/errors; native_fog_environment_controls_check.log parser passed and inspected. GD state/schema/lifecycle/dirty callbacks remain partial; fog render-quality UI and painters/gizmos remain production GD. Runtime acceptance unverified, no exports/packages/recordings.
+
+FogPainterOperations, FogPaintGizmoOperations and FogRenderSettingsOperations/HistoryAction now port slice painter and viewport paint projection/input/symmetry/cancel/history, plus project rendering quality UI/preview/persistence and method-backed history. Build clean 0 warnings/errors; native_fog_painters_quality_check.log actor_ui_gizmo dependency parser passed and inspected. Fog production logic now native with temporary typed/state/schema/lifecycle/dirty callbacks retained; migration is not complete while these and other production GD remain. Behavioral acceptance, UI/GPU/history/persistence/performance unverified; no exports/packages/recordings.
+
+Native DestructionControlOperations/Layout/MaterialControl and StructureControlOperations/Layout now port complete authoring panels/keyed drags/cancel/history/status. Incoming link select API argument count corrected. PointActorOperations/VideoActorOperations, UiActorOperations/Material/Visual and TransformImageActorOperations port substantive point/video/2D/transformation-image lifecycle/evaluation/materials/shapes/model binding. Build clean 0 warnings/errors; native_physics_controls_ui_actors_check.log and native_transform_image_actor_check.log parser passes inspected. Remaining typed/base-super/state/constant facades remain partial; BasicActor and other production scripts still require migration, queue feature acceptance unaudited. Runtime/history/persistence/UI/GPU/performance unverified; no exports/packages/recordings.
+
+BasicActorOperations and Primitives/Evaluation/Resources/Materials/Environment/Models port substantive shared 3D actor lifecycle/transforms/camera guides/catalog evaluation/shape/light/decal/particles, standard/natural/shader material/texture resolution/time, camera/fog shader adaptation, environment setup/restore, model/document/GLTF loading/skin/growth/rig binding. Two initially extracted nested Vector3 schema defaults corrected before parser. Direct native calls replace already ported GD dispatch. Fog spread RNG hash seed now widens unsigned engine hash bits. Builds 0 warnings/errors; native_basic_actor_resources_models_check.log and native_basic_actor_inspector_check.log parser passes inspected. Temporary state/schema/typed API/base-super/exit cleanup facades remain; production migration and queued-feature acceptance incomplete. Runtime visuals/GPU/simulation/history/persistence/performance unverified; no exports/packages/recordings.
+
+ActorSceneExportOperations/Lifecycle/Encoding now implement substantive scene-render controller behavior, camera/readiness/state restore, encoding, bounded PCM fallback writing and bounded stderr handling. Input frame arithmetic guarded, actor.title lookup corrected to display_name. GD frame/await/original progress Callable driver remains; no exports executed. TimelineCanvasOperations/Assets/Drag/Input/Media/Drawing port all substantive timeline canvas behavior, using native timeline model operations and typed array mutation; lifecycle notification routing avoids needless native lookups and unrepresentable ruler increments stop safely. Builds clean 0 warnings/errors; native_scene_render_controller_check.log and native_timeline_canvas_check.log parser passes inspected. UI/rendering/media/history/persistence/performance unverified, original facade removal and entire outstanding feature queue incomplete. No app/media exports/packages/recordings.
+
+KeyframeCanvasOperations/Drawing/Input port substantive keyframe canvas behavior, preserving selected-key array metadata/track getter aliasing while caching per-draw context. Missing deleted clip is handled without dereferencing null. Build clean 0 warnings/errors; native_keyframe_canvas_check.log parser passed. Native scene render pipeline GD await driver also explicitly rechecked after integration: native_scene_render_pipeline_check.log passed; earlier helper-only parser log was not evidence for later driver changes. State/signal/API/await/Callable facades remain partial. Runtime/UI/media/history/persistence/performance unverified; no exports/packages/recordings.
+
+ValueCurveOperations/Input and KeyframeEditorOperations/Layout/Curves/Details port substantive curve templates, geometry/drawing, tangent/point gestures, complete keyframe editor layout, multi-key history/value controls and live popup synchronization. History snapshots are detached before clearing editor state; model popup callbacks disconnect on exit. Clean build (0 warnings/errors); native_value_curve_check.log and native_keyframe_editor_check.log parser passes inspected. Temporary typed state/signals/API/incoming Callable facades remain partial. Runtime/UI/history/persistence/performance acceptance unverified; production migration and feature queue incomplete. No exports/packages/recordings.
+
+ActorInspectorOperations and Controls/Refresh/Keyframes/Properties/Special/Visibility/RigFont/References/ObjectValues/ObjectSpecial/ShaderUniforms port substantive inspector navigation/scroll restoration, main and nested fields, live text/color/number/vector gestures and batch history, property diamonds, bone/font controls, physics/fog UI and shader defaults/grouping/uniform controls. Native resource callback dispatch preserves typed GD arrays; resource depth restored in finally. Missing definition guarded after nullable warning; latest build 0 warnings/errors. native_actor_inspector_navigation_check.log, native_actor_inspector_fields_check.log and native_actor_inspector_objects_uniforms_check.log parser passes inspected. File-object editing/file picker/await/Callable adapters and temporary schemas/state/API remain partial. Runtime/UI/history/serialization/performance unverified; no exports/packages/recordings.
+
+Inspector continuation now includes full substantive file-backed field/history controls and uniform edits, media/source/resource validation/embedding/saving, transformation-state controls, nested texture slots/noise expansion, original-Callable adapters, shader binding resolution across scene restores, and natural-material preview/commit histories. ActorNaturalMaterialEditorOperations ports complete embedded browser layout/sync/debounce/preview/commit/input/lifecycle. File uniform edits now use method-backed undo actions; weak model/editor targets avoid history ownership cycles. TimelineEditorOperations/Recording/Actions/SceneState/Refresh port runtime parenting/evaluation, physics/remote/particle/camera flow, recording controller with GD await drivers, actor clipboard/parent/delete actions, scene and camera/UI state persistence, duration history and scroll/inspector refresh. Invalid AcceptDialog popup_hide source usage replaced with Confirmed/Canceled. Deprecated SplitOffset replaced with SplitOffsets. Latest builds clean 0 warnings/errors; native_actor_inspector_bindings_save_check.log, native_actor_inspector_natural_editor_check.log, native_timeline_editor_runtime_state_check.log parser passes inspected. Timeline setup/toolbar/context/input/creation/UI save remain pending. Temporary typed state/API/Callable/await schemas remain partial. Current runtime/UI/undo/persistence/recording/GPU/performance acceptance deferred/unverified. No app/media exports/packages/recording runs.
+
+Timeline full toolbar/views/input/context menus/actor creation/drop and ActorPicker now substantive native implementations. SceneTabs full lifecycle/open/save/close, all workspace dispatch, scene/audio association and undoable linked audio replacement ported. Builds clean; native_timeline_editor_full_check.log and native_scene_tabs_audio_menu_check.log inspected. FileOperationsNative/Thumbnails and ProjectFileBrowserOperations port shared filesystem and browser behavior, with copy-self recursion guard and FileDialogSelection handler cleanup. Build clean; native_project_file_browser_check.log parser inspected. Temporary typed state/API/Callable/await/schema bridges remain partial; current runtime/UI/history/persistence/media/performance acceptance unverified. No application export/package, recording or media export executed.
+
+ShaderCodeEditorOperations/Editing/Layout and ActorSceneTreeOperations/Input port complete substantive compact shader editing/diagnostics/completion/save/focus and scene hierarchy/selection/parenting/shortcuts. SceneExportButtonOperations/Layout port all settings UI/destination/duration/confirmation/controller preparation/result behavior; only await drivers remain. Latest C# build clean 0 warnings/errors. native_shader_code_editor_check.log, native_actor_scene_tree_check.log, native_scene_export_panel_check.log inspected. ShaderDocumentationOperations port added and built clean; parser being checked. Temporary state/API/schema/Callable/await facades partial. Current runtime/UI/history/persistence/rendering acceptance unverified; no exports/packages/recordings.
+
+Shader documentation native parser passed (native_shader_documentation_check.log). ClipboardStoreOperations/Editing/history, ClipboardSnapshotOperations/Cloning, SuperClipboardOperations and ClipboardWindowOperations/Actions/Layout now port complete substantive clipboard persistence/capture/service/browser behavior. Build clean 0 warnings/errors; native_clipboard_store_snapshot_service_check.log and native_clipboard_window_check.log inspected. LocalProjectFilesystemOperations and ProjectFileSelectionOperations built clean, parser native_local_project_filesystem_check.log and native_project_file_selection_check.log inspected. Copy/read/bounds safety and no-project guards preserved/improved; scan avoids duplicate rebuild; shift anchor and multi-deselect source bugs corrected. Project file context UI and hold-mover ports added, build pending. Typed state/schema/API/original Callable/frame-wait bridges remain partial. Runtime/UI/history/persistence/recording/media/performance acceptance unverified. No exports/packages/recordings.
+
+Further native ports: ProjectFileContext/Mover/Actions/History; SceneMenu; DragNumber/LiveColorPicker; FocusableInput/Freecam/ViewportFocusableInput/ProjectFileInput; RecordingOptions; ThumbnailRenderer; SharedControlOperations [Tool]; NaturalEditApi and AudioProviderContract. Build clean 0 warnings/errors after all helper ports. Parser logs native_project_file_context_check, native_project_file_mover_check, native_project_file_actions_check, native_scene_menu_check, native_drag_number_check, native_live_color_picker_check, native_viewport_focus_input_check, native_shared_expandable_controls_check, native_thumbnail_renderer_check, native_recording_options_check, native_dialog_params_check inspected. Native ImageWarpShader now replaces shader constant caller; ProjectManagerSavedProjects native resource + legacy textual resource mapping added, obsolete GD data files removed; latest build pending. Temporary schemas/state/API/Callable/await/editor tool fallbacks remain partial, not a completed migration. Current UI/history/persistence/input/media/GPU/performance acceptance unverified; no application exports/packages/recordings or acceptance launches.
+
+Native resource migration: ProjectManagerSavedProjects, DialogParamChooserMapping, ActorSection, ActorInspectorState, ActorClip, ActorKeyframe, ActorAnimationTrack, ActorData and ActorObjectData now own exported schemas and API in C#. Old GD sources/UID sidecars retired and active factories/scene ext_resources updated. ImageWarpShader replaces constant-only GD source; unused empty rename_project_panel stub retired. ActorObjectData build passes with 0 warnings/errors; native_actor_data_import.log has no script errors, but Windows root certificate-store diagnostic remains. Static overloaded C# factories require explicit loaded script .call from remaining GD callers; test assertions preserved while factory syntax/type annotations adapted, targeted check-only parser logs pass. These are parser checks, not test execution. LegacyResourceLoader rewrites textual resource paths and registers original saved script UID aliases for native classes, preserving current valid-UID binary dependency resolution; binary assets without valid legacy UIDs and runtime save/load/history remain unverified. Scene-state resource migration is in progress; full migration/queued feature acceptance remains incomplete. No application export/package, recording or acceptance launch executed.
+
+Further retired production schemas: ActorSceneData, ActorObjectReference, ActorProperty, ActorObjectDefinition and Project. All active known constructors and bundled property/object-definition ext_resources integrated. Native incoming asset resolvers preserve Callable Variants and use engine Expression for invocation; no GD class adapter remains for these resources. Builds pass 0 warnings/errors. native_scene_reference_import.log and native_property_project_import.log contain no script errors; Windows root certificate-store warning remains. native_object_reference_parser.log, native_scene_state_parser.log, native_property_factory_parser.log, native_project_factory_parser.log pass, parser checks only. Image texture recipe/pattern schemas now native and build clean; metadata import pending. Original fixture assertions preserved while constructor/factory syntax follows native APIs. Runtime callbacks/serialization/UI/history/acceptance still unverified. Migration and entire feature queue remain incomplete; no exports/packages/recordings/acceptance launches executed.
+
+Image resources retired: image_texture_recipe/pattern_preset, texture_material/live_paint_region/live_material_template, image_warp_data/image_layer/image_document. Native classes preserve exported schemas, source/coverage/mapping textures, copied recipes/materials, per-resource warp kernel lifetime, selection-mask reference transforms, parent hierarchy and document snapshots. Active factories and image-workspace preloads updated. Builds clean 0 warnings/errors. native_image_recipe_import.log no script errors; native_image_document_import.log found stale image-layer preload, corrected; native_image_resources_workspace_parser.log and native_image_recipe_repair_parser.log pass afterward (parser checks only). Transformation state/key/component/document schemas and native factories now converted too, build clean after syntax/type fixes; metadata integration pending. Full native control/workspace migration and queued feature acceptance remain incomplete; runtime/GPU/morph/history/serialization unverified. No application exports/packages, media exports, recordings or acceptance launches.
+
+Transformation native resource import and workspace parser passed; actor fixture initially needed explicit custom-resource types, fixed without changing assertions (native_transform_actor_resource_parser2.log passes). StaticData now native with get/set API; all known native callers and GD fixtures adapted. Empty texture_material_library alias retired after caller rewrites; NaturalMaterialCatalog.cs now owns immutable category/structure tables, full native API, and updates shader specialization/UI/preset consumers. Build clean; native_project_state_material_catalog_import.log no script errors, Windows root certificate-store diagnostic remains. Physics bake-cache schema/API migration added; current build pending. These are compilation/parser/import checks, not executed tests or user-workflow acceptance. Full facade removal and queued requirements remain incomplete. No application export/package, recording, media export or acceptance launch performed.
+
+Native bake cache/model topology/rig binding resource classes added: KiwiPhysicsBakeCache, KiwiModelMesh, KiwiRigBinding. Exported schemas, native per-instance kernels, public overloads and all known construction callers integrated; original GD sources and UID sidecars retired, legacy mappings added. Latest builds clean 0 warnings/errors. native_physics_bake_schema_import.log has no script errors (certificate-store diagnostic remains). Model mesh/binding metadata import currently in progress; targeted consumers next. Runtime saved-resource round trips, history, simulation, deformation, GPU and performance acceptance remain unverified; no exports/packages/recordings/acceptance launches.
+
+Model component/document plus derived environment document schemas now native as one inheritance migration, preventing GD-to-C# inheritance gaps. Factories, base-class script recognition and native scene instantiation integrated. Climate schema/default/hints and native API converted; environment default climate no longer loads GD. Surface-growth data, styles and materials now native with presets and typed model-component links; original GD sources retired. Shared bootstrap growth shader/thumbnail service retained; dynamic SurfaceGrowthGeometry.NewResource now explicitly constructs native model meshes/components/growth data/materials. Builds and import logs native_model_environment_document_import, native_environment_climate_import, native_surface_growth_schema_import, native_growth_material_style_import have no script errors (certificate-store diagnostic remains). native_model_document_workspace_parser, native_environment_document_workspace_parser, native_model_document_scene_parser pass. Previous rig/material fixture inference errors fixed via annotations only; native_rig_binding_parser2 and native_material_catalog_parser2 pass. Actor definition/catalog/registry migration currently compiling. Runtime/UI/history/serialization/rendering/groom/physics/performance acceptance unverified; full migration and queued features incomplete; no application export/package/recording/media export/acceptance launch performed.
+
+ActorDefinition/ActorCatalog/ActorRegistry fully native schemas and API; bundled catalog/type resources rewritten to native scripts. Actor smoke fixture inference fixed with explicit ActorData/ActorRuntime annotations and cast; native_actor_definition_smoke_parser.log and native_actor_registry_timeline_parser.log pass. Climate/growth shared fixture failures fixed via type annotations without altering assertions; native_surface_growth_base_parser2, native_climate_schema_parser2, native_growth_material_schema_parser2, native_growth_resource_schema_parser2 pass. Removed retired-schema fallbacks from ActorDataOperations.New and SurfaceGrowthGeometry.NewResource. Cave/building/world authored sources now native with GD static factory call syntax and all known type checks/factories/preloads updated. Latest build clean 0 warnings/errors; metadata import in progress. Runtime/serialization/history/GPU/physics/performance acceptance remains unverified; full native migration and queued features incomplete; no exports/packages/recordings or acceptance launches.
+
+TimelineMaterialBinding replaces GD resource; weak target setup crosses via WeakRefs, raw engine Variant calls avoid manufacturing target wrappers, and temporary strong engine references are disposed. EngineVariantDispatch caches reentrant expressions per thread and disposes pools after native jobs join on shutdown. Existing setup API retained; production adapter uses setup_weak/active_for_id; old listener connections are detached on retarget. Native TIME preparation direct. Build and native_timeline_material_binding_import clean apart from certificate-store diagnostic; native_timeline_material_assets_parser passes. Shader-time fixture needed actor/runtime annotations only; final recheck pending. Known lifecycle consideration: native C# RefCounted binding itself follows CLR GC (Godot 4.6.1 csharp_script.cpp refcount_decremented); existing immediate weak-link release assertion preserved, unexecuted, and must receive deterministic native lifetime coverage during test migration. Do not claim no-cycle/lifetime acceptance yet. CuteCondition, ExpandableButtonControl, FileActionPanelControl, FileActionDialogueControl, DialogParamChooser/Request, ProjectFileDragButton and NodeOperations native conversions integrated with scenes/UID preloads. Per-request Dictionary completion signals preserve await API; next-frame context dismissal preserved. Raw Callable dispatch centralized and ActorObjectReference uses it; no incoming GD Callable cast. Controls built clean; drag/node build in progress, metadata/callers next. No behavioral tests/acceptance launches, recordings or exports/packages performed. Full queue/migration remains incomplete.
+
+Native input/control continuation: FocusableKeyInput with native viewport/filesystem descendants, FreecamController, DragNumber and LiveColorPickerButton retired their GD sources/UIDs with scene/factory integrations and legacy mappings. Build clean (0 warnings/errors); native_numeric_color_import and native_focus_camera_input_import have no script errors, Windows certificate-store diagnostic remains. native_number_warp_parser and native_number_repair_parser pass. Timeline fixture parser exposed native array-element inference; explicit ActorDefinition annotation added, assertions unchanged, recheck pending. RecordingOptionsButton + ScreenRecordingOptionsButton atomic inheritance conversion in progress; raw engine callback dispatch retained, source constructors in audio/scene workspaces updated. Runtime/UI/history/serialization acceptance and full migration/queue remain incomplete. No application export/package.
+
+Recording options native build/import clean of script errors (certificate-store diagnostic remains), active timeline/audio factories converted, placement fixture parser passes. Timeline fixture ActorDefinition annotation recheck passes. KiwiAudioTempoMap / KiwiAudioConductor replace all known native GD timing factories; C# build clean, native_audio_timing_import no script errors, native_audio_timing_playback_parser and native_audio_timing_midi_parser pass. KiwiAudioFilePreview native state/signals/API and AudioFilePreviewReader global native class replace duplicate GD reader implementation; async fixture assertions retained with native Reader reference and constant accessors. Build clean; metadata/parser pending. KiwiAudioJobs / AudioWorkToken / KiwiAudioSourceCache now native; incoming job Callable retained as raw Variant and invoked through native-owned worker callback. Cache and job cancellation/shutdown remain bounded and worker joins preserved; static GD cache calls expanded to original default argument values. Current cache/job build pending. Full migration and queued feature acceptance not complete; no behavioral tests, app exports/packages or recordings performed in this continuation.
+
+Native audio workers/cache build clean; native_audio_workers_import no script errors (certificate-store diagnostic), preview reader/document/workspace parser passes. ActorPicker + ActorNaturalMaterialEditor native state/signals/API, factory and incoming raw Callable dispatch integrated; full build clean after typed-array Variant conversion. Actor-picker fixture inference annotations corrected without changing assertions; native_actor_picker_parser2 passes; actor inspector parser passes. Scene-controls import also emitted Android editor-settings shutdown diagnostic; no export executed. Eleven GD helper adapters (model selection, road follow/building massing/stamp/seed, world override, terrain LOD/water/waterfall, image pattern fill/live eraser) replaced by native APIs and direct native factories. Build and native_helper_adapters_import clean of script errors (certificate-store diagnostic); model selection workspace, world seed, image repair parser passes. Pixel edge/segmentation/magnet/async selection engine schemas and production factories now native, build pending. No behavioral verification/acceptance claim; full production migration/test migration/feature queue remain unfinished.
+
+Pixel edge-field/object-segmenter/magnet/selection-engine and stroke-corrector schemas/API now native; direct worker/painting factories replace GD construction. Streaming corrector retains original packed Variant revision cache to avoid repeated packed-array copies on property reads. PixelSelectionAlpha/ImageSoftenBrush APIs native; incoming soften coverage callbacks use raw Variant engine dispatch with pooled Expression, removing per-pixel GD adapter. Builds clean; native_pixel_selection_import/native_brush_api_import/native_actor_core_api_import no script errors (certificate-store diagnostic remains). Pixel-smart/image-workspace, corrected worker, soften/alpha, corrected stroke and high-scale parser passes; fixture changes only explicit annotations/default arguments, assertions unchanged. ActorShaderTime/ActorImageGenerator/ActorSkeletonPose APIs native, noise caches moved from GD static state to shared native dictionaries, native consumers load CSharpScript rather than GDScript. Shader-time/rig fixtures required annotations, recheck pending. DestructionMaterialControl/DestructionControl/StructureControl/PowderMaterialControl native state/API integrated, including inspector dynamic construction switch and raw refresh Callable; current build pending. Full queue remains incomplete; these are compilation/parser checks only, no runtime acceptance, export/package, recording or media export performed.
+
+Physics inspector controls and resource drag slots built clean; dynamic inspector factories integrated. Destruction/structure persistent updater callbacks now method-backed and explicitly removed on control exit. ActorTextSettings/EditorAudioSettings native APIs and font cache integrated; shared font/noise caches cleared during bootstrap shutdown after worker joins. Necessary retired-reference scan found audio workspace attempted GD.Load<GDScript> on native RecordingOptionsButton; fixed by direct native construction. Text/audio build clean. ActorFontPicker/ActorDimensionDialog/ActorMediaPreview/ImageOperationPreview source and UID retired; native state/signals/scene-factory/legacy mappings integrated, current build pending. Dimension choice returns native awaitable Signal and completes teardown cancellation, preserving immediate 3d headless choice. Shader-time/rig inference fixture annotations recheck pending. Full migration and feature acceptance not complete; no runtime/behavior tests or exports/packages/recordings performed.
+
+ActorVideo native manager/cache/schema now replaces GD source; active native loads use CSharpScript, constant-map consumers use native extensions accessor, filesystem const retains exact literal extension list and explicit frame priority default. ActorAudioSystem/KiwiAudioPlayback native state/signals/API and timeline dynamic factory integrated. CLR field/accessor naming collisions fixed without renaming engine-facing document/output_bus properties; update_effects owner argument corrected; latest playback/system build clean. Native playback still constructs tracked ActorTimeline state facade until its own conversion. Native media/audio metadata import surfaced explicit StringName inference needed for dimension choice; fixed in timeline_editor.gd. Shader-time parser2 passes; rig/physics fixture dependencies recheck pending after dimension annotation. Media fixture previous time annotated float, assertions unchanged. ActorAudio shared-source cache schema/mutex state/API converted; initial generated method enumeration missed return-valued adapters, restored all typed wrappers before metadata registration. Static overload calls in GD adapted through native script callv; native C# consumers use CSharpScript. Current final source API build pending. No runtime/behavioral test or application export/package/recording performed; full queue incomplete.
+
+Shared audio source/cache/FLAC native API build clean; native_audio_source_import no script errors (certificate-store diagnostic), rig/physics/media/source/PCM/filesystem parsers now pass after dimension/media inference annotations. ActorAnimation/ActorTransformationStates/ActorPropertyBatch/ActorFileImport native schemas/API integrated; static GD overload callv paths retained, native static transformation asset cache and all known consumers converted. Builds clean and native_animation_batch_import no script errors; inspector/physics parser pass, keyframe fixture needed explicit native ActorRuntime/ActorObjectData types (assertions unchanged), recheck pending. Actor runtime inheritance family inspected for next atomic migration: base, basic/point/video/UI/environment plus skeleton rig and transform-image UI derived classes and nested visual. No runtime acceptance tests or exports/packages/recordings performed. Entire migration/test migration/feature queue remains incomplete.
+
+Atomic ActorRuntime inheritance migration integrated: ActorRuntime, BasicActorRuntime, PointActorRuntime, VideoActorRuntime, ActorUIRuntime/ActorUIVisual, ActorSkeletonRigRuntime, ActorTransformImage2DRuntime, EnvironmentActorRuntime, KiwiPowderRuntime and KiwiFluidRuntime. Ten original GD scripts and UID sidecars retired after native family compiled. Every native state field compared to old facade (basic28, point2, video7, UI15, environment9; none missing), all six BasicActor constant tables transferred into native BasicActorDefaults. Preserved inherited overrides, shader watcher cleanup, skeleton pose initialization, shared UI solid texture, environment source job lifecycle and physics presentation. Basic ready no longer clears preinitialized fluid/powder content nodes; native overrides preserve grain material dispatch. ActorDefinition validates native runtime type and returns ActorRuntime; scenes/type checks/callers and legacy UID/path mappings updated. Builds clean 0 warnings/errors; native_actor_runtime_family_import no script errors (certificate-store diagnostic), native_runtime_smoke_parser/native_animation_keyframes_parser2/native_runtime_timeline_parser/native_runtime_picker_parser pass. Rig fixture needs two native property inference annotations, pending recheck. No behavioral tests/GPU or user-workflow acceptance executed; entire migration and feature queue incomplete; no export/package/recording performed.

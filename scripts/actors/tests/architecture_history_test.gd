@@ -1,6 +1,6 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Buildings=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_session.gd")
-const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/building_source.gd")
+const Source=preload("res://Workspaces/EnvironmentWorkspace/architecture/BuildingSource.cs")
 func run() -> void:
 	var session:=KiwiEnvironmentSession.new(); var building:=Buildings.add(session,Vector3(5,0,3),2); var id:=building.id; var wall_id:=id+":floor0:wall:wall0"; var wall:=session.document.component(wall_id); var vertices:=wall.mesh.vertices.duplicate(); var material:=wall.surface_materials[0]; var source:=Buildings.source(building)
 	check(session.document.validate().is_empty() and session.document.world_transform(building).origin==Vector3(5,0,3),"Building integrates into the shared environment hierarchy at its placed pose")

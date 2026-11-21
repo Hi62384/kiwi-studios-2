@@ -1,6 +1,6 @@
 extends SceneTree
 ## Run with a real renderer to verify rendering, baking and saved material masks.
-const Library = preload("res://Workspaces/ImageWorkspace/texture_material_library.gd")
+const Library = preload("res://scripts/materials/NaturalMaterialCatalog.cs")
 var failures := 0
 var checks := 0
 

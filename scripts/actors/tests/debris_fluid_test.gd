@@ -10,7 +10,7 @@ func fixture(gravity: float=0) -> Dictionary:
 	var controller:=KiwiTimelinePhysics.new(); var model:=ActorTimeline.new(); controller._model=model
 	var registry:=ActorRegistry.new(); BasicActors.register_all(registry); var actor:=registry.get_definition(&"basic_shape").create_actor({&"physics":{"enabled":true,"gravity":gravity,"damping":0.0,"angular_damping":0.0},&"debris_enabled":true}); var fluid:=KiwiFluidDefinition.create().create_actor({&"fluid_spacing":.2,&"fluid_quality":1})
 	actor.values[&"physics"]={"enabled":true,"gravity":gravity,"damping":0.0,"angular_damping":0.0}
-	model.actors.assign([actor,fluid]); model.clips.assign([ActorClip.create(actor),ActorClip.create(fluid)])
+	model.actors.assign([actor,fluid]); model.clips.assign([(load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip),(load("res://scripts/actors/core/ActorClip.cs").call("create",fluid) as ActorClip)])
 	for i in model.actors.size(): controller.prototypes[model.actors[i].id]={"actor":model.actors[i],"clip":model.clips[i],"geometry":{"meshes":[],"bounds":AABB(-Vector3.ONE*.05,Vector3.ONE*.1)}}
 	var state:={"type":6,"active":true,"initialized":true,"pose":Transform3D.IDENTITY,"v":Vector3.ZERO}; var points:=PackedVector3Array()
 	for x in range(-2,3):

@@ -6,7 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://8vmiy3qcy1nq" path="res://resources/Images/BasicImages/Plus.png" id="3_rarhs"]
 [ext_resource type="StyleBox" uid="uid://ck4h6q1rp4uqc" path="res://resources/StyleBoxes/Default.tres" id="4_rarhs"]
 [ext_resource type="PackedScene" uid="uid://vmu5rxoalk8x" path="res://CustomNodes/FileSystem/file_system.tscn" id="6_3p2gp"]
-[ext_resource type="Script" uid="uid://cbpyo2oo61yst" path="res://Workspaces/SceneWorkspace/scripts/Viewport/viewport_focusable_key_input.gd" id="7_nfivy"]
+[ext_resource type="Script" path="res://Workspaces/SceneWorkspace/scripts/Viewport/ViewportFocusableKeyInput.cs" id="7_nfivy"]
 [ext_resource type="SystemFont" uid="uid://bwdt8qysdchp6" path="res://resources/fonts/ReemKufi.tres" id="8_1nqs0"]
 [ext_resource type="PackedScene" uid="uid://nk3th1hepl7n" path="res://CustomNodes/Freecam/Freecam.tscn" id="16_bb450"]
 [ext_resource type="Environment" uid="uid://bngpc7xkudi0e" path="res://resources/environments/DefaultEnvironment.tres" id="17_bb450"]

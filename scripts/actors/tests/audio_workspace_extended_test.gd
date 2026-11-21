@@ -1,21 +1,6 @@
 extends SceneTree
 var failed:=0
-class SimulatedRecorder extends ActorAudioRecorder:
- var recorded:AudioStreamWAV
- var starts:=0
- func _process(_delta:float)->void:pass
- func start()->String:
-  starts+=1;recording=true;return ""
- func stop()->AudioStreamWAV:
-  recording=false
-  await get_tree().create_timer(0.03).timeout
-  return recorded
- func stop_to_files()->Dictionary:
-  recording=false
-  await get_tree().create_timer(.03).timeout
-  var directory:=ProjectSettings.globalize_path("user://audio_workspace/takes/"+ActorData.new_id());DirAccess.make_dir_recursive_absolute(directory)
-  var path:=directory.path_join("microphone.wav");recorded.save_to_wav(path)
-  return {"directory":directory,"paths":[path],"mono":false,"error":""}
+const SimulatedRecorder = preload("res://scripts/actors/tests/fixtures/SimulatedAudioRecorder.cs")
 func check(condition:bool,label:String)->void:
  if not condition:failed+=1;push_error(label)
  print("PASS " if condition else "FAIL ",label)
@@ -28,18 +13,18 @@ func test()->void:
  var workspace:=KiwiAudioWorkspace.new();workspace.recorder.free();var recorder:=SimulatedRecorder.new();workspace.recorder=recorder
  var samples:=PackedVector2Array();samples.resize(4410)
  for i in samples.size():samples[i]=Vector2.ONE*sin(TAU*400*i/44100.0)*0.1
- recorder.recorded=KiwiAudioSourceCache.to_wav(samples)
+ recorder.recorded=KiwiAudioSourceCache.to_wav(samples,44100,true)
  root.add_child(workspace);await process_frame
  var doc:=KiwiAudioDocument.from_source(null,"Recording target");doc.time_signature=Vector2i(6,8);doc.loop_enabled=true
  workspace.open_source(doc)
  check(workspace.loop_button.button_pressed and workspace.meter_input.get_item_text(workspace.meter_input.selected)=="6/8","toolbar restores document meter and loop")
- var original_count:=workspace.session.document.tracks.size()
+ var original_count: int =workspace.session.document.tracks.size()
  workspace._library_add({"kind":"instrument","id":"piano","label":"Test piano"})
  check(workspace.session.document.tracks.size()==original_count+1 and workspace.session.document.clips.size()==1,"library instrument creates track and pattern")
  workspace.undo();await process_frame
  check(workspace.session.document.tracks.size()==original_count and workspace.session.document.clips.is_empty(),"instrument creation is one undo action")
  workspace.redo();await process_frame
- var clip:=workspace.session.document.clips[0];workspace.session.select(clip.id)
+ var clip: ActorClip =workspace.session.document.clips[0];workspace.session.select(clip.id)
  var effect:=KiwiAudioEffects.create("lowpass");workspace.session.primary_actor().values[&"effects"]=[effect]
  workspace.effect_automation_dialog(0);await process_frame
  var editors:Array=[]
@@ -66,11 +51,11 @@ func test()->void:
  check(not notifications.is_empty() and notifications[0]==target_session,"background take marks original tab dirty")
  target_session.undo()
  check(target_session.document.clips.is_empty() and target_session.document.takes.is_empty(),"one undo removes recorded clip and take metadata")
- workspace.open_source(KiwiAudioDocument.from_source(recorder.recorded,"Freeze source"));var freeze_id:=workspace.session.selected_track;var original_source:Variant=workspace.session.document.actors[0].values[&"audio"]
+ workspace.open_source(KiwiAudioDocument.from_source(recorder.recorded,"Freeze source"));var freeze_id: String =workspace.session.selected_track;var original_source:Variant=workspace.session.document.actors[0].values[&"audio"]
  workspace.session.document.tracks[0].solo=true;workspace.freeze_track();await wait_jobs(workspace)
- var original_track:=workspace.session.document.track_for_id(freeze_id)
+ var original_track: Dictionary =workspace.session.document.track_for_id(freeze_id)
  check(original_track.has("frozen_track") and original_track.locked and original_track.mute,"freeze produces a rendered replacement and locks source")
- var frozen:=workspace.session.document.track_for_id(str(original_track.get("frozen_track","")))
+ var frozen: Dictionary =workspace.session.document.track_for_id(str(original_track.get("frozen_track","")))
  check(bool(frozen.get("solo",false)) and not original_track.solo,"freeze transfers solo state to audible replacement")
  check(workspace.session.document.actors[0].values[&"audio"]==original_source,"freeze preserves original source resource")
  workspace.session.selected_track=str(frozen.get("id",""));workspace.unfreeze_track();await wait_jobs(workspace)
@@ -81,7 +66,7 @@ func test()->void:
  check(workspace.session.document.tracks.size()==2,"unfreeze is undoable")
  workspace.redo();await process_frame
  check(workspace.session.document.tracks.size()==1,"unfreeze redo restores editable source")
- workspace._countdown=1;var starts:=recorder.starts;workspace.toggle_recording();workspace.open_source(KiwiAudioDocument.from_source(null,"Cancelled countdown"));await create_timer(1.1).timeout
+ workspace._countdown=1;var starts: int =recorder.starts;workspace.toggle_recording();workspace.open_source(KiwiAudioDocument.from_source(null,"Cancelled countdown"));await create_timer(1.1).timeout
  check(recorder.starts==starts and not workspace._record_busy,"tab switch cancels recording countdown")
  workspace.queue_free();await process_frame;await create_timer(0.1).timeout
  print("AUDIO_UI_EXTENDED failures=",failed);quit(failed)

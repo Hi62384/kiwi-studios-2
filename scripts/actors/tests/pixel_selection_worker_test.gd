@@ -13,7 +13,7 @@ func run() -> void:
 	engine.prepare(image,Rect2i(Vector2i.ZERO,image.get_size()))
 	# Request before analysis starts: it must be queued, never erase analysis.
 	engine.request("object",Vector2(500,400),.1)
-	var latest:=engine.request("object",Vector2(500,400),.5)
+	var latest: int =engine.request("object",Vector2(500,400),.5)
 	while result.is_empty() and Time.get_ticks_msec()-started<20000:
 		await process_frame; frames+=1
 	check(not result.is_empty(),"1920×1080 object selection completes asynchronously")
@@ -21,7 +21,7 @@ func run() -> void:
 		check(result[0][2]==latest and result.size()==1,"Only the newest queued request is delivered")
 		check(result[0][0]!=null and result[0][0].get_pixel(750,400).a>.5,"Large-image selection includes multicolored foreground")
 	check(frames>5,"Main-thread processing continues during source analysis")
-	var analyzed:=engine.edges; var cached:=engine.objects
+	var analyzed: KiwiPixelEdgeField =engine.edges; var cached: KiwiPixelObjectSegmenter =engine.objects
 	result.clear(); started=Time.get_ticks_msec()
 	engine.request("object",Vector2(500,400),.4)
 	while result.is_empty() and Time.get_ticks_msec()-started<10000: await process_frame

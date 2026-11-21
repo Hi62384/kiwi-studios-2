@@ -62,25 +62,25 @@ func run() -> void:
 		for property in definition.properties:
 			check(not str(property.options.get("group", "")).is_empty(), property.label + " has an inspector category")
 	for index in definitions.size():
-		var definition := definitions[index]
+		var definition: ActorDefinition = definitions[index]
 		var initial_values := {}
 		if definition.type_id == &"image_3d":
-			var source_image := image_object_definition.create_object()
+			var source_image: ActorObjectData = image_object_definition.create_object()
 			source_image.set_value(&"source", image_test_path)
 			initial_values[&"image_path"] = ActorObjectReference.from_object(source_image)
-		var actor := definition.create_actor(initial_values)
-		var runtime := definition.create_runtime(actor)
+		var actor: ActorData = definition.create_actor(initial_values)
+		var runtime: ActorRuntime = definition.create_runtime(actor) as ActorRuntime
 		check(runtime != null, "Create runtime " + definition.display_name)
 		root.add_child(runtime)
-		runtime.evaluate_clip(ActorClip.create(actor), 1.0)
+		runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip), 1.0)
 		check(runtime.active, "Evaluate " + definition.display_name)
 		if definition.type_id == &"image_3d":
 			var mesh := runtime.get_child(0) as MeshInstance3D
-			var material_property := definition.find_property(&"material")
+			var material_property: ActorProperty = definition.find_property(&"material")
 			check(definition.find_property(&"color") == null and material_property != null, "Image actor replaces Color with Material")
-			check(material_property.file_resource_mode() == ActorProperty.FileResourceMode.EDITABLE, "Material is an editable file resource property")
+			check(material_property.file_resource_mode() == ActorProperty.file_resource_modes().EDITABLE, "Material is an editable file resource property")
 			check(actor.get_value(&"material") == null, "New image defaults to no Material")
-			var material_object := editor.registry.get_object_definition(&"material").create_object()
+			var material_object: ActorObjectData = editor.registry.get_object_definition(&"material").create_object()
 			actor.set_value(&"material", ActorObjectReference.from_object(material_object))
 			check(actor.get_value(&"scale").is_equal_approx(Vector3(1.0, 0.75, 1.0)), "Image actor stores aspect ratio as its dynamic Scale default")
 			check(definition.find_property(&"scale").create_default_for_actor(actor).is_equal_approx(Vector3(1.0, 0.75, 1.0)), "Reset resolves the current image aspect ratio")
@@ -98,7 +98,7 @@ func run() -> void:
 			material_object.set_value(&"emission_enabled", true)
 			material_object.set_value(&"emission_map", image_test_path)
 			material_object.set_value(&"emission_operator", 1)
-			runtime.evaluate_clip(ActorClip.create(actor), 1.0)
+			runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip), 1.0)
 			check((mesh.material_override as StandardMaterial3D).albedo_color == Color.RED, "Image runtime evaluates nested Material properties")
 			var runtime_material := mesh.material_override as StandardMaterial3D
 			check(runtime_material.normal_enabled and runtime_material.normal_texture != null and is_equal_approx(runtime_material.normal_scale, 2.5), "Material evaluates normal map and strength")
@@ -109,15 +109,15 @@ func run() -> void:
 			check(runtime_material.shading_mode == BaseMaterial3D.SHADING_MODE_PER_PIXEL, "Materials are shaded by default")
 			material_object.set_value(&"metallic", 1.75)
 			material_object.set_value(&"roughness", -0.5)
-			runtime.evaluate_clip(ActorClip.create(actor), 1.0)
+			runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip), 1.0)
 			check(runtime_material.metallic == 1.75 and runtime_material.roughness == -0.5, "Runtime preserves values outside inspector slider ranges")
 		runtime.free()
 		# Audio requires a chosen source; audio_test exercises creation and its picker schema.
 		if definition.type_id in [&"audio", &"video", &"video_2d"]: continue
 		if definition.type_id == &"image_3d":
-			var image_property := definition.find_property(&"image_path")
+			var image_property: ActorProperty = definition.find_property(&"image_path")
 			check(image_property != null and image_property.options.get("prompt_on_create", false), "Image actor prompts for its file on creation")
-			var created_image := image_object_definition.create_object()
+			var created_image: ActorObjectData = image_object_definition.create_object()
 			created_image.set_value(&"source", "C:/example/image.png")
 			editor.model.create_actor(definition, 0.0, {&"image_path": ActorObjectReference.from_object(created_image)})
 			var created_reference := editor.model.selected_actor().get_value(&"image_path") as ActorObjectReference
@@ -125,7 +125,7 @@ func run() -> void:
 			var selected_image := editor.model.selected_actor()
 			check(selected_image.get_value(&"material") == null, "Timeline-created image has an empty Material slot")
 			var material_definition := editor.registry.get_object_definition(&"material")
-			var selected_material := material_definition.create_object()
+			var selected_material: ActorObjectData = material_definition.create_object()
 			selected_image.set_value(&"material", ActorObjectReference.from_object(selected_material))
 			editor.model.edit_object_property(selected_image, selected_material, material_definition, &"tint", Color.BLUE)
 			check(selected_material.get_value(&"tint") == Color.BLUE, "Nested Material edit changes actor resource")
@@ -140,7 +140,7 @@ func run() -> void:
 		check(editor.model.clips.is_empty(), "Undo new actor")
 	DirAccess.remove_absolute(image_test_path)
 	var image_definition := editor.registry.get_definition(&"image_3d")
-	var source_property := image_object_definition.find_property(&"source")
+	var source_property: ActorProperty = image_object_definition.find_property(&"source")
 	var image_extensions: PackedStringArray = source_property.options.get("extensions", [])
 	check(ActorProjectFilePicker.is_allowed_path(ActorProjectFilePicker.root_directory(), ProjectSettings.globalize_path("res://resources/Images/ActorIcons/Image3D.svg"), image_extensions), "Project image picker accepts supported files inside project")
 	check(not ActorProjectFilePicker.is_allowed_path(ActorProjectFilePicker.root_directory(), image_test_path, image_extensions), "Project image picker rejects files outside project")
@@ -166,7 +166,7 @@ func run() -> void:
 	check(ActorProjectFilePicker.is_allowed_path(ActorProjectFilePicker.root_directory(), ProjectSettings.globalize_path("res://project.godot"), PackedStringArray()), "Empty extension filter supports any project file type")
 	asset_picker.free()
 	var dropped_material_path := ProjectSettings.globalize_path("res://actor_drop_test_" + ActorData.new_id() + ".tres")
-	var dropped_material := editor.registry.get_object_definition(&"material").create_object()
+	var dropped_material: ActorObjectData = editor.registry.get_object_definition(&"material").create_object()
 	check(ResourceSaver.save(dropped_material, dropped_material_path) == OK, "Create temporary project Material for drag-and-drop")
 	var save_dialog := ActorProjectResourceSaveDialog.new()
 	root.add_child(save_dialog)
@@ -199,7 +199,7 @@ func run() -> void:
 	drag_source.free()
 	var ui_model := ActorTimeline.new()
 	var ui_image_definition := editor.registry.get_definition(&"image_3d")
-	var ui_image_object := image_object_definition.create_object()
+	var ui_image_object: ActorObjectData = image_object_definition.create_object()
 	ui_image_object.set_value(&"source", "C:/missing.png")
 	ui_model.create_actor(ui_image_definition, 0.0, {&"image_path": ActorObjectReference.from_object(ui_image_object)})
 	ui_image_object = (ui_model.selected_actor().get_value(&"image_path") as ActorObjectReference).embedded
@@ -207,7 +207,7 @@ func run() -> void:
 	legacy_material.type_id = &"material"
 	legacy_material.values = {&"tint": Color.WHITE}
 	var inspector_material_definition := editor.registry.get_object_definition(&"material")
-	var roughness_property := inspector_material_definition.find_property(&"roughness")
+	var roughness_property: ActorProperty = inspector_material_definition.find_property(&"roughness")
 	check(inspector_material_definition.value_for(legacy_material, roughness_property) == roughness_property.create_default(), "Older Materials use schema defaults for missing properties")
 	check(inspector_material_definition.find_property(&"normal_map") != null and inspector_material_definition.find_property(&"normal_strength") != null, "Material schema includes normal map and strength")
 	check(inspector_material_definition.find_property(&"uv_scale") != null
@@ -295,9 +295,9 @@ func run() -> void:
 	check(not material_slot._can_drop_data(Vector2.ZERO, image_payload), "Material slot rejects image drags")
 	material_slot._drop_data(Vector2.ZERO, material_payload)
 	var dropped_reference := ui_model.selected_actor().get_value(&"material") as ActorObjectReference
-	check(dropped_reference != null and dropped_reference.source == ActorObjectReference.Source.ASSET and dropped_reference.asset_id == dropped_material_path, "Dropping a Material assigns the filesystem resource")
+	check(dropped_reference != null and dropped_reference.source == ActorObjectReference.source_modes().ASSET and dropped_reference.asset_id == dropped_material_path, "Dropping a Material assigns the filesystem resource")
 	ui_model.undo()
-	check((ui_model.selected_actor().get_value(&"material") as ActorObjectReference).source == ActorObjectReference.Source.EMBEDDED, "Material file drop participates in undo")
+	check((ui_model.selected_actor().get_value(&"material") as ActorObjectReference).source == ActorObjectReference.source_modes().EMBEDDED, "Material file drop participates in undo")
 	resource_inspector._rebuild_selected()
 	material_slot = resource_inspector.find_child("material_resource", true, false) as ActorResourceSlot
 	var active_material := (ui_model.selected_actor().get_value(&"material") as ActorObjectReference).embedded
@@ -367,7 +367,7 @@ func run() -> void:
 	var resource_menu := material_slot.get_child(0) as PopupMenu
 	check(resource_menu != null and resource_menu.get_item_text(resource_menu.get_item_index(100)) == "New Material" and resource_menu.get_item_text(resource_menu.get_item_index(101)) == "New Natural Material" and resource_menu.get_item_text(resource_menu.get_item_index(102)) == "New ShaderMaterial" and resource_menu.get_item_text(resource_menu.get_item_index(1)) == "Load from project…" and resource_menu.get_item_text(resource_menu.get_item_index(2)) == "Make Unique" and resource_menu.get_item_text(resource_menu.get_item_index(3)) == "Save As…" and resource_menu.get_item_text(resource_menu.get_item_index(4)) == "Clear", "Material context menu provides all three compatible creation types and resource actions")
 	var ui_actor := ui_model.selected_actor()
-	var material_property := ui_image_definition.find_property(&"material")
+	var material_property: ActorProperty = ui_image_definition.find_property(&"material")
 	check(material_property.accepts(null), "Editable resource property can be cleared")
 	ui_model.edit_property(ui_actor, ui_image_definition, &"material", null)
 	check(ui_actor.get_value(&"material") == null, "Clear removes the Material resource")
@@ -380,12 +380,12 @@ func run() -> void:
 	picker.search.text = "basic shape"
 	picker.rebuild()
 	check(picker._matches.size() == 2 and definitions[picker._matches[0]].type_id == &"basic_shape", "Search includes 2D and 3D basic shapes")
-	var shape_card := picker.cards.find_child("Actor_basic_shape", true, false)
+	var shape_card: Node = picker.cards.find_child("Actor_basic_shape", true, false)
 	check(shape_card != null and shape_card.find_children("*", "TextureRect", true, false).size() == 1, "Picker card displays actor icon")
 	picker.category = "Lighting"
 	picker.search.text = ""
 	picker.rebuild()
-	var lighting_types := picker._matches.map(func(index: int): return definitions[index].type_id)
+	var lighting_types: Array = picker._matches.map(func(index: int): return definitions[index].type_id)
 	check(picker._matches.size() == 6 and lighting_types.has(&"global_fog") and lighting_types.has(&"light_3d") and lighting_types.has(&"directional_light")
 		and lighting_types.has(&"world_environment") and lighting_types.has(&"fog_volume")
 		and lighting_types.has(&"reflection_probe"), "Category filter")

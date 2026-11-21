@@ -1,6 +1,6 @@
 extends SceneTree
 
-const ShaderTime = preload("res://scripts/actors/core/actor_shader_time.gd")
+const ShaderTime = preload("res://scripts/actors/core/ActorShaderTime.cs")
 var failures := 0
 
 
@@ -40,13 +40,13 @@ void fragment() { ALBEDO = vec3(TIME / 5.0); }
 	BasicActors.register_all(registry)
 	var shader := Shader.new()
 	shader.code = source
-	var object := registry.get_object_definition(&"shader_material").create_object()
+	var object: ActorObjectData = registry.get_object_definition(&"shader_material").create_object()
 	object.set_value(&"shader_path", shader)
-	var actor := registry.get_definition(&"basic_shape").create_actor()
+	var actor: ActorData = registry.get_definition(&"basic_shape").create_actor()
 	actor.set_value(&"material", ActorObjectReference.from_object(object))
-	var runtime := registry.get_definition(&"basic_shape").create_runtime(actor)
+	var runtime: ActorRuntime = registry.get_definition(&"basic_shape").create_runtime(actor)
 	root.add_child(runtime)
-	var clip := ActorClip.create(actor)
+	var clip := (load("res://scripts/actors/core/ActorClip.cs").call("create",actor) as ActorClip)
 	runtime.evaluate_clip(clip, 2.25)
 	var material := runtime.get("shader_material") as ShaderMaterial
 	check(material != null and material.shader != shader and shader.code == source,
@@ -58,7 +58,7 @@ void fragment() { ALBEDO = vec3(TIME / 5.0); }
 		"Scrubbing updates the time uniform without recompilation")
 	var sky_shader := Shader.new()
 	sky_shader.code = "shader_type sky; void sky() { COLOR = vec3(TIME); }"
-	var sky_object := registry.get_object_definition(&"shader_material").create_object()
+	var sky_object: ActorObjectData = registry.get_object_definition(&"shader_material").create_object()
 	sky_object.set_value(&"shader_path", sky_shader)
 	var sky_material := runtime.call("_create_shader_material", sky_object) as ShaderMaterial
 	var sky_uniform := str(sky_material.get_meta("kiwi_time_uniform", ""))
@@ -71,14 +71,14 @@ void fragment() { ALBEDO = vec3(TIME / 5.0); }
 	runtime.set_timeline_time(1.5)
 	check(is_equal_approx(float(sky_material.get_shader_parameter(sky_uniform)), 1.5),
 		"Sky material receives timeline time")
-	var environment_object := registry.get_object_definition(&"environment").create_object()
+	var environment_object: ActorObjectData = registry.get_object_definition(&"environment").create_object()
 	environment_object.set_value(&"background_mode", 3)
 	environment_object.set_value(&"sky_material", ActorObjectReference.from_object(sky_object))
-	var environment_actor := registry.get_definition(&"world_environment").create_actor()
+	var environment_actor: ActorData = registry.get_definition(&"world_environment").create_actor()
 	environment_actor.set_value(&"environment", ActorObjectReference.from_object(environment_object))
-	var environment_runtime := registry.get_definition(&"world_environment").create_runtime(environment_actor)
+	var environment_runtime: ActorRuntime = registry.get_definition(&"world_environment").create_runtime(environment_actor)
 	root.add_child(environment_runtime)
-	environment_runtime.evaluate_clip(ActorClip.create(environment_actor), 1.5)
+	environment_runtime.evaluate_clip((load("res://scripts/actors/core/ActorClip.cs").call("create",environment_actor) as ActorClip), 1.5)
 	var live_environment := environment_runtime.get("_world_environment_resource") as Environment
 	check(live_environment.sky != null and live_environment.sky.process_mode == Sky.PROCESS_MODE_REALTIME,
 		"Animated sky uses real-time radiance updates after TIME replacement")

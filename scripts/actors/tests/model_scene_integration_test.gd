@@ -22,7 +22,7 @@ func width(editor: ActorTimelineEditor, clip_id: String) -> float:
 func run() -> void:
 	root.size=Vector2i(1440,1000); root.gui_embed_subwindows=true
 	var folder := ProjectSettings.globalize_path("user://model_project_"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash"))
-	var project := Project.new("Model integration"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(ProjectSettings.globalize_path(folder.path_join(".proj/Project.tres"))); StaticData.loaded_project=project
+	var project := Project.create("Model integration"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(ProjectSettings.globalize_path(folder.path_join(".proj/Project.tres"))); StaticData.set_loaded_project(project)
 	var main: Node=load("res://scenes/Main.tscn").instantiate(); root.add_child(main); await settle(); await settle()
 	var tabs := get_first_node_in_group("actor_scene_tabs") as ActorSceneTabs
 	tabs.new_model(); await settle(); var workspace := tabs.model_workspace
@@ -73,5 +73,5 @@ func run() -> void:
 	tabs._capture_current(); tabs._open_index(1); await settle(); check(workspace.session.primary().mesh.vertices[0].x<-.9,"Switching models retains each document and its editing history")
 	tabs.new_image(); await settle(); check(tabs.image_workspace.visible and not workspace.visible,"Image workspace stays isolated from modeling world")
 	tabs._capture_current(); tabs._open_index(0); await settle(); check(tabs.scene_workspace.visible and not workspace.visible,"Scene workspace restores normally after modeling/image tabs")
-	main.queue_free(); await process_frame; await process_frame; StaticData.loaded_project=null
+	main.queue_free(); await process_frame; await process_frame; StaticData.set_loaded_project(null)
 	print("MODEL_SCENE_INTEGRATION checks=%d failures=%d"%[checks,failures]); quit(failures)

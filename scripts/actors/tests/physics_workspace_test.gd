@@ -23,7 +23,7 @@ func click_point(point: Vector2) -> void:
 func run() -> void:
 	root.size=Vector2i(1600,1000); root.gui_embed_subwindows=true
 	var folder:=ProjectSettings.globalize_path("user://physics_workspace_"+ActorData.new_id()); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash"))
-	var project:=Project.new("Physics verification"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.loaded_project=project
+	var project:=Project.create("Physics verification"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.set_loaded_project(project)
 	var main: Node=load("res://scenes/Main.tscn").instantiate(); root.add_child(main); await settle(12)
 	var tabs:=get_first_node_in_group("actor_scene_tabs") as ActorSceneTabs; editor=tabs.timeline
 	var floor_clip:=editor.model.create_actor(editor.registry.get_definition(&"basic_shape"),0,{&"position":Vector3(0,-.5,0),&"box_size":Vector3(10,1,10)})

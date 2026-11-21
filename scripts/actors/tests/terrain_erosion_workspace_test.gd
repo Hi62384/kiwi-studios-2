@@ -1,7 +1,7 @@
 extends "res://scripts/actors/tests/surface_growth_test.gd"
 const Workspace=preload("res://Workspaces/EnvironmentWorkspace/environment_workspace.gd")
 func run() -> void:
-	root.size=Vector2i(1280,800); var folder:=ProjectSettings.globalize_path("user://terrain-erosion-workspace"); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.new("Terrain erosion"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.loaded_project=project
+	root.size=Vector2i(1280,800); var folder:=ProjectSettings.globalize_path("user://terrain-erosion-workspace"); DirAccess.make_dir_recursive_absolute(folder.path_join(".proj/.trash")); var project:=Project.create("Terrain erosion"); ResourceSaver.save(project,folder.path_join(".proj/Project.tres")); project.take_over_path(folder.path_join(".proj/Project.tres")); StaticData.set_loaded_project(project)
 	var document:=KiwiEnvironmentDocument.new(); var source:=KiwiEnvironmentTerrain.new(); source.amplitude=10.; source.generation=KiwiTerrainGenerator.preset(2); var item:=document.add_terrain(source); var workspace:=Workspace.new(); root.add_child(workspace); check(workspace.open_source(document),"Steep generated terrain opens as a valid editable environment")
 	workspace.session.select(item.id); workspace._advanced_generation=true; workspace._refresh_properties()
 	for i in 8: await process_frame

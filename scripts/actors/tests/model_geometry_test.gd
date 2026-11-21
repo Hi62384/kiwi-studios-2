@@ -66,7 +66,7 @@ func run() -> void:
 	check(sphere.get_faces()==original,"Import conversion leaves original shared source unchanged")
 	var invalid := box.copy_mesh(); invalid.faces[0][0]=999
 	check(not invalid.validate().is_empty(),"Invalid imported indices are detected without accessing out-of-bounds geometry")
-	var graph := preload("res://Workspaces/ModelWorkspace/model_selection.gd")
+	var graph := preload("res://Workspaces/ModelWorkspace/KiwiModelSelection.cs")
 	var grown := graph.expand(box,"Face",PackedInt32Array([0]),"Grow selection")
 	check(grown.size()==5,"Grow advances one adjacent-face ring, not the entire connected object")
 	check(graph.expand(box,"Face",grown,"Shrink selection")==PackedInt32Array([0]),"Shrink removes boundary faces rather than growing selection")

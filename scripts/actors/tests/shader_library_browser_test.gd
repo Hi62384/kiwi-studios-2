@@ -1,7 +1,7 @@
 extends SceneTree
 const Browser = preload("res://Workspaces/ShaderWorkspace/shader_sample_browser.gd")
 const Application = preload("res://Workspaces/ShaderWorkspace/shader_sample_application.gd")
-const Preview = preload("res://Workspaces/ShaderWorkspace/shader_sample_preview.gd")
+const Preview = preload("res://Workspaces/ShaderWorkspace/ShaderSamplePreview.cs")
 var failures := 0
 
 func _initialize() -> void:
@@ -26,7 +26,7 @@ func run() -> void:
 	check(not Application.target_for_model(model, registry, "spatial").has("actor"), "No selection disables apply")
 	var definition := registry.get_definition(&"basic_shape")
 	var actor := definition.create_actor()
-	var clip := ActorClip.create(actor, 0.0, 5.0)
+	var clip := (load("res://scripts/actors/core/ActorClip.cs").call("create",actor, 0.0, 5.0) as ActorClip)
 	model.actors.append(actor)
 	model.clips.append(clip)
 	model.selected_id = clip.id
@@ -49,7 +49,7 @@ func run() -> void:
 	check(actor.get_value(&"material") != null, "Redo restores sample material")
 	var sky_definition := registry.get_definition(&"world_environment")
 	var sky_actor := sky_definition.create_actor()
-	var sky_clip := ActorClip.create(sky_actor, 0, 5)
+	var sky_clip := (load("res://scripts/actors/core/ActorClip.cs").call("create",sky_actor, 0, 5) as ActorClip)
 	model.actors.append(sky_actor)
 	model.clips.append(sky_clip)
 	model.selected_id = sky_clip.id
@@ -72,7 +72,7 @@ func run() -> void:
 	runtime.queue_free()
 	model.history.undo()
 	check(sky_actor.get_value(&"environment") == null, "Sky assignment undo restores previous environment")
-	var fixture := Preview.test_texture().get_image()
+	var fixture: Image = Engine.get_singleton("KiwiNativeServices").call("service","shader_preview_assets").call("test_texture").get_image()
 	check(fixture.get_width() == 192 and fixture.get_pixel(0, 0).a < 0.01, "Actual canvas test image includes transparent edges")
 	var popup := ShaderDocumentationPopup.new()
 	root.add_child(popup)
